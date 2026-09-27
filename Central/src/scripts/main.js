@@ -3,11 +3,10 @@
    Entrar com a senha, ver as lojas, criar uma loja nova (com o passo a
    passo na tela), mandar o convite, atualizar, reativar e excluir.
    ========================================================== */
-import { html, montar } from "/src/scripts/base/html.js";
+import { bruto, html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
-import { TEMAS, gerarTokens } from "/src/scripts/base/tema.js";
 
 const raiz = document.getElementById("raiz");
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -33,57 +32,67 @@ async function api(metodo, caminho, corpo) {
 const marca = html`<span class="marca-central"><span class="marca-central__selo">${icone("cupcake", { tamanho: 22 })}</span>
   <span><strong>Forminha</strong><small>Central</small></span></span>`;
 
+/* ---------- claro / escuro ---------- */
+const CHAVE_TEMA = "forminha:central-tema";
+const SVG_TEMA = {
+  claro: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
+  escuro: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>',
+};
+const temaAtual = () => document.documentElement.dataset.tema === "escuro" ? "escuro" : "claro";
+/** Botão sol/lua: mostra o ícone do tema para onde vai trocar. */
+const botaoTema = (classe = "") => {
+  const vai = temaAtual() === "escuro" ? "claro" : "escuro";
+  return html`<button type="button" class="tema-botao ${classe}" data-acao="tema" aria-label="Usar tema ${vai}" title="Tema ${vai}">${bruto(SVG_TEMA[temaAtual()])}</button>`;
+};
+function trocarTema(tema) {
+  document.documentElement.dataset.tema = tema;
+  for (const b of document.querySelectorAll('[data-acao="tema"]')) {
+    const vai = tema === "escuro" ? "claro" : "escuro";
+    b.innerHTML = SVG_TEMA[tema];
+    b.setAttribute("aria-label", `Usar tema ${vai}`);
+    b.title = `Tema ${vai}`;
+  }
+}
+document.addEventListener("click", (ev) => {
+  if (!ev.target.closest('[data-acao="tema"]')) return;
+  const novo = temaAtual() === "escuro" ? "claro" : "escuro";
+  try { localStorage.setItem(CHAVE_TEMA, novo); } catch { /* modo privado */ }
+  trocarTema(novo);
+});
+// sem escolha guardada, acompanha o computador/celular quando ele muda de tema
+window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", (ev) => {
+  let escolhido = null;
+  try { escolhido = localStorage.getItem(CHAVE_TEMA); } catch { /* modo privado */ }
+  if (!escolhido) trocarTema(ev.matches ? "escuro" : "claro");
+});
+
 /* ---------- entrar ---------- */
-const VANTAGENS = [
-  ["bolo", "Loja e painel no ar em minutos", "Banco, sites e tabelas se montam sozinhos."],
-  ["mensagem", "Convite pronto para o WhatsApp", "A dona cria o acesso e já cai no painel dela."],
-  ["escudo", "Cada loja no seu cantinho", "Código próprio e dados separados das outras."],
-];
-
-/** As bolinhas dos temas prontos (com as cores de verdade de cada um). */
-const amostraDeTemas = () => html`<ul class="entrar__temas" aria-label="Temas prontos">${TEMAS.map((t) => {
-  const c = gerarTokens({ tema: t.id });
-  return html`<li title="${t.nome}" style="background:linear-gradient(135deg, ${c["--marca-300"]} 50%, ${c["--escura"]} 50%)"></li>`;
-})}</ul>`;
-
 function telaEntrar(aviso = "") {
   document.title = "Entrar — Forminha";
   montar(raiz, html`
     <main class="entrar">
-      <section class="entrar__vitrine">
-        <div class="entrar__vitrine-miolo">
-          ${marca}
-          <h1>Cada doceria com a <span class="script">sua</span> loja.</h1>
-          <p class="entrar__lema">Crie em minutos a loja online e o painel de uma cliente — e acompanhe todas daqui.</p>
-          <ul class="entrar__vantagens">${VANTAGENS.map(([ic, titulo, texto]) => html`
-            <li><span class="entrar__ico">${icone(ic, { tamanho: 18 })}</span><div><strong>${titulo}</strong><small>${texto}</small></div></li>`)}</ul>
-          <div class="entrar__rodape-vitrine">
-            ${amostraDeTemas()}
-            <small>${TEMAS.length} temas prontos — ou as cores da marca de cada cliente</small>
-          </div>
-        </div>
-        <span class="entrar__marca-dagua" aria-hidden="true">${icone("cupcake", { tamanho: 360 })}</span>
+      <section class="entrar__arte" aria-hidden="true">
+        <div class="entrar__centro"><div class="entrar__forminha"></div><span class="entrar__selo">${icone("cupcake", { tamanho: 44 })}</span></div>
+        <p class="entrar__nome">Forminha<small>Central</small></p>
       </section>
-
       <section class="entrar__lado">
+        ${botaoTema("entrar__tema")}
         <div class="entrar__caixa">
-          <p class="entrar__sobre">Central</p>
-          <h2>Entrar</h2>
-          <p class="texto-suave">Use a senha da Central da Forminha.</p>
+          ${marca}
+          <h1>Entrar</h1>
           ${aviso && html`<div class="aviso aviso--aviso">${icone("alerta", { tamanho: 16 })}<span>${aviso}</span></div>`}
           <form id="form-entrar" novalidate>
             <div class="form-erro" data-erro-geral hidden></div>
             ${campo({ nome: "senha", rotulo: "Senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password" autofocus' })}
-            <p class="entrar__caps" data-caps hidden>${icone("alerta", { tamanho: 14 })} O Caps Lock está ligado.</p>
+            <p class="entrar__caps" data-caps hidden>${icone("alerta", { tamanho: 14 })} Caps Lock ligado</p>
             <button type="submit" class="btn btn--primario btn--grande btn--bloco">Entrar ${icone("direita", { tamanho: 17 })}</button>
           </form>
           <details class="entrar__ajuda">
             <summary>Esqueceu a senha?</summary>
-            <p>Por segurança, a senha não fica guardada em lugar nenhum — nem dá para "recuperar". Crie uma nova no computador:
-              na pasta <code>Central</code>, rode <code>npm run configurar</code>.</p>
+            <p>Crie uma nova no computador: na pasta <code>Central</code>, rode <code>npm run configurar</code>.</p>
           </details>
-          <p class="entrar__rodape">${icone("cadeado", { tamanho: 14 })} Conexão protegida · só para quem administra a Forminha</p>
         </div>
+        <p class="entrar__copy">© ${new Date().getFullYear()} Forminha</p>
       </section>
     </main>`);
   const form = raiz.querySelector("form");
@@ -143,7 +152,7 @@ async function telaLojas() {
     <div class="central">
       <header class="topo-central">
         ${marca}
-        <button type="button" class="btn btn--suave btn--pequeno" data-acao="sair">${icone("sair", { tamanho: 15 })} Sair</button>
+        <div class="topo-central__acoes">${botaoTema()}<button type="button" class="btn btn--suave btn--pequeno" data-acao="sair">${icone("sair", { tamanho: 15 })} Sair</button></div>
       </header>
       <main class="central__corpo">
         ${eu.simulado && html`<div class="aviso aviso--info">${icone("info", { tamanho: 16 })}<span><strong>Modo de teste:</strong> nada é criado de verdade no Supabase nem na Vercel.</span></div>`}

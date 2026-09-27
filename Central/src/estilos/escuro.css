@@ -1,0 +1,79 @@
+/* ==========================================================
+   TEMA ESCURO DA CENTRAL — as mesmas variáveis do tema claro,
+   com valores escuros e quentes (café), e os poucos componentes
+   que usam branco fixo trocados por superfícies escuras.
+   Contraste de texto conferido: ≥ 4,5:1 em todo texto comum.
+   ========================================================== */
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --superficie: #1b1916;
+  --superficie-alta: #221f1b;
+  --fundo: #12100e;          --fundo-rgb: 18 16 14;
+  --texto: #ece6df;
+  --texto-suave: #a9a198;
+  --texto-apagado: #756e67;
+  --borda: #2f2b27;
+  --borda-forte: #3d3833;
+  --neutro-bg: #26221e;
+  --creme: #1b1916;
+  --marca-25: #171512;  --marca-50: #1b1916;  --marca-100: #25221e;  --marca-200: #2f2b26;
+  --marca-300: #3b3630; --marca-400: #5b5248; --marca-500: #7b6e60;
+  --marca-destaque: #d2b48c;
+  --marca-texto: #e3cda9;
+  --escura: #f3ede6;          --escura-rgb: 243 237 230;
+  --escura-hover: #ffffff;
+  --escura-brilho: #2c2621;
+  --profunda: #0b0a09;        --profunda-rgb: 11 10 9;
+  --profunda-hover: #000000;
+  --detalhe: #c6a579;         --detalhe-rgb: 198 165 121;
+  --detalhe-claro: #5e4f3c;   --detalhe-claro-rgb: 94 79 60;
+  --sobre-profunda: #efe8e0;
+  --sobre-profunda-suave: #cfc7be;
+  --sobre-profunda-apagado: #978e85;
+  --sucesso: #6fcf9b;  --sucesso-bg: #16302a;
+  --aviso: #f0c078;    --aviso-bg: #33270f;
+  --info: #9cc0f5;     --info-bg: #172538;
+  --perigo: #ff8fa6;   --perigo-bg: #3b1820;
+  --sombra-sm: 0 1px 2px rgb(0 0 0 / .4), 0 2px 8px rgb(0 0 0 / .3);
+  --sombra: 0 2px 4px rgb(0 0 0 / .35), 0 12px 32px rgb(0 0 0 / .45);
+  --sombra-forte: 0 4px 8px rgb(0 0 0 / .4), 0 24px 56px rgb(0 0 0 / .6);
+}
+
+/* superfícies que no claro são brancas */
+[data-tema="escuro"] .loja,
+[data-tema="escuro"] .convite-pronto__link,
+[data-tema="escuro"] .btn-icone--contorno,
+[data-tema="escuro"] .qtd,
+[data-tema="escuro"] .opcao { background: var(--superficie); }
+[data-tema="escuro"] .modal__caixa { background: var(--superficie-alta); }
+[data-tema="escuro"] .campo input,
+[data-tema="escuro"] .campo select,
+[data-tema="escuro"] .campo textarea { background: #15130f; color: var(--texto); }
+[data-tema="escuro"] .campo input:focus,
+[data-tema="escuro"] .campo select:focus,
+[data-tema="escuro"] .campo textarea:focus { background: #15130f; box-shadow: 0 0 0 4px rgb(var(--detalhe-rgb) / .18); border-color: var(--detalhe); }
+[data-tema="escuro"] .vazio__ico { background: radial-gradient(circle at 30% 25%, var(--marca-300), var(--marca-100) 70%); }
+
+/* botão principal: claro sobre o fundo escuro */
+[data-tema="escuro"] .btn--primario { background: var(--escura); color: #16130f; box-shadow: 0 6px 18px rgb(0 0 0 / .45); }
+[data-tema="escuro"] .btn--primario:hover { background: #ffffff; }
+[data-tema="escuro"] .btn--primario.carregando::after { border-color: #16130f transparent #16130f transparent; }
+[data-tema="escuro"] .btn--perigo-suave:hover { background: #4b1f2a; }
+
+/* avisos e selos com texto claro */
+[data-tema="escuro"] .aviso { color: var(--info); }
+[data-tema="escuro"] .aviso--aviso { color: var(--aviso); }
+[data-tema="escuro"] .aviso--perigo { color: var(--perigo); }
+[data-tema="escuro"] .aviso--sucesso { color: var(--sucesso); }
+[data-tema="escuro"] .selo--sucesso { color: var(--sucesso); }
+[data-tema="escuro"] .selo--info { color: var(--info); }
+[data-tema="escuro"] .selo--aviso { color: var(--aviso); }
+[data-tema="escuro"] .selo--perigo { color: var(--perigo); }
+
+/* avisos de mensagem (toasts) ganham borda para não sumir no fundo */
+[data-tema="escuro"] .toast { background: var(--superficie-alta); color: var(--texto); box-shadow: 0 0 0 1px var(--borda-forte), var(--sombra-forte); }
+
+/* troca suave entre claro e escuro */
+@media (prefers-reduced-motion: no-preference) {
+  body, .loja, .modal__caixa, .campo input, .topo-central { transition: background-color .25s, color .25s, border-color .25s; }
+}
