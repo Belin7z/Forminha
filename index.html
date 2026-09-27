@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Luciene Aguiar Confeitaria — Doces feitos com amor</title>
-  <meta name="description" content="Bolos, brigadeiros gourmet, cupcakes, tortas e docinhos para festas. Faça seu pedido online, com entrega ou retirada.">
-  <meta name="theme-color" content="#4f2436">
+  <!-- título, descrição e imagem são trocados pelos da loja na hora do build (build/personalizar.mjs)
+       para aparecerem certinho quando o link é compartilhado no WhatsApp/Instagram -->
+  <title>Loja de doces</title>
+  <meta name="description" content="Bolos, doces e encomendas para festas. Faça seu pedido online, com entrega ou retirada.">
+  <meta name="theme-color" content="#2f2925">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Luciene Aguiar Confeitaria">
-  <meta property="og:title" content="Luciene Aguiar Confeitaria — Doces artesanais feitos com amor">
-  <meta property="og:description" content="Bolos, brigadeiros gourmet, cupcakes, tortas e docinhos para festas. Faça seu pedido online, com entrega ou retirada.">
+  <meta property="og:site_name" content="Loja de doces">
+  <meta property="og:title" content="Loja de doces">
+  <meta property="og:description" content="Bolos, doces e encomendas para festas. Faça seu pedido online, com entrega ou retirada.">
   <meta property="og:locale" content="pt_BR">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -18,8 +20,10 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="src/estilos/main.css">
+  <!-- cores e letras da loja, aplicadas antes de a página aparecer -->
+  <script src="config.js"></script>
+  <script src="/src/scripts/base/tema-inicial.js"></script>
 </head>
 <body>
   <a class="pular" href="#pagina">Ir para o conteúdo</a>
@@ -32,7 +36,6 @@
   <div id="gaveta-fundo" class="gaveta-fundo" hidden></div>
 
   <noscript><p style="padding:2rem;text-align:center">Ative o JavaScript para usar a loja.</p></noscript>
-  <script src="config.js"></script>
   <script src="/src/vendor/supabase.js"></script>
   <script type="module" src="src/scripts/main.js"></script>
 </body>

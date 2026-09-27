@@ -167,7 +167,7 @@ function abaPrivacidade(alvo) {
           const arquivo = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
           const link = document.createElement("a");
           link.href = URL.createObjectURL(arquivo);
-          link.download = "meus-dados-luciene-aguiar.json";
+          link.download = "meus-dados.json";
           document.body.append(link);
           link.click();
           link.remove();

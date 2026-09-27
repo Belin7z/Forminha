@@ -7,7 +7,7 @@ const definir = (seletor, criar, valor) => {
   el.setAttribute(criar.alvo, valor);
 };
 
-/** Preenche título, descrição, imagem de compartilhamento e os dados estruturados da confeitaria. */
+/** Preenche título, descrição, imagem de compartilhamento e os dados estruturados da loja. */
 export function aplicarSeo(config) {
   const { loja, textos } = config;
   const titulo = `${loja.nome} — ${loja.slogan}`;

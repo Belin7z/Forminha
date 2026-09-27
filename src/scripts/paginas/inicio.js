@@ -21,7 +21,7 @@ const PASSOS = [
 
 const DIFERENCIAIS = [
   ["faisca", "Ingredientes selecionados", "Chocolate de verdade, frutas frescas e nada de essências artificiais."],
-  ["chef", "Feito à mão", "Cada receita é preparada em pequenos lotes, com o cuidado de um ateliê."],
+  ["chef", "Feito à mão", "Cada receita é preparada em pequenos lotes, com cuidado em cada detalhe."],
   ["caixa", "Embalagem cuidadosa", "Caixas especiais para o doce chegar perfeito até você."],
   ["presente", "Do seu jeito", "Escolha tamanhos, recheios e adicionais direto no pedido."],
 ];
@@ -33,7 +33,7 @@ function perguntas(config) {
   const formas = [pagamento.pix_ativo && "PIX", pagamento.dinheiro_ativo && "dinheiro", pagamento.cartao_ativo && "cartão (na entrega ou na retirada)"].filter(Boolean);
   return [
     { p: "Com quanta antecedência preciso encomendar?", r: `Trabalhamos com encomendas: pedimos ao menos ${horasTexto(pedidos.antecedencia_horas)} de antecedência (alguns produtos pedem mais, e o aviso aparece no carrinho). Você escolhe a data e o horário direto no pedido.` },
-    { p: "Vocês entregam?", r: entrega.entrega_ativa ? `Sim! O frete é calculado pela distância até o seu endereço.${entrega.retirada_ativa ? " Se preferir, também é possível retirar no ateliê, sem custo." : ""}` : "No momento atendemos somente com retirada no ateliê." },
+    { p: "Vocês entregam?", r: entrega.entrega_ativa ? `Sim! O frete é calculado pela distância até o seu endereço.${entrega.retirada_ativa ? " Se preferir, também é possível retirar na loja, sem custo." : ""}` : "No momento atendemos somente com retirada na loja." },
     { p: "Como posso pagar?", r: formas.length ? `Aceitamos ${formas.join(", ").replace(/, ([^,]*)$/, " e $1")}. Ao finalizar o pedido, você vê as instruções de pagamento.` : "As formas de pagamento aparecem ao finalizar o pedido." },
     { p: "Posso personalizar o meu pedido?", r: "Sim. Muitos produtos têm opções de tamanho, recheio e adicionais, e há um campo de observações para contar o tema, as cores e a dedicatória." },
     { p: "Como acompanho o meu pedido?", r: "Depois de criar a sua conta, em “Meus pedidos” você vê cada etapa, do recebimento até a entrega, com atualização automática." },
@@ -148,7 +148,7 @@ export function inicio(ctx) {
     </section>`}
 
     ${temCardapio && html`
-    <section class="secao secao--rosa">
+    <section class="secao secao--marca">
       <div class="container">
         <header class="secao__cab revelar">
           <span class="rotulo">Os queridinhos</span>
@@ -176,7 +176,7 @@ export function inicio(ctx) {
           <h2>Levamos até <span class="script">você</span></h2>
           <p>${config.entrega.entrega_ativa
             ? html`Entregamos ${zonas.length ? `em até ${Math.max(...zonas.map((z) => z.ate_km))} km da loja` : "na região"}${menorFrete != null ? html`, com frete a partir de <strong>${brl(menorFrete)}</strong>` : ""}.`
-            : "No momento atendemos somente retirada no ateliê."}
+            : "No momento atendemos somente retirada na loja."}
             ${config.entrega.retirada_ativa && " Prefere buscar? A retirada é sem custo."}
             ${config.entrega.gratis_acima > 0 && html` Frete grátis em pedidos acima de <strong>${brl(config.entrega.gratis_acima)}</strong>.`}</p>
           <a href="#/contato" class="btn btn--primario">${icone("pino", { tamanho: 18 })} Ver no mapa</a>
@@ -188,7 +188,7 @@ export function inicio(ctx) {
     ${galeria.length > 0 && html`
     <section class="secao">
       <div class="container">
-        <header class="secao__cab revelar"><span class="rotulo">Galeria</span><h2>Um pouco do nosso <span class="script">ateliê</span></h2><div class="ornamento" aria-hidden="true"><i></i></div></header>
+        <header class="secao__cab revelar"><span class="rotulo">Galeria</span><h2>Um pouco da nossa <span class="script">cozinha</span></h2><div class="ornamento" aria-hidden="true"><i></i></div></header>
         <div class="galeria">${galeria.map((url) => html`<figure class="galeria__foto revelar"><img src="${url}" alt="Doces da ${config.loja.nome}" loading="lazy"></figure>`)}</div>
         ${config.loja.instagram && html`<p class="galeria__insta"><a class="btn btn--contorno" href="https://instagram.com/${config.loja.instagram}" target="_blank" rel="noopener">${icone("instagram", { tamanho: 18 })} Ver mais no Instagram</a></p>`}
       </div>
@@ -196,7 +196,7 @@ export function inicio(ctx) {
 
     <div id="avaliacoes"></div>
 
-    <section class="secao secao--rosa">
+    <section class="secao secao--marca">
       <div class="container">
         <header class="secao__cab revelar"><span class="rotulo">Dúvidas</span><h2>Perguntas <span class="script">frequentes</span></h2><div class="ornamento" aria-hidden="true"><i></i></div></header>
         <div class="faq revelar">
@@ -209,7 +209,7 @@ export function inicio(ctx) {
       <div class="container sobre">
         <div class="sobre__arte revelar" aria-hidden="${sobreImagem ? "false" : "true"}"><div class="moldura">${sobreImagem ? html`<img src="${sobreImagem}" alt="${config.loja.nome}" loading="lazy">` : html`<span class="moldura__ico">${icone("chef", { tamanho: 64 })}</span>`}</div></div>
         <div class="sobre__txt revelar">
-          <span class="rotulo">Conheça a confeiteira</span>
+          <span class="rotulo">Nossa história</span>
           <h2>${config.textos.sobre_titulo}</h2>
           ${paragrafos.map((p) => html`<p>${p}</p>`)}
           <a href="#/cardapio" class="btn btn--primario">Fazer meu pedido</a>

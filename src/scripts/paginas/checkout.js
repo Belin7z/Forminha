@@ -104,7 +104,7 @@ export async function checkout(ctx) {
   function desenharTipo() {
     montar($("#bloco-tipo"), html`${tiposAtivos.map((t) => html`
       <label class="opcao"><input type="radio" name="tipo" value="${t}" ${f.tipo === t && "checked"}><span class="opcao__marca"></span>
-        <span class="opcao__texto"><strong>${t === "entrega" ? "Entrega" : "Retirada no ateliê"}</strong>
+        <span class="opcao__texto"><strong>${t === "entrega" ? "Entrega" : "Retirada na loja"}</strong>
         <small>${t === "entrega" ? "Levamos até você" : "Sem custo, você busca"}</small></span>
         ${icone(t === "entrega" ? "caminhao" : "sacola", { tamanho: 22 })}</label>`)}`);
   }
@@ -112,7 +112,7 @@ export async function checkout(ctx) {
   function desenharEndereco() {
     const bloco = $("#bloco-endereco");
     if (f.tipo === "retirada") {
-      montar(bloco, html`<div class="aviso aviso--rosa">${icone("pino", { tamanho: 17 })}<div>
+      montar(bloco, html`<div class="aviso aviso--marca">${icone("pino", { tamanho: 17 })}<div>
         <strong>Retire em:</strong> ${cfg.loja.endereco}${cfg.loja.cidade && ` — ${cfg.loja.cidade}/${cfg.loja.uf}`}<br>
         <a href="#/contato" class="link">Ver no mapa e horários</a></div></div>`);
       return;

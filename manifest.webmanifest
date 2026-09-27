@@ -1,12 +1,12 @@
 {
-  "name": "Luciene Aguiar Confeitaria",
-  "short_name": "Confeitaria",
-  "description": "Doces artesanais feitos sob encomenda.",
+  "name": "Loja de doces",
+  "short_name": "Doces",
+  "description": "Faça seu pedido online, com entrega ou retirada.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#fffaf9",
-  "theme_color": "#4f2436",
+  "background_color": "#fcfbfa",
+  "theme_color": "#2f2925",
   "lang": "pt-BR",
   "icons": [
     {

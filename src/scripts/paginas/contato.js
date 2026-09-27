@@ -20,7 +20,7 @@ export function contato(ctx) {
     <section class="container pagina-contato">
       <header class="pagina-cab">
         <h1>Onde <span class="script">estamos</span></h1>
-        <p class="texto-suave">Retire no ateliê ou receba em casa.</p>
+        <p class="texto-suave">Retire na loja ou receba em casa.</p>
       </header>
 
       <div class="contato__grade">
@@ -53,8 +53,8 @@ export function contato(ctx) {
                 ? html`<table class="tabela-zonas"><thead><tr><th>Faixa</th><th>Distância</th><th>Frete</th><th>Prazo</th></tr></thead>
                     <tbody>${zonas.map((z) => html`<tr><td>${z.nome}</td><td>até ${km(z.ate_km)}</td><td>${z.taxa ? brl(z.taxa) : "Grátis"}</td><td>~${z.prazo_min} min</td></tr>`)}</tbody></table>`
                 : html`<p class="texto-suave">Entregamos na região. Frete: ${entrega.taxa_padrao ? brl(entrega.taxa_padrao) : "grátis"}.</p>`)
-              : html`<p class="texto-suave">No momento atendemos apenas retirada no ateliê.</p>`}
-            ${entrega.gratis_acima > 0 && html`<p class="aviso aviso--rosa">${icone("caminhao", { tamanho: 17 })}<span>Frete grátis em pedidos acima de <strong>${brl(entrega.gratis_acima)}</strong>.</span></p>`}
+              : html`<p class="texto-suave">No momento atendemos apenas retirada na loja.</p>`}
+            ${entrega.gratis_acima > 0 && html`<p class="aviso aviso--marca">${icone("caminhao", { tamanho: 17 })}<span>Frete grátis em pedidos acima de <strong>${brl(entrega.gratis_acima)}</strong>.</span></p>`}
           </section>
         </div>
       </div>

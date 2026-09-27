@@ -1,6 +1,6 @@
 /* FORMULÁRIOS — campos discretos, seleções em cartão e interruptores */
 .campo { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; min-width: 0; }
-.campo > label { font-size: .78rem; font-weight: 500; color: var(--vinho); letter-spacing: .03em; }
+.campo > label { font-size: .78rem; font-weight: 500; color: var(--escura); letter-spacing: .03em; }
 .campo__obrig { color: var(--perigo); }
 .campo__ajuda { color: var(--texto-suave); font-size: .76rem; }
 .campo__erro { color: var(--perigo); font-size: .78rem; font-weight: 500; }
@@ -11,13 +11,13 @@
   transition: border-color .2s, box-shadow .2s, background .2s;
 }
 .campo textarea { resize: vertical; min-height: 88px; }
-.campo input::placeholder, .campo textarea::placeholder { color: #b8a3ad; }
-.campo input:hover, .campo select:hover, .campo textarea:hover, .entrada:hover { border-color: var(--rosa-400); }
+.campo input::placeholder, .campo textarea::placeholder { color: var(--texto-apagado); }
+.campo input:hover, .campo select:hover, .campo textarea:hover, .entrada:hover { border-color: var(--marca-400); }
 .campo input:focus, .campo select:focus, .campo textarea:focus, .entrada:focus {
-  outline: 0; background: #fff; border-color: var(--rosa-destaque); box-shadow: 0 0 0 4px var(--rosa-100);
+  outline: 0; background: #fff; border-color: var(--marca-destaque); box-shadow: 0 0 0 4px var(--marca-100);
 }
 .campo--erro input, .campo--erro select, .campo--erro textarea { border-color: var(--perigo) !important; background: #fffafb; }
-.campo input[readonly], .campo input:disabled { background: var(--rosa-50); color: var(--texto-suave); }
+.campo input[readonly], .campo input:disabled { background: var(--marca-50); color: var(--texto-suave); }
 
 .campo__senha { position: relative; }
 .campo__senha input { padding-right: 2.8rem; }
@@ -34,41 +34,41 @@
   position: relative; display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; cursor: pointer;
   border: 1px solid var(--borda); border-radius: var(--raio-sm); background: #fff; transition: border-color .2s, background .2s, box-shadow .2s;
 }
-.opcao:hover { border-color: var(--rosa-400); }
+.opcao:hover { border-color: var(--marca-400); }
 .opcao input { position: absolute; opacity: 0; pointer-events: none; }
 .opcao__marca {
-  flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--rosa-400); background: #fff;
+  flex: none; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--marca-400); background: #fff;
   display: grid; place-items: center; transition: background .2s, border-color .2s;
 }
 .opcao--caixa .opcao__marca { border-radius: 5px; }
-.opcao input:checked ~ .opcao__marca { background: var(--vinho); border-color: var(--vinho); }
+.opcao input:checked ~ .opcao__marca { background: var(--escura); border-color: var(--escura); }
 .opcao input:checked ~ .opcao__marca::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; }
 .opcao--caixa input:checked ~ .opcao__marca::after { width: 5px; height: 9px; border-radius: 0; background: none; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
-.opcao:has(input:checked) { border-color: var(--vinho); background: var(--rosa-50); box-shadow: 0 0 0 3px var(--rosa-100); }
-.opcao:has(input:focus-visible) { outline: 2px solid var(--rosa-destaque); outline-offset: 2px; }
+.opcao:has(input:checked) { border-color: var(--escura); background: var(--marca-50); box-shadow: 0 0 0 3px var(--marca-100); }
+.opcao:has(input:focus-visible) { outline: 2px solid var(--marca-destaque); outline-offset: 2px; }
 .opcao__texto { flex: 1; min-width: 0; }
-.opcao__texto strong { display: block; font-size: .93rem; font-weight: 500; color: var(--vinho); }
+.opcao__texto strong { display: block; font-size: .93rem; font-weight: 500; color: var(--escura); }
 .opcao__texto small { color: var(--texto-suave); font-size: .78rem; }
-.opcao__extra { font-weight: 500; font-size: .85rem; color: var(--rosa-texto); white-space: nowrap; }
+.opcao__extra { font-weight: 500; font-size: .85rem; color: var(--marca-texto); white-space: nowrap; }
 
 /* Interruptor liga/desliga */
 .interruptor { display: flex; align-items: center; gap: .8rem; cursor: pointer; margin-bottom: .8rem; }
 .interruptor input { position: absolute; opacity: 0; pointer-events: none; }
-.interruptor__trilho { flex: none; width: 42px; height: 24px; border-radius: 999px; background: #e6d3db; position: relative; transition: background .2s; }
+.interruptor__trilho { flex: none; width: 42px; height: 24px; border-radius: 999px; background: var(--borda-forte); position: relative; transition: background .2s; }
 .interruptor__trilho::after {
   content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s;
 }
-.interruptor input:checked ~ .interruptor__trilho { background: var(--vinho); }
+.interruptor input:checked ~ .interruptor__trilho { background: var(--escura); }
 .interruptor input:checked ~ .interruptor__trilho::after { transform: translateX(18px); }
-.interruptor input:focus-visible ~ .interruptor__trilho { outline: 2px solid var(--rosa-destaque); outline-offset: 2px; }
-.interruptor__texto strong { display: block; font-size: .92rem; color: var(--vinho); font-weight: 500; }
+.interruptor input:focus-visible ~ .interruptor__trilho { outline: 2px solid var(--marca-destaque); outline-offset: 2px; }
+.interruptor__texto strong { display: block; font-size: .92rem; color: var(--escura); font-weight: 500; }
 .interruptor__texto small { color: var(--texto-suave); font-size: .78rem; }
 
 /* Controle de quantidade */
 .qtd { display: inline-flex; align-items: center; border: 1px solid var(--borda); border-radius: 999px; background: #fff; }
-.qtd button { width: 34px; height: 34px; border: 0; background: none; border-radius: 50%; color: var(--vinho); display: grid; place-items: center; }
-.qtd button:hover { background: var(--rosa-100); }
+.qtd button { width: 34px; height: 34px; border: 0; background: none; border-radius: 50%; color: var(--escura); display: grid; place-items: center; }
+.qtd button:hover { background: var(--marca-100); }
 .qtd button:disabled { opacity: .35; pointer-events: none; }
 .qtd output { min-width: 30px; text-align: center; font-weight: 500; font-size: .95rem; }
 

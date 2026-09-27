@@ -26,7 +26,7 @@ function mensagemDoStatus(p) {
     novo: "Recebemos o seu pedido! Assim que a loja confirmar, você será avisado aqui.",
     confirmado: `Pedido confirmado! Já estamos organizando tudo para ${quando}.`,
     em_preparo: "Estamos preparando os seus doces com todo o carinho.",
-    pronto: retirada ? "Seu pedido está pronto! Pode retirar no ateliê." : "Seu pedido está pronto e logo sai para entrega.",
+    pronto: retirada ? "Seu pedido está pronto! Pode retirar na loja." : "Seu pedido está pronto e logo sai para entrega.",
     saiu_entrega: "Seu pedido saiu para entrega e chega em breve!",
     entregue: retirada ? "Pedido retirado. Bom apetite!" : "Pedido entregue. Bom apetite!",
     cancelado: `Este pedido foi cancelado${p.motivo_cancelamento ? `: ${p.motivo_cancelamento}` : "."}`,
@@ -193,7 +193,7 @@ export async function pedido(ctx) {
               ${p.avaliacao.resposta && html`<p class="depoimento__resposta"><strong>Resposta da loja:</strong> ${p.avaliacao.resposta}</p>`}
               ${!p.avaliacao.aprovada && html`<small class="texto-suave">Sua avaliação aparece na loja depois de revisada. Obrigada!</small>`}</section>`
           : html`<form class="cartao-form avaliacao" id="form-avaliar" novalidate>
-              <h2>Como foi o seu pedido?</h2><p class="texto-suave">Sua opinião ajuda muito a nossa confeitaria.</p>
+              <h2>Como foi o seu pedido?</h2><p class="texto-suave">Sua opinião ajuda muito a nossa loja.</p>
               ${escolherNota("nota")}
               <div class="campo"><label for="comentario">Comentário <span class="texto-suave">(opcional)</span></label>
                 <textarea id="comentario" name="comentario" class="entrada" rows="3" maxlength="500" placeholder="Conte o que você mais gostou…"></textarea></div>

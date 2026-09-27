@@ -1,53 +1,88 @@
 /* ==========================================================
    TOKENS — a identidade visual em um só lugar.
-   Rosa bebê como assinatura, cacau para o texto e um toque
-   champanhe nos detalhes. Trocar uma cor aqui muda o site todo.
+   Os valores abaixo são o tema "Neutro" (o padrão de toda loja nova).
+   Cada loja escolhe o seu tema em Dashboard > Configurações > Aparência:
+   o site troca estas variáveis sozinho (src/scripts/base/tema.js).
+   Por isso, NUNCA use uma cor fixa (#hex) nos estilos: use estas variáveis.
+     --marca-25 … --marca-500  tons claros da cor da marca (fundos e realces)
+     --marca-destaque / -texto cor da marca forte o bastante para texto
+     --escura                  títulos e botão principal
+     --profunda                rodapé e fundos escuros
+     --detalhe                 filetes, estrelas e pequenos enfeites
+     --sobre-profunda…         textos em cima dos fundos escuros
+     --*-rgb                   a mesma cor em "r g b", para usar com transparência:
+                               rgb(var(--escura-rgb) / .3)
    ========================================================== */
 :root {
-  /* Rosa bebê: do quase-branco ao rosa mais firme */
-  --rosa-25:  #fffcfd;
-  --rosa-50:  #fef7f9;
-  --rosa-100: #fcedf2;
-  --rosa-200: #f9dde7;
-  --rosa-300: #f4c9d9;   /* rosa bebê principal */
-  --rosa-400: #ebaac4;
-  --rosa-500: #df88a8;
+  /* Cor da marca: do quase-branco ao tom mais firme */
+  --marca-25:  #fefdfc;
+  --marca-50:  #faf9f7;
+  --marca-100: #f4f1ed;
+  --marca-200: #ebe4dd;
+  --marca-300: #e0d5c9;
+  --marca-400: #cdbdaa;
+  --marca-500: #b9a38a;
 
-  /* Rosas para texto e detalhes (contraste ≥ 4,5:1 sobre branco) */
-  --rosa-destaque: #b4527a;
-  --rosa-texto:    #96395f;
+  /* Cor da marca para texto e detalhes (contraste ≥ 4,5:1 sobre branco) */
+  --marca-destaque: #897054;
+  --marca-texto:    #6f573c;
 
-  /* Cacau e neutros quentes */
-  --vinho:       #4f2436;   /* títulos e botão principal */
-  --cacau:       #2e1a24;   /* rodapé e fundos escuros */
-  --texto:       #4a3540;
-  --texto-suave: #82707a;
-  --creme:       #fdf8f4;
-  --branco:      #ffffff;
-  --borda:       #efe0e7;
-  --fundo:       #fffaf9;
+  /* Escuros: títulos, botão principal, rodapé */
+  --escura:          #2f2925;
+  --escura-hover:    #221d1a;
+  --escura-brilho:   #39322e;
+  --profunda:        #1a1715;
+  --profunda-hover:  #0f0c0b;
 
-  /* Champanhe: filetes, estrelas e pequenos detalhes */
-  --ouro:        #b08a58;
-  --ouro-claro:  #ead9bd;
+  /* Textos e neutros */
+  --texto:          #3f3c39;
+  --texto-suave:    #757270;
+  --texto-apagado:  #aca9a7;
+  --creme:          #fcf8f3;
+  --branco:         #ffffff;
+  --borda:          #e8e4e0;
+  --borda-forte:    #ddd8d3;
+  --neutro-bg:      #efeeec;
+  --fundo:          #fcfbfa;
 
-  /* Estados */
+  /* Textos sobre fundo escuro (rodapé, faixas) */
+  --sobre-profunda:          #dedbd9;
+  --sobre-profunda-suave:    #cdcac8;
+  --sobre-profunda-apagado:  #a7a3a0;
+
+  /* Detalhes: filetes, estrelas e pequenos enfeites */
+  --detalhe:        #a8895f;
+  --detalhe-claro:  #ead9c2;
+
+  /* As mesmas cores em "r g b" (para transparência) */
+  --escura-rgb:         47 41 37;
+  --profunda-rgb:       26 23 21;
+  --detalhe-rgb:        168 137 95;
+  --detalhe-claro-rgb:  234 217 194;
+  --fundo-rgb:          252 251 250;
+  --marca-300-rgb:      224 213 201;
+
+  /* Estados (iguais em todos os temas: verde é sempre "deu certo") */
   --sucesso:  #2b8a5e;  --sucesso-bg:  #e3f6ec;
   --aviso:    #a8620a;  --aviso-bg:    #fdf0d9;
   --info:     #3b6fc4;  --info-bg:     #e6effc;
   --perigo:   #c8324f;  --perigo-bg:   #fde6eb;
   --whats:    #15803d;
 
-  /* Formas e sombras (suaves, com tom de cacau) */
+  /* Formas e sombras (suaves, no tom da cor escura) */
   --raio-sm: 8px;
   --raio:    14px;
   --raio-lg: 20px;
-  --sombra-sm: 0 1px 2px rgba(79, 36, 54, .05), 0 2px 8px rgba(79, 36, 54, .05);
-  --sombra:    0 2px 4px rgba(79, 36, 54, .04), 0 12px 32px rgba(79, 36, 54, .08);
-  --sombra-forte: 0 4px 8px rgba(79, 36, 54, .06), 0 24px 56px rgba(79, 36, 54, .16);
+  --sombra-sm: 0 1px 2px rgb(var(--escura-rgb) / .05), 0 2px 8px rgb(var(--escura-rgb) / .05);
+  --sombra:    0 2px 4px rgb(var(--escura-rgb) / .04), 0 12px 32px rgb(var(--escura-rgb) / .08);
+  --sombra-forte: 0 4px 8px rgb(var(--escura-rgb) / .06), 0 24px 56px rgb(var(--escura-rgb) / .16);
 
-  /* Fontes */
+  /* Letras (o estilo escolhido troca estas) */
   --f-titulo: "Cormorant Garamond", "Playfair Display", Georgia, serif;
   --f-corpo:  "Jost", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-script: var(--f-titulo);
+  --f-script-estilo: italic;
+  /* equaliza o tamanho visual entre fontes diferentes ("none" = tamanho natural) */
+  --f-titulo-ajuste: none;
+  --f-corpo-ajuste:  none;
 }

@@ -1,12 +1,12 @@
 /* PÁGINAS ENTRAR / CRIAR CONTA */
 .auth { display: grid; grid-template-columns: .85fr 1fr; gap: 0; margin: 2.5rem auto; background: #fff; border: 1px solid var(--borda); border-radius: var(--raio-lg); overflow: hidden; box-shadow: var(--sombra); max-width: 980px; }
-.auth__lateral { position: relative; padding: 3rem 2.4rem; background: radial-gradient(90% 60% at 100% 0, #5d2b41, transparent 70%), var(--cacau); color: #e9d6de; display: flex; flex-direction: column; justify-content: center; gap: 1.2rem; }
-.auth__lateral::before { content: ""; position: absolute; inset: 14px; border: 1px solid rgba(234, 217, 189, .2); border-radius: 12px; pointer-events: none; }
-.auth__bolo { color: var(--ouro-claro); }
+.auth__lateral { position: relative; padding: 3rem 2.4rem; background: radial-gradient(90% 60% at 100% 0, var(--escura-brilho), transparent 70%), var(--profunda); color: var(--sobre-profunda); display: flex; flex-direction: column; justify-content: center; gap: 1.2rem; }
+.auth__lateral::before { content: ""; position: absolute; inset: 14px; border: 1px solid rgb(var(--detalhe-claro-rgb) / .2); border-radius: 12px; pointer-events: none; }
+.auth__bolo { color: var(--detalhe-claro); }
 .auth__lateral h2 { font-size: 2.2rem; color: #fff; }
 .auth__lateral ul { display: grid; gap: 1rem; font-size: .93rem; }
 .auth__lateral li { display: flex; align-items: center; gap: .85rem; }
-.auth__lateral li span { flex: none; width: 38px; height: 38px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(234, 217, 189, .4); color: var(--ouro-claro); display: grid; place-items: center; }
+.auth__lateral li span { flex: none; width: 38px; height: 38px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(var(--detalhe-claro-rgb) / .4); color: var(--detalhe-claro); display: grid; place-items: center; }
 .auth__caixa { padding: 2.6rem 2.4rem; }
 .auth__caixa h1 { font-size: 2.3rem; margin-bottom: .3rem; }
 .auth__caixa > .texto-suave { margin-bottom: 1.4rem; font-size: .92rem; }
@@ -15,11 +15,11 @@
 
 .armadilha { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
 .aceite { display: flex; align-items: flex-start; gap: .6rem; margin: 1rem 0 .4rem; font-size: .86rem; color: var(--texto-suave); cursor: pointer; }
-.aceite input { margin-top: .2rem; accent-color: var(--vinho); flex: none; }
+.aceite input { margin-top: .2rem; accent-color: var(--escura); flex: none; }
 .aceite__erro { color: var(--perigo); font-size: .8rem; margin-bottom: .6rem; }
 .aceite__erro:not([hidden]) { display: block; }
 .forca { display: flex; gap: 4px; margin: -.4rem 0 1rem; }
-.forca span { flex: 1; height: 5px; border-radius: 3px; background: var(--rosa-100); transition: background .2s; }
+.forca span { flex: 1; height: 5px; border-radius: 3px; background: var(--marca-100); transition: background .2s; }
 .forca span.on.n1 { background: #e5677f; } .forca span.on.n2 { background: #e8a23a; }
 .forca span.on.n3 { background: #7cb86a; } .forca span.on.n4 { background: var(--sucesso); }
 

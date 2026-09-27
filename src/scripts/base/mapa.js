@@ -4,6 +4,8 @@
    carregado quando alguma página realmente pede um mapa.
    ========================================================== */
 
+import { corDoTema } from "./tema.js";
+
 let promessaLeaflet = null;
 
 export function carregarLeaflet() {
@@ -68,7 +70,7 @@ export async function criarMapa(elemento, { lat, lng, zoom = 16, pino = true, ar
       raiosKm.forEach((km, i) => {
         camadas.push(
           L.circle([centro.lat, centro.lng], {
-            radius: km * 1000, color: "#cf6690", weight: 2, fillColor: "#f9ccdc", fillOpacity: 0.12 + (raiosKm.length - i) * 0.02,
+            radius: km * 1000, color: corDoTema("--marca-destaque", "#cf6690"), weight: 2, fillColor: corDoTema("--marca-300", "#f9ccdc"), fillOpacity: 0.12 + (raiosKm.length - i) * 0.02,
           }).addTo(mapa)
         );
       });

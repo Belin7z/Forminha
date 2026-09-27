@@ -1,18 +1,18 @@
 /* SOBREPOSIÇÕES — janelas (modal) e avisos (toast) */
 .modal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 1rem; animation: aparecer .2s; }
 .modal--saindo { opacity: 0; transition: opacity .18s; }
-.modal__fundo { position: absolute; inset: 0; background: rgba(46, 26, 36, .5); backdrop-filter: blur(4px); }
+.modal__fundo { position: absolute; inset: 0; background: rgb(var(--profunda-rgb) / .5); backdrop-filter: blur(4px); }
 .modal__caixa {
   position: relative; width: 100%; max-height: calc(100dvh - 2rem); display: flex; flex-direction: column;
   background: #fff; border-radius: var(--raio-lg); box-shadow: var(--sombra-forte); animation: subir .26s cubic-bezier(.2, .8, .2, 1);
 }
 .modal__caixa:focus { outline: 0; }
 .modal__cab { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.4rem .5rem; }
-.modal__cab h2 { font-family: var(--f-titulo); font-size: 1.55rem; font-weight: 600; color: var(--vinho); }
+.modal__cab h2 { font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-size: 1.55rem; font-weight: 600; color: var(--escura); }
 .modal__corpo { padding: .5rem 1.4rem 1.4rem; overflow-y: auto; }
 .modal__rodape {
   display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .6rem; padding: .95rem 1.4rem;
-  border-top: 1px solid var(--borda); background: var(--rosa-25); border-radius: 0 0 var(--raio-lg) var(--raio-lg);
+  border-top: 1px solid var(--borda); background: var(--marca-25); border-radius: 0 0 var(--raio-lg) var(--raio-lg);
 }
 @media (max-width: 560px) {
   .modal { padding: 0; align-items: end; }
@@ -24,13 +24,13 @@
 .toasts { position: fixed; z-index: 300; left: 50%; bottom: 1.2rem; transform: translateX(-50%); display: grid; gap: .5rem; width: min(440px, calc(100% - 2rem)); pointer-events: none; }
 .toast {
   pointer-events: none; display: flex; align-items: center; gap: .65rem; padding: .8rem 1.1rem; border-radius: var(--raio);
-  background: var(--cacau); color: #fff; box-shadow: var(--sombra-forte); font-size: .9rem; font-weight: 400; letter-spacing: .01em;
+  background: var(--profunda); color: #fff; box-shadow: var(--sombra-forte); font-size: .9rem; font-weight: 400; letter-spacing: .01em;
   animation: subir .26s cubic-bezier(.2, .8, .2, 1);
 }
 .toast--saindo { opacity: 0; transform: translateY(8px); transition: all .25s; }
 .toast--sucesso .icone { color: #7fd6a8; }
 .toast--erro .icone { color: #ff9db1; }
-.toast--info .icone { color: var(--ouro-claro); }
+.toast--info .icone { color: var(--detalhe-claro); }
 
 @keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
 @keyframes subir { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }

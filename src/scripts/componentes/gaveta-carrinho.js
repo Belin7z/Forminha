@@ -52,7 +52,7 @@ function desenhar() {
     </div>
     ${itens.length > 0 && html`
       <footer class="gaveta__rodape">
-        ${antecedencia > 0 && html`<p class="aviso aviso--rosa">${icone("relogio", { tamanho: 16 })}<span>Este pedido exige <strong>${horasTexto(antecedencia)}</strong> de antecedência.</span></p>`}
+        ${antecedencia > 0 && html`<p class="aviso aviso--marca">${icone("relogio", { tamanho: 16 })}<span>Este pedido exige <strong>${horasTexto(antecedencia)}</strong> de antecedência.</span></p>`}
         ${falta > 0 && html`<p class="aviso aviso--aviso">${icone("alerta", { tamanho: 16 })}<span>Faltam <strong>${brl(falta)}</strong> para o pedido mínimo de ${brl(minimo)}.</span></p>`}
         <div class="gaveta__total"><span>Subtotal</span><strong>${brl(total)}</strong></div>
         <small class="texto-suave">Entrega, cupom e horário você escolhe na próxima etapa.</small>

@@ -1,47 +1,47 @@
 /* INDICADORES — selos de status, avisos, carregando e "nada por aqui" */
 .badge {
   display: inline-flex; align-items: center; gap: .3rem; padding: .16rem .65rem; border-radius: 999px;
-  font-size: .72rem; font-weight: 500; letter-spacing: .03em; background: var(--rosa-100); color: var(--rosa-texto); white-space: nowrap;
+  font-size: .72rem; font-weight: 500; letter-spacing: .03em; background: var(--marca-100); color: var(--marca-texto); white-space: nowrap;
 }
 .badge--sucesso { background: var(--sucesso-bg); color: var(--sucesso); }
 .badge--aviso { background: var(--aviso-bg); color: var(--aviso); }
 .badge--info { background: var(--info-bg); color: var(--info); }
 .badge--perigo { background: var(--perigo-bg); color: var(--perigo); }
-.badge--neutro { background: #f3ecef; color: var(--texto-suave); }
+.badge--neutro { background: var(--neutro-bg); color: var(--texto-suave); }
 
 /* Status do pedido: cada etapa com cor própria (o texto sempre acompanha) */
 .status { display: inline-flex; align-items: center; gap: .4rem; padding: .2rem .72rem; border-radius: 999px; font-size: .75rem; font-weight: 500; letter-spacing: .02em; white-space: nowrap; }
 .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.status--novo { background: var(--rosa-200); color: var(--rosa-texto); }
+.status--novo { background: var(--marca-200); color: var(--marca-texto); }
 .status--confirmado { background: var(--info-bg); color: var(--info); }
 .status--em_preparo { background: var(--aviso-bg); color: var(--aviso); }
 .status--pronto { background: #dcf3f1; color: #17766f; }
 .status--saiu_entrega { background: #ece6fb; color: #6547b5; }
 .status--entregue { background: var(--sucesso-bg); color: var(--sucesso); }
-.status--cancelado { background: #f3ecef; color: var(--texto-suave); }
+.status--cancelado { background: var(--neutro-bg); color: var(--texto-suave); }
 
 .aviso { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem 1rem; border-radius: var(--raio-sm); font-size: .88rem; background: var(--info-bg); color: #25508f; }
 .aviso .icone { margin-top: 2px; }
 .aviso--aviso { background: var(--aviso-bg); color: #7d4808; }
 .aviso--perigo { background: var(--perigo-bg); color: #a02640; }
 .aviso--sucesso { background: var(--sucesso-bg); color: #1f6b48; }
-.aviso--rosa { background: var(--rosa-100); color: var(--rosa-texto); }
+.aviso--marca { background: var(--marca-100); color: var(--marca-texto); }
 
 .carregando-pagina { display: grid; place-items: center; min-height: 40vh; }
-.spinner { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--rosa-200); border-top-color: var(--vinho); animation: girar .8s linear infinite; }
+.spinner { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--marca-200); border-top-color: var(--escura); animation: girar .8s linear infinite; }
 
 /* esqueleto: retângulos que "respiram" enquanto o conteúdo carrega */
-.esqueleto { background: linear-gradient(90deg, var(--rosa-100) 25%, var(--rosa-50) 50%, var(--rosa-100) 75%); background-size: 200% 100%; animation: brilho 1.4s infinite; border-radius: var(--raio-sm); }
+.esqueleto { background: linear-gradient(90deg, var(--marca-100) 25%, var(--marca-50) 50%, var(--marca-100) 75%); background-size: 200% 100%; animation: brilho 1.4s infinite; border-radius: var(--raio-sm); }
 @keyframes brilho { to { background-position: -200% 0; } }
 
 /* "nada por aqui": um selo com ícone de linha no lugar dos emojis */
 .vazio { text-align: center; padding: 2.75rem 1rem; color: var(--texto-suave); }
 .vazio__ico {
   display: grid; place-items: center; width: 84px; height: 84px; margin: 0 auto 1rem; border-radius: 50%;
-  color: var(--ouro); background: radial-gradient(circle at 30% 25%, #fff, var(--rosa-100) 70%);
-  box-shadow: inset 0 0 0 1px var(--ouro-claro), 0 8px 24px rgba(79, 36, 54, .06);
+  color: var(--detalhe); background: radial-gradient(circle at 30% 25%, #fff, var(--marca-100) 70%);
+  box-shadow: inset 0 0 0 1px var(--detalhe-claro), 0 8px 24px rgb(var(--escura-rgb) / .06);
 }
-.vazio h3 { font-family: var(--f-titulo); color: var(--vinho); font-size: 1.45rem; font-weight: 600; margin-bottom: .35rem; }
+.vazio h3 { font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); color: var(--escura); font-size: 1.45rem; font-weight: 600; margin-bottom: .35rem; }
 .vazio p { max-width: 44ch; margin: 0 auto 1.1rem; font-size: .93rem; }
 
 .pino-mapa, .mapa-pino { background: none; border: 0; }

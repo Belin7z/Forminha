@@ -26,6 +26,7 @@ import { contato } from "./paginas/contato.js";
 import { naoEncontrada } from "./paginas/nao-encontrada.js";
 import { paginaPrivacidade, paginaTermos } from "./paginas/legal.js";
 import { aplicarSeo, registrarApp } from "./nucleo/seo.js";
+import { aplicarAparencia } from "/src/scripts/base/tema.js";
 import { iniciarWhatsFlutuante } from "./componentes/whats-flutuante.js";
 
 const pagina = document.getElementById("pagina");
@@ -35,6 +36,7 @@ async function iniciar() {
   try {
     const [config] = await Promise.all([api.get("/config"), carregarSessao()]);
     estado.config = config;
+    aplicarAparencia(config.aparencia);
     await carregarCatalogo();
     limparIndisponiveis();
   } catch (erro) {

@@ -1,22 +1,22 @@
 /* PÁGINA MINHA CONTA — cabeçalho, endereços e lista de pedidos */
 .conta { padding: 2rem 0 1rem; max-width: 900px; }
 .conta__cab { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.4rem; }
-.conta__cab h1 { font-family: var(--f-titulo); font-size: 1.7rem; color: var(--vinho); }
+.conta__cab h1 { font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-size: 1.7rem; color: var(--escura); }
 
 .lista-enderecos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
-.endereco-card { display: flex; flex-direction: column; gap: .3rem; padding: 1.1rem; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--rosa-25); }
-.endereco-card__topo { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--vinho); }
+.endereco-card { display: flex; flex-direction: column; gap: .3rem; padding: 1.1rem; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--marca-25); }
+.endereco-card__topo { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: var(--escura); }
 .endereco-card p { font-size: .9rem; }
 .endereco-card__entrega { font-size: .82rem; margin: .2rem 0; }
 .endereco-card__acoes { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .5rem; }
 
 .lista-pedidos { display: grid; gap: .7rem; }
 .pedido-linha { display: grid; grid-template-columns: 1.1fr 1.2fr auto; align-items: center; gap: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--borda); border-radius: var(--raio); background: #fff; transition: border-color .18s, box-shadow .18s, transform .18s; }
-.pedido-linha:hover { border-color: var(--rosa-400); box-shadow: var(--sombra-sm); transform: translateY(-2px); }
+.pedido-linha:hover { border-color: var(--marca-400); box-shadow: var(--sombra-sm); transform: translateY(-2px); }
 .pedido-linha > div { display: grid; gap: .25rem; }
-.pedido-linha strong { color: var(--vinho); }
+.pedido-linha strong { color: var(--escura); }
 .pedido-linha__meio { justify-items: start; }
-.pedido-linha__fim { display: flex !important; align-items: center; gap: .5rem; color: var(--rosa-texto); }
+.pedido-linha__fim { display: flex !important; align-items: center; gap: .5rem; color: var(--marca-texto); }
 @media (max-width: 620px) {
   .pedido-linha { grid-template-columns: 1fr auto; }
   .pedido-linha__meio { grid-column: 1 / -1; grid-row: 2; }
