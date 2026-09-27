@@ -1,0 +1,6 @@
+# nunca enviar para a Vercel pela linha de comando
+node_modules
+dist
+.env
+.env.*
+.vercel
