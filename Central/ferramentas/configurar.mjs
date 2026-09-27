@@ -9,9 +9,12 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import readline from "node:readline";
+import { fileURLToPath } from "node:url";
 import { resumirSenha } from "../lib/sessao.js";
 
 const PROJETO = process.env.PROJETO_VERCEL || "forminha";
+// o projeto na Vercel usa a pasta "Central" como raiz: os comandos precisam rodar da RAIZ do repositório
+const RAIZ = fileURLToPath(new URL("../../", import.meta.url));
 
 function perguntar(texto, { secreto = false } = {}) {
   return new Promise((ok) => {
@@ -22,7 +25,7 @@ function perguntar(texto, { secreto = false } = {}) {
 }
 
 function vercel(args, entrada) {
-  const r = spawnSync("vercel", args, { input: entrada, encoding: "utf8", shell: process.platform === "win32" });
+  const r = spawnSync("vercel", args, { cwd: RAIZ, input: entrada, encoding: "utf8", shell: process.platform === "win32" });
   return { ok: r.status === 0, saida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
