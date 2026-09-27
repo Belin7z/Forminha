@@ -1,10 +1,11 @@
 # Loja
 
 Site que o **cliente** usa: cardápio, conta, endereços com mapa, carrinho, pedido (com agenda e sinal) e acompanhamento.
-Visual premium em rosa e dourado; fotos, perguntas frequentes e textos legais são editados no Dashboard.
+As cores e as letras seguem o tema escolhido pela dona no Dashboard (8 temas prontos ou as cores da marca dela);
+fotos, perguntas frequentes e textos legais também são editados lá.
 
-**Esta pasta é um site completo**, com repositório próprio (`Luciene-Aguiar-Confeitaria-Loja`, privado) e projeto próprio na Vercel.
-Tudo de que precisa está aqui dentro. Não usa nenhum arquivo do Dashboard nem de outra pasta.
+**Esta pasta é um site completo**: cada loja tem o seu projeto na Vercel com a pasta `Loja` deste repositório como raiz
+(a Central cria sozinha). Tudo de que precisa está aqui dentro. Não usa nenhum arquivo do Dashboard nem de outra pasta.
 
 ```
 Loja/

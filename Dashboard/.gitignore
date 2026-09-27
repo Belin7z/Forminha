@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.vercel/
+# gerado por `npm run sql`
+supabase/instalar-tudo.sql
+# arquivos temporários das ferramentas de linha de comando
+supabase/.temp/

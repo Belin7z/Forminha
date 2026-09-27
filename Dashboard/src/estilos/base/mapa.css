@@ -1,0 +1,4 @@
+/* MAPA — caixas do Leaflet usadas na loja e no painel */
+.mapa { height: 280px; border-radius: var(--raio); overflow: hidden; border: 2px solid var(--borda); background: var(--marca-100); z-index: 0; }
+.mapa--pequeno { height: 190px; margin-top: .8rem; }
+.mapa--grande { height: 340px; margin-bottom: 1rem; }

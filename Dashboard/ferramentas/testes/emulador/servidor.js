@@ -1,0 +1,295 @@
+/* ==========================================================
+   MINI-SUPABASE DE TESTE
+   Um servidor HTTP que fala o mesmo protocolo do Supabase:
+     /auth/v1/*    cadastro, login, renovação, usuário, recuperação
+     /rest/v1/rpc  funções do banco (PostgREST)
+     /storage/v1/* fotos dos produtos
+   Por baixo roda o Postgres de teste com as migrações reais. Assim a
+   biblioteca oficial `supabase-js` funciona sem nenhuma alteração,
+   tanto nos testes quanto no navegador.
+   (Não é o Supabase de verdade: serve para provar a lógica.)
+   ========================================================== */
+import crypto from "node:crypto";
+import http from "node:http";
+import { criarBanco, executarRpc, sql } from "./banco.js";
+import { criarExternos } from "./externos.js";
+import { cabecalhosCors, criarRpc } from "../../../supabase/functions/_shared/comum.js";
+import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
+import { receberWebhook } from "../../../supabase/functions/pix-webhook/logica.js";
+import { avisarWhatsapp } from "../../../supabase/functions/whatsapp-avisar/logica.js";
+
+const b64 = (dados) => Buffer.from(dados).toString("base64url");
+
+export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemplo = true } = {}) {
+  const db = await criarBanco({ exemplo });
+  const segredo = crypto.randomBytes(32).toString("hex");
+  const arquivos = new Map();          // "bucket/caminho" -> { tipo, bytes }
+  const tokensRenovacao = new Map();   // refresh_token -> id do usuário
+  const emails = [];                   // e-mails "enviados" (para os testes conferirem)
+
+  /* ---------- JWT (HS256, como o Supabase) ---------- */
+  const assinar = (payload) => {
+    const corpo = `${b64(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${b64(JSON.stringify(payload))}`;
+    return `${corpo}.${crypto.createHmac("sha256", segredo).update(corpo).digest("base64url")}`;
+  };
+  const verificar = (token) => {
+    const [h, p, s] = String(token).split(".");
+    if (!s) return null;
+    const esperado = crypto.createHmac("sha256", segredo).update(`${h}.${p}`).digest("base64url");
+    if (s.length !== esperado.length || !crypto.timingSafeEqual(Buffer.from(s), Buffer.from(esperado))) return null;
+    const claims = JSON.parse(Buffer.from(p, "base64url").toString());
+    return claims.exp && claims.exp < Date.now() / 1000 ? null : claims;
+  };
+  const chaveAnon = assinar({ role: "anon", iss: "emulador", exp: 4102444800 });
+
+  /* ---------- Senhas ---------- */
+  const hashSenha = (senha) => {
+    const sal = crypto.randomBytes(8).toString("hex");
+    return `${sal}$${crypto.scryptSync(senha, sal, 32).toString("hex")}`;
+  };
+  const confereSenha = (senha, guardado) => {
+    const [sal, hash] = String(guardado).split("$");
+    return hash && crypto.timingSafeEqual(Buffer.from(hash, "hex"), crypto.scryptSync(senha, sal, 32));
+  };
+
+  /* ---------- Auxiliares HTTP ---------- */
+  const cors = { "access-control-allow-origin": "*", "access-control-expose-headers": "*" };
+  const responder = (res, status, corpo, extras = {}) => {
+    const texto = corpo === undefined ? "" : typeof corpo === "string" || Buffer.isBuffer(corpo) ? corpo : JSON.stringify(corpo);
+    res.writeHead(status, { ...cors, ...(status === 204 ? {} : { "content-type": "application/json" }), ...extras });
+    res.end(texto);
+  };
+  const lerCorpo = (req) => new Promise((ok) => {
+    const partes = [];
+    req.on("data", (c) => partes.push(c));
+    req.on("end", () => ok(Buffer.concat(partes)));
+  });
+  const lerJson = async (req) => {
+    const buf = await lerCorpo(req);
+    try { return buf.length ? JSON.parse(buf.toString()) : {}; } catch { return {}; }
+  };
+  const erroAuth = (res, status, error_code, msg) => responder(res, status, { code: status, error_code, msg });
+  const claimsDe = (req) => {
+    const token = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    return token ? verificar(token) : null;
+  };
+
+  /* ---------- Auth ---------- */
+  const usuarioJson = (u) => ({
+    id: u.id, aud: "authenticated", role: "authenticated", email: u.email, email_confirmed_at: new Date().toISOString(), phone: "",
+    app_metadata: { provider: "email", providers: ["email"] }, user_metadata: u.raw_user_meta_data ?? {}, identities: [],
+    created_at: u.created_at, updated_at: u.created_at,
+  });
+  const criarSessao = (u) => {
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const refresh = crypto.randomBytes(16).toString("hex");
+    tokensRenovacao.set(refresh, u.id);
+    return {
+      access_token: assinar({ sub: u.id, email: u.email, role: "authenticated", aud: "authenticated", exp, iat: exp - 3600, user_metadata: u.raw_user_meta_data ?? {} }),
+      token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: refresh, user: usuarioJson(u),
+    };
+  };
+  const usuarioPorEmail = async (email) => (await sql(db, "select * from auth.users where email = $1", [String(email).toLowerCase()])).rows[0];
+  const usuarioPorId = async (id) => (await sql(db, "select * from auth.users where id = $1", [id])).rows[0];
+
+  async function rotaAuth(req, res, caminho, url) {
+    const corpo = await lerJson(req);
+
+    if (caminho === "/signup" && req.method === "POST") {
+      const email = String(corpo.email ?? "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return erroAuth(res, 400, "email_address_invalid", `Email address "${email}" is invalid`);
+      if (String(corpo.password ?? "").length < 6) return erroAuth(res, 422, "weak_password", "Password should be at least 6 characters.");
+      if (await usuarioPorEmail(email)) return erroAuth(res, 422, "user_already_exists", "User already registered");
+      const r = await sql(db, "insert into auth.users (email, encrypted_password, raw_user_meta_data) values ($1, $2, $3::jsonb) returning *",
+        [email, hashSenha(corpo.password), JSON.stringify(corpo.data ?? {})]);
+      return responder(res, 200, confirmarEmail ? usuarioJson(r.rows[0]) : criarSessao(r.rows[0]));
+    }
+
+    if (caminho === "/token" && req.method === "POST") {
+      const tipo = url.searchParams.get("grant_type");
+      if (tipo === "password") {
+        const u = await usuarioPorEmail(corpo.email ?? "");
+        if (!u || !confereSenha(String(corpo.password ?? ""), u.encrypted_password)) return erroAuth(res, 400, "invalid_credentials", "Invalid login credentials");
+        return responder(res, 200, criarSessao(u));
+      }
+      if (tipo === "refresh_token") {
+        const id = tokensRenovacao.get(corpo.refresh_token);
+        const u = id && (await usuarioPorId(id));
+        if (!u) return erroAuth(res, 400, "refresh_token_not_found", "Invalid Refresh Token: Refresh Token Not Found");
+        tokensRenovacao.delete(corpo.refresh_token);
+        return responder(res, 200, criarSessao(u));
+      }
+      return erroAuth(res, 400, "unsupported_grant_type", "Tipo de login não suportado");
+    }
+
+    if (caminho === "/user") {
+      const claims = claimsDe(req);
+      if (!claims?.sub) return erroAuth(res, 401, "bad_jwt", "invalid JWT");
+      const u = await usuarioPorId(claims.sub);
+      if (!u) return erroAuth(res, 401, "user_not_found", "User from sub claim in JWT does not exist");
+      if (req.method === "GET") return responder(res, 200, usuarioJson(u));
+      if (req.method === "PUT") {
+        if (corpo.password) {
+          if (String(corpo.password).length < 6) return erroAuth(res, 422, "weak_password", "Password should be at least 6 characters.");
+          if (confereSenha(corpo.password, u.encrypted_password)) return erroAuth(res, 422, "same_password", "New password should be different from the old password.");
+          await sql(db, "update auth.users set encrypted_password = $1 where id = $2", [hashSenha(corpo.password), u.id]);
+        }
+        return responder(res, 200, usuarioJson((await usuarioPorId(u.id))));
+      }
+    }
+
+    if (caminho === "/logout") return responder(res, 204, undefined);
+    if (caminho === "/recover" && req.method === "POST") {
+      emails.push({ tipo: "recuperacao", email: String(corpo.email ?? "").toLowerCase(), redirecionar: url.searchParams.get("redirect_to") });
+      return responder(res, 200, {});
+    }
+    return erroAuth(res, 404, "not_found", "Rota de Auth não suportada no emulador");
+  }
+
+  /* ---------- PostgREST: funções (RPC) ---------- */
+  async function rotaRpc(req, res, funcao) {
+    if (!req.headers.apikey) return responder(res, 401, { message: "No API key found in request", hint: "No `apikey` request header or url param was found." });
+    const claims = claimsDe(req);
+    const token = String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+    if (token && !claims) return responder(res, 401, { code: "PGRST301", message: "JWT expired", details: null, hint: null });
+    const papel = claims?.role === "authenticated" ? "authenticated" : "anon";
+    const corpo = await lerJson(req);
+    try {
+      const cabecalhos = Object.fromEntries(["cf-connecting-ip", "x-forwarded-for", "x-real-ip"].filter((h) => req.headers[h]).map((h) => [h, String(req.headers[h])]));
+      const dados = await executarRpc(db, { papel, claims: papel === "authenticated" ? claims : {}, cabecalhos }, funcao, corpo.p);
+      if (funcao === "admin_gerar_segredo_gateway" && dados?.segredo) envFuncoes.SEGREDO_GATEWAY = dados.segredo;
+      return responder(res, 200, dados === null ? "null" : dados);
+    } catch (e) {
+      const propria = /^PT(\d{3})$/.exec(e.code ?? "");
+      if (propria) return responder(res, Number(propria[1]), { code: e.code, message: e.message, details: e.detail ?? "", hint: e.hint ?? null });
+      if (e.code === "42501") return responder(res, papel === "anon" ? 401 : 403, { code: "42501", message: e.message, details: null, hint: null });
+      if (e.code === "42883") return responder(res, 404, { code: "PGRST202", message: `Could not find the function public.${funcao}`, details: null, hint: null });
+      return responder(res, 400, { code: e.code ?? "XX000", message: e.message, details: e.detail ?? null, hint: e.hint ?? null });
+    }
+  }
+
+  /* ---------- Funções do servidor (Edge Functions) simuladas ---------- */
+  // Rodam a MESMA lógica de supabase/functions, com o Mercado Pago e a Meta de mentira.
+  const externos = criarExternos();
+  const envFuncoes = { SUPABASE_URL: "", MP_ACCESS_TOKEN: "TEST-simulado", MP_WEBHOOK_SECRET: "", SEGREDO_GATEWAY: "",
+                       WHATSAPP_TOKEN: "wa-simulado", WHATSAPP_PHONE_ID: "0000000000", URL_LOJA: "http://localhost:3000" };
+  const FUNCOES = { "pix-criar": criarPix, "pix-webhook": receberWebhook, "whatsapp-avisar": avisarWhatsapp };
+  let rpcFuncoes = null;
+  const lerTexto = async (req) => (await lerCorpo(req)).toString();
+
+  async function rotaFuncao(req, res, nome) {
+    const tratar = FUNCOES[nome];
+    if (!tratar) return responder(res, 404, { message: "Função não encontrada" });
+    const cabCors = cabecalhosCors(req.headers.origin, "");
+    if (req.method === "OPTIONS") { res.writeHead(204, cabCors); return res.end(); }
+    const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), String(v)]));
+    const r = await tratar({ metodo: req.method, url: `${envFuncoes.SUPABASE_URL}${req.url}`, cabecalhos, corpoTexto: req.method === "POST" ? await lerTexto(req) : "" },
+      { env: envFuncoes, fetchFn: externos.fetchFn, rpc: rpcFuncoes });
+    res.writeHead(r.status, { ...cors, "content-type": "application/json" });
+    res.end(r.status === 204 ? undefined : JSON.stringify(r.corpo ?? {}));
+  }
+
+  /** Controles só do simulador (não existem no Supabase de verdade). */
+  async function rotaTeste(req, res, caminho) {
+    const corpo = req.method === "POST" ? await lerJson(req) : {};
+    if (caminho === "/mp/aprovar") { // "o cliente pagou no app do banco": aprova no Mercado Pago simulado e dispara o aviso ao webhook
+      const pag = externos.pagamentoDoPedido(String(corpo.codigo));
+      if (!pag) return responder(res, 404, { message: "Nenhum PIX gerado para este pedido." });
+      externos.aprovar(pag.id);
+      const r = await receberWebhook({ metodo: "POST", url: `${envFuncoes.SUPABASE_URL}/functions/v1/pix-webhook?data.id=${pag.id}&type=payment`, cabecalhos: {},
+        corpoTexto: JSON.stringify({ type: "payment", data: { id: String(pag.id) } }) }, { env: envFuncoes, fetchFn: externos.fetchFn, rpc: rpcFuncoes });
+      return responder(res, r.status, r.corpo);
+    }
+    if (caminho === "/whatsapp") return responder(res, 200, { envios: externos.estado.metaEnvios });
+    if (caminho === "/whatsapp/falha") { externos.estado.falhas.meta = corpo.erro ?? null; return responder(res, 200, { ok: true }); }
+    return responder(res, 404, { message: "Controle inexistente" });
+  }
+
+  /* ---------- Storage ---------- */
+  async function ehAdmin(req) {
+    const claims = claimsDe(req);
+    if (claims?.role !== "authenticated") return false;
+    try { return (await executarRpc(db, { papel: "authenticated", claims }, "e_admin")) === true; } catch { return false; }
+  }
+
+  async function rotaStorage(req, res, caminho) {
+    const m = /^\/object\/(?:public\/)?([a-z0-9_-]+)\/(.+)$/.exec(caminho);
+    if (req.method === "GET" && caminho.startsWith("/object/public/") && m) {
+      const arq = arquivos.get(`${m[1]}/${decodeURIComponent(m[2])}`);
+      if (!arq) return responder(res, 404, { statusCode: "404", error: "not_found", message: "Object not found" });
+      res.writeHead(200, { ...cors, "content-type": arq.tipo, "cache-control": "public, max-age=31536000" });
+      return res.end(arq.bytes);
+    }
+
+    const idBucket = m ? m[1] : (/^\/object\/([a-z0-9_-]+)$/.exec(caminho) ?? [])[1];
+    const bucket = idBucket ? (await sql(db, "select * from storage.buckets where id = $1", [idBucket])).rows[0] : null;
+    if (!bucket) return responder(res, 404, { statusCode: "404", error: "Bucket not found", message: "Bucket not found" });
+    if (req.method === "DELETE" && caminho === `/object/${idBucket}`) {
+      if (!(await ehAdmin(req))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
+      const { prefixes = [] } = await lerJson(req);
+      prefixes.forEach((p) => arquivos.delete(`${idBucket}/${p}`));
+      return responder(res, 200, prefixes.map((name) => ({ name })));
+    }
+    if ((req.method === "POST" || req.method === "PUT") && m) {
+      if (!(await ehAdmin(req))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
+      const bruto = await lerCorpo(req);
+      let arquivo;
+      if (/multipart\/form-data/.test(req.headers["content-type"] ?? "")) {
+        const dados = await new Response(bruto, { headers: { "content-type": req.headers["content-type"] } }).formData();
+        arquivo = dados.get("");
+        arquivo = { tipo: arquivo.type, bytes: Buffer.from(await arquivo.arrayBuffer()) };
+      } else {
+        arquivo = { tipo: req.headers["content-type"] ?? "application/octet-stream", bytes: bruto };
+      }
+      if (!bucket.allowed_mime_types.includes(arquivo.tipo)) return responder(res, 415, { statusCode: "415", error: "invalid_mime_type", message: `mime type ${arquivo.tipo} is not supported` });
+      if (arquivo.bytes.length > Number(bucket.file_size_limit)) return responder(res, 413, { statusCode: "413", error: "Payload too large", message: "The object exceeded the maximum allowed size" });
+      const nome = `${idBucket}/${decodeURIComponent(m[2])}`;
+      if (arquivos.has(nome)) return responder(res, 400, { statusCode: "409", error: "Duplicate", message: "The resource already exists" });
+      arquivos.set(nome, arquivo);
+      return responder(res, 200, { Key: nome, Id: crypto.randomUUID() });
+    }
+    return responder(res, 404, { statusCode: "404", error: "not_found", message: "Rota de Storage não suportada no emulador" });
+  }
+
+  /* ---------- Servidor ---------- */
+  const servidor = http.createServer(async (req, res) => {
+    try {
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, { ...cors, "access-control-allow-methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+          "access-control-allow-headers": req.headers["access-control-request-headers"] ?? "*", "access-control-max-age": "600" });
+        return res.end();
+      }
+      const url = new URL(req.url, "http://emulador");
+      const p = url.pathname;
+      if (p.startsWith("/auth/v1")) return await rotaAuth(req, res, p.slice(8), url);
+      if (p.startsWith("/rest/v1/rpc/")) return await rotaRpc(req, res, p.slice(13));
+      if (p.startsWith("/storage/v1")) return await rotaStorage(req, res, p.slice(11));
+      if (p.startsWith("/functions/v1/")) return await rotaFuncao(req, res, p.slice(14));
+      if (p.startsWith("/__teste/")) return await rotaTeste(req, res, p.slice(8));
+      return responder(res, 404, { message: "Rota não encontrada no emulador" });
+    } catch (e) {
+      console.error("[emulador]", e);
+      responder(res, 500, { message: String(e.message) });
+    }
+  });
+  await new Promise((ok) => servidor.listen(porta, "127.0.0.1", ok));
+  envFuncoes.SUPABASE_URL = `http://127.0.0.1:${servidor.address().port}`;
+  rpcFuncoes = criarRpc({ url: envFuncoes.SUPABASE_URL, chaveAnon, fetchFn: fetch });
+
+  return {
+    url: `http://127.0.0.1:${servidor.address().port}`,
+    chaveAnon, db, emails,
+    /** Cria uma conta de administrador (cadastra e promove no banco, como o SQL Editor faria). */
+    async criarAdmin(email = "admin@teste.local", senha = "Admin12345") {
+      const r = await fetch(`${this.url}/auth/v1/signup`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password: senha, data: { nome: "Administrador" } }) });
+      if (!r.ok && r.status !== 422) throw new Error(`Não criou o admin: ${r.status}`);
+      await sql(db, "update public.perfis set papel = 'admin' where lower(email) = lower($1)", [email]);
+      return { email, senha };
+    },
+    async fechar() {
+      servidor.closeAllConnections?.();
+      await new Promise((ok) => servidor.close(ok));
+      await db.close();
+    },
+  };
+}

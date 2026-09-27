@@ -1,0 +1,6 @@
+/* ESTILOS DO PAINEL — ponto de entrada (base → estrutura → componentes → páginas) */
+@import url("/src/estilos/base/index.css");
+
+@import url("estrutura.css");
+@import url("componentes.css");
+@import url("paginas.css");

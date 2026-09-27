@@ -1,0 +1,20 @@
+{
+  "name": "forminha-central",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Central da Forminha: cria, lista, atualiza e exclui as lojas das clientes.",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "node build/montar.mjs",
+    "dev": "node ferramentas/dev.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test \"ferramentas/testes/*.test.js\"",
+    "configurar": "node ferramentas/configurar.mjs",
+    "copiar-sql": "node ferramentas/copiar-sql.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0"
+  }
+}

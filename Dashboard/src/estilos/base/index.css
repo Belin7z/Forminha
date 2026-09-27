@@ -1,0 +1,8 @@
+/* ESTILOS COMPARTILHADOS — importados pela loja e pelo painel */
+@import url("tokens.css");
+@import url("base.css");
+@import url("botoes.css");
+@import url("formularios.css");
+@import url("sobreposicoes.css");
+@import url("indicadores.css");
+@import url("mapa.css");

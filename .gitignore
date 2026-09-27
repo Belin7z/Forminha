@@ -1,0 +1,7 @@
+# arquivos locais que nunca vão para o repositório (cada pasta tem também o seu .gitignore)
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.vercel/
