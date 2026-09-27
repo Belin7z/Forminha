@@ -1,0 +1,26 @@
+/* PÁGINA CONTATO — canais, horários e área de entrega */
+.pagina-contato { padding-bottom: 1rem; }
+.contato__grade { display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.4rem; align-items: start; }
+@media (max-width: 860px) { .contato__grade { grid-template-columns: 1fr; } }
+
+.info-lista { display: grid; gap: 1rem; margin-bottom: 1.2rem; }
+.info-lista li { display: flex; gap: .9rem; align-items: center; }
+.info-lista li > .icone { width: 44px; height: 44px; padding: 11px; border-radius: 14px; background: var(--rosa-100); color: var(--rosa-texto); box-sizing: border-box; }
+.info-lista small { display: block; color: var(--rosa-texto); font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; }
+.info-lista strong { color: var(--texto); font-weight: 500; word-break: break-word; }
+
+.horarios { display: grid; margin-bottom: .8rem; }
+.horarios li { display: flex; justify-content: space-between; gap: 1rem; padding: .6rem .5rem; border-bottom: 1px dashed var(--rosa-300); font-size: .9rem; }
+.horarios li span:last-child { font-weight: 600; color: var(--rosa-texto); }
+.horarios__hoje { background: var(--rosa-50); border-radius: 8px; border-bottom-color: transparent !important; font-weight: 600; }
+
+.tabela-zonas { font-size: .88rem; margin-bottom: 1rem; }
+.tabela-zonas th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--rosa-texto); padding: .5rem .4rem; border-bottom: 1px solid var(--rosa-200); }
+.tabela-zonas td { padding: .6rem .4rem; border-bottom: 1px solid var(--rosa-100); }
+
+/* páginas de texto (privacidade e termos) */
+.texto-legal { max-width: 820px; }
+.texto-legal .cartao-form { padding: 2rem 2.2rem; }
+.texto-legal h2 { font-size: 1.7rem; margin: 1.6rem 0 .5rem; }
+.texto-legal h2:first-child { margin-top: 0; }
+.texto-legal p { color: var(--texto); margin-bottom: .8rem; }

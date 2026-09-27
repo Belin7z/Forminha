@@ -1,0 +1,10 @@
+/* PÁGINA CARDÁPIO / FAVORITOS — barra de ferramentas e resultados */
+.pagina-cardapio { padding-bottom: 2rem; }
+.ferramentas { display: flex; flex-wrap: wrap; gap: .7rem; margin-bottom: 1rem; }
+.busca { position: relative; flex: 1 1 260px; color: var(--rosa-texto); }
+.busca .icone { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); }
+.busca input { width: 100%; padding: .72rem 1rem .72rem 2.7rem; border-radius: 999px; border: 1px solid var(--borda); background: #fff; font-size: .92rem; transition: border-color .18s, box-shadow .18s; }
+.busca input:focus { outline: 0; border-color: var(--rosa-400); box-shadow: 0 0 0 4px var(--rosa-200); }
+.ferramentas__ordem { width: auto; border-radius: 999px; padding-right: 2rem; background: #fff; }
+.resultado { font-size: .84rem; margin-bottom: .8rem; }
+.vazio--largo { grid-column: 1 / -1; }

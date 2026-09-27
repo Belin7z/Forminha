@@ -1,0 +1,41 @@
+/* PÁGINA PEDIDO — linha do tempo, PIX, itens e avaliação */
+.pedido { max-width: 1000px; padding-bottom: 1rem; }
+.pedido__novo { margin: .6rem 0 1rem; align-items: center; }
+.pedido__cab { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.pedido__cab h1 { font-family: var(--f-titulo); font-size: 1.8rem; color: var(--vinho); }
+.status--grande { font-size: .9rem; padding: .4rem 1rem; }
+
+.pedido__status { background: #fff; border: 1px solid var(--borda); border-radius: var(--raio-lg); padding: 1.6rem 1.5rem; margin-bottom: 1.2rem; box-shadow: var(--sombra-sm); text-align: center; }
+.tempo { display: flex; justify-content: space-between; gap: .3rem; margin-bottom: 1.3rem; position: relative; }
+.tempo__etapa { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .5rem; position: relative; font-size: .76rem; color: var(--texto-suave); }
+.tempo__etapa:not(:first-child)::before { content: ""; position: absolute; top: 15px; right: 50%; width: 100%; height: 3px; background: var(--rosa-200); z-index: 0; }
+.tempo__etapa--feita:not(:first-child)::before, .tempo__etapa--atual:not(:first-child)::before { background: var(--rosa-destaque); }
+.tempo__bolinha { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 3px solid var(--rosa-200); display: grid; place-items: center; font-weight: 600; font-size: .8rem; }
+.tempo__etapa--feita .tempo__bolinha { background: var(--rosa-destaque); border-color: var(--rosa-destaque); color: #fff; }
+.tempo__etapa--atual .tempo__bolinha { background: var(--rosa-300); border-color: var(--rosa-destaque); color: var(--vinho); box-shadow: 0 0 0 6px var(--rosa-100); animation: pulsar-rosa 2s infinite; }
+.tempo__etapa--atual .tempo__nome { color: var(--vinho); font-weight: 600; }
+.tempo__nome { max-width: 90px; line-height: 1.25; }
+.pedido__mensagem { font-size: 1.05rem; font-weight: 500; color: var(--vinho); margin-bottom: .4rem; }
+.pedido__mensagem--cancelado { color: var(--perigo); }
+@keyframes pulsar-rosa { 0%, 100% { box-shadow: 0 0 0 4px var(--rosa-100); } 50% { box-shadow: 0 0 0 9px rgba(249, 204, 220, .4); } }
+@media (max-width: 620px) { .tempo__nome { font-size: .66rem; max-width: 56px; } .tempo__bolinha { width: 28px; height: 28px; } .tempo__etapa:not(:first-child)::before { top: 13px; } }
+
+.pix { background: var(--rosa-50); border: 1px dashed var(--ouro); border-radius: var(--raio-lg); padding: 1.4rem 1.5rem; margin-bottom: 1.2rem; }
+.pix h2 { display: flex; align-items: center; gap: .5rem; font-family: var(--f-titulo); color: var(--vinho); font-size: 1.25rem; margin-bottom: .5rem; }
+.pix__qr { display: block; margin: .8rem auto; border: 1px solid var(--ouro); border-radius: var(--raio-sm); padding: .5rem; background: #fff; }
+.pix__aguardando { display: flex; align-items: center; gap: .4rem; justify-content: center; margin-top: .8rem; font-size: .85rem; }
+.pix__alternativo { margin-top: 1rem; font-size: .88rem; }
+.pix__alternativo summary { cursor: pointer; color: var(--vinho); }
+.pix__codigo { display: block; margin: .9rem 0; padding: .8rem 1rem; background: #fff; border-radius: var(--raio-sm); border: 1px solid var(--borda); font-family: ui-monospace, Consolas, monospace; font-size: .76rem; word-break: break-all; max-height: 84px; overflow-y: auto; color: var(--texto); }
+
+.pedido__grade { display: grid; grid-template-columns: 1.15fr 1fr; gap: 1.2rem; align-items: start; }
+@media (max-width: 800px) { .pedido__grade { grid-template-columns: 1fr; } }
+.pedido__itens li { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--rosa-100); font-size: .9rem; }
+.pedido__itens small { display: block; color: var(--texto-suave); font-size: .76rem; }
+.pedido__acoes { display: flex; flex-wrap: wrap; gap: .6rem; }
+.pedido .cartao-form p { display: flex; gap: .5rem; align-items: flex-start; margin-bottom: .4rem; font-size: .92rem; }
+.pedido .cartao-form p .icone { margin-top: 3px; color: var(--rosa-destaque); }
+
+.historico { display: grid; gap: .8rem; }
+.historico li { display: grid; gap: .15rem; justify-items: start; padding-left: .8rem; border-left: 3px solid var(--rosa-200); }
+.avaliacao { margin-top: 1.2rem; }

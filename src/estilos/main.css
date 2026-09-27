@@ -1,0 +1,13 @@
+/* ESTILOS DA LOJA — ponto de entrada (base → layout → componentes → páginas) */
+@import url("/src/estilos/base/index.css");
+
+@import url("layout.css");
+@import url("componentes.css");
+
+@import url("paginas/inicio.css");
+@import url("paginas/cardapio.css");
+@import url("paginas/autenticacao.css");
+@import url("paginas/checkout.css");
+@import url("paginas/conta.css");
+@import url("paginas/pedido.css");
+@import url("paginas/contato.css");

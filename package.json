@@ -1,0 +1,13 @@
+{
+  "name": "luciene-loja",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Loja — site do cliente (Vercel + Supabase)",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "node build/montar.mjs loja"
+  }
+}

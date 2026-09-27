@@ -1,0 +1,53 @@
+/* ==========================================================
+   TOKENS — a identidade visual em um só lugar.
+   Rosa bebê como assinatura, cacau para o texto e um toque
+   champanhe nos detalhes. Trocar uma cor aqui muda o site todo.
+   ========================================================== */
+:root {
+  /* Rosa bebê: do quase-branco ao rosa mais firme */
+  --rosa-25:  #fffcfd;
+  --rosa-50:  #fef7f9;
+  --rosa-100: #fcedf2;
+  --rosa-200: #f9dde7;
+  --rosa-300: #f4c9d9;   /* rosa bebê principal */
+  --rosa-400: #ebaac4;
+  --rosa-500: #df88a8;
+
+  /* Rosas para texto e detalhes (contraste ≥ 4,5:1 sobre branco) */
+  --rosa-destaque: #b4527a;
+  --rosa-texto:    #96395f;
+
+  /* Cacau e neutros quentes */
+  --vinho:       #4f2436;   /* títulos e botão principal */
+  --cacau:       #2e1a24;   /* rodapé e fundos escuros */
+  --texto:       #4a3540;
+  --texto-suave: #82707a;
+  --creme:       #fdf8f4;
+  --branco:      #ffffff;
+  --borda:       #efe0e7;
+  --fundo:       #fffaf9;
+
+  /* Champanhe: filetes, estrelas e pequenos detalhes */
+  --ouro:        #b08a58;
+  --ouro-claro:  #ead9bd;
+
+  /* Estados */
+  --sucesso:  #2b8a5e;  --sucesso-bg:  #e3f6ec;
+  --aviso:    #a8620a;  --aviso-bg:    #fdf0d9;
+  --info:     #3b6fc4;  --info-bg:     #e6effc;
+  --perigo:   #c8324f;  --perigo-bg:   #fde6eb;
+  --whats:    #15803d;
+
+  /* Formas e sombras (suaves, com tom de cacau) */
+  --raio-sm: 8px;
+  --raio:    14px;
+  --raio-lg: 20px;
+  --sombra-sm: 0 1px 2px rgba(79, 36, 54, .05), 0 2px 8px rgba(79, 36, 54, .05);
+  --sombra:    0 2px 4px rgba(79, 36, 54, .04), 0 12px 32px rgba(79, 36, 54, .08);
+  --sombra-forte: 0 4px 8px rgba(79, 36, 54, .06), 0 24px 56px rgba(79, 36, 54, .16);
+
+  /* Fontes */
+  --f-titulo: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --f-corpo:  "Jost", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-script: var(--f-titulo);
+}

@@ -1,0 +1,51 @@
+/* BASE — reset, tipografia e utilidades usadas em toda parte */
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; font-family: var(--f-corpo); color: var(--texto); background: var(--fundo);
+  font-size: 1.02rem; line-height: 1.65; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  font-variant-numeric: lining-nums; /* preços e números legíveis, mesmo nos títulos em serifa */
+}
+img, svg { max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2, h3 { font-family: var(--f-titulo); font-weight: 600; color: var(--vinho); letter-spacing: -.005em; line-height: 1.12; }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+table { border-collapse: collapse; width: 100%; }
+::selection { background: var(--rosa-300); color: var(--vinho); }
+
+:focus-visible { outline: 2px solid var(--rosa-destaque); outline-offset: 3px; border-radius: 6px; }
+
+.icone { flex: none; vertical-align: middle; }
+.texto-suave { color: var(--texto-suave); }
+.texto-direita { text-align: right; }
+.texto-centro { text-align: center; }
+.negrito { font-weight: 500; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* palavra de destaque nos títulos: serifa em itálico, sem letra cursiva */
+.script { font-family: var(--f-titulo); font-style: italic; font-weight: 600; color: var(--rosa-destaque); }
+.linha-flex { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.espaco { flex: 1; }
+
+/* pequeno rótulo em caixa-alta, acima dos títulos de seção */
+.rotulo { display: inline-block; font-size: .7rem; font-weight: 500; letter-spacing: .24em; text-transform: uppercase; color: var(--ouro); }
+
+/* filete com um losango no meio (separador elegante) */
+.ornamento { display: flex; align-items: center; justify-content: center; gap: .8rem; color: var(--ouro); }
+.ornamento::before, .ornamento::after { content: ""; height: 1px; width: 56px; background: linear-gradient(90deg, transparent, var(--ouro-claro)); }
+.ornamento::after { transform: scaleX(-1); }
+.ornamento i { width: 6px; height: 6px; background: currentColor; transform: rotate(45deg); }
+
+/* entrada suave ao rolar a página (ligada só quando o JavaScript está ativo) */
+.anima .revelar { opacity: 0; transform: translateY(16px); transition: opacity .8s cubic-bezier(.2, .7, .2, 1), transform .8s cubic-bezier(.2, .7, .2, 1); }
+.anima .revelar.revelar--visivel { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+  .anima .revelar { opacity: 1; transform: none; }
+}
