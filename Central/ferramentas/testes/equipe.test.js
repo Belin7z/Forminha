@@ -159,10 +159,10 @@ describe("cada função faz só o que pode", () => {
   it("as atividades mostram quem fez o quê (e dá para filtrar por pessoa)", async () => {
     const { atividades } = (await api("GET", "atividades")).dados;
     const linhas = atividades.map((a) => `${a.usuario} | ${a.acao} | ${a.alvo}`);
-    assert.ok(linhas.includes(`${vendedora.usuario} | Cadastrou cliente e gerou a cobrança | Doce da Maria`), linhas.join("\n"));
-    assert.ok(linhas.includes(`${financeiro.usuario} | Confirmou pagamento recebido | Doce da Maria`));
+    assert.ok(linhas.includes(`${vendedora.usuario} | Cadastrou cliente | Doce da Maria`), linhas.join("\n"));
+    assert.ok(linhas.includes(`${financeiro.usuario} | Confirmou pagamento | Doce da Maria`));
     assert.ok(linhas.includes(`${suporte.usuario} | Anotou na ficha | Doce da Maria`));
-    assert.ok(linhas.includes(`${suporte.usuario} | Entrou na Central | `));
+    assert.ok(linhas.includes(`${suporte.usuario} | Entrou | `));
     assert.ok(linhas.some((l) => l.startsWith(`Dono | Cadastrou funcionário | ${vendedora.usuario}`)));
     const soDela = (await api("GET", `atividades?quem=${vendedora.id}`)).dados.atividades;
     assert.ok(soDela.length > 0 && soDela.every((a) => a.usuario === vendedora.usuario));

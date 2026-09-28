@@ -266,51 +266,56 @@ button.quem-esta:hover { border-color: var(--detalhe); }
 .quem-esta small { color: var(--texto-suave); font-size: .7rem; }
 .quem-esta--dono { color: var(--texto-suave); }
 
-/* ---------- equipe ---------- */
-.tabela-equipe { border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie); overflow: hidden; }
-.te__cab, .te__linha { display: grid; grid-template-columns: minmax(0, 1.8fr) 7.5rem minmax(0, 1fr) minmax(0, 1.3fr) 9rem auto; gap: 1rem; align-items: center; padding: .8rem 1.2rem; }
-.te__cab { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--detalhe); border-bottom: 1px solid var(--borda); }
-.te__linha { border-bottom: 1px solid var(--borda); }
-.te__linha:last-child { border-bottom: 0; }
-.te__linha--inativa { opacity: .62; }
-.te__nome { display: grid; min-width: 0; }
-.te__nome strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.te__nome small, .te__data { color: var(--texto-suave); font-size: .8rem; }
-.te__acoes { display: flex; gap: .15rem; justify-content: flex-end; }
-.equipe__extras { margin-top: 1.4rem; }
-.equipe__extras .cartao__cab select { width: auto; max-width: 12rem; padding: .35rem .6rem; font-size: .85rem; }
-.funcoes { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
-.funcoes li p { margin: .3rem 0 0; font-size: .86rem; color: var(--texto-suave); }
-.funcoes__cab { display: flex; align-items: center; gap: .5rem; }
-.atividades { list-style: none; margin: 0; padding: 0; display: grid; max-height: 26rem; overflow: auto; }
-.atividades li { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) auto; gap: .7rem; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--borda); font-size: .86rem; }
-.atividades li:last-child { border-bottom: 0; }
-.atividades__quem { font: 500 .78rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--detalhe); }
-.atividades time { color: var(--texto-suave); font-size: .74rem; white-space: nowrap; }
-.funcoes-escolha { display: grid; gap: .5rem; margin: .4rem 0 1rem; padding: 0; border: 0; }
-.funcoes-escolha legend { margin-bottom: .5rem; font-size: .88rem; font-weight: 500; }
-.funcoes-escolha__item { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem .85rem; border: 1px solid var(--borda); border-radius: var(--raio); cursor: pointer; transition: border-color .15s, background .15s; }
-.funcoes-escolha__item:hover { border-color: var(--detalhe); }
-.funcoes-escolha__item:has(input:checked) { border-color: var(--escura); background: var(--marca-25); }
-.funcoes-escolha__item input { margin-top: .25rem; accent-color: var(--escura); }
-.funcoes-escolha__item > span { display: grid; gap: .15rem; }
-.funcoes-escolha__item small { color: var(--texto-suave); font-size: .82rem; }
-.acesso-pronto { display: grid; gap: .1rem; margin-bottom: 1rem; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; }
-.acesso-pronto__linha { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .7rem .9rem; background: var(--marca-25); }
-.acesso-pronto__linha span { color: var(--texto-suave); font-size: .85rem; }
-.acesso-pronto__linha .codigo { font-size: 1rem; }
+/* ---------- tabelas (equipe e atividade): cabeçalho e linhas na mesma grade ---------- */
+.tabela { border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie); overflow: hidden; }
+.tabela__linha { display: grid; grid-template-columns: var(--colunas); column-gap: 1.5rem; align-items: center; min-height: 3.5rem; padding: .5rem 1.25rem; border-bottom: 1px solid var(--borda); font-size: .9rem; }
+.tabela__linha:last-child { border-bottom: 0; }
+.tabela__linha > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tabela__cab { min-height: 0; padding-block: .7rem; font-size: .68rem; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--texto-suave); background: var(--marca-25); }
+.tabela__linha--apagada { color: var(--texto-suave); }
+.tabela__principal { display: grid; }
+.tabela__principal strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.tabela__mono { font: 500 .86rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .03em; }
+.tabela__suave { color: var(--texto-suave); font-size: .84rem; }
+.tabela__acoes { display: flex; justify-content: flex-end; gap: .1rem; overflow: visible !important; }
+.tabela--equipe { --colunas: minmax(0, 1.6fr) 6.5rem minmax(0, 1fr) minmax(0, 1fr) 7.5rem 10.6rem; }
+.tabela--atividades { --colunas: 7.5rem 6.5rem minmax(0, 1.3fr) minmax(0, 1fr); }
+.so-celular { display: none; }
+.ponto { display: inline-flex; align-items: center; gap: .5rem; }
+.ponto::before { content: ""; flex: none; width: .5rem; height: .5rem; border-radius: 50%; background: var(--borda-forte); }
+.ponto--sucesso::before { background: var(--sucesso); }
+.ponto--aviso::before { background: #d4962b; }
+.secao-titulo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 2.4rem 0 .9rem; }
+.secao-titulo h2 { font-size: 1.6rem; }
+.entrada--compacta { width: auto; min-width: 11rem; padding: .45rem .7rem; font-size: .86rem; }
+
+/* formulários e dados curtos: rótulo em cima, valor embaixo, tudo na mesma margem */
+.form-empilhado .campo { margin-bottom: 1.1rem; }
+.form-empilhado__dica { margin: -.55rem 0 0; font-size: .82rem; color: var(--texto-suave); }
+.dados-empilhados { display: grid; gap: 1.1rem; margin: 0 0 1.1rem; }
+.dados-empilhados dt { font-size: .72rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-suave); }
+.dados-empilhados dd { margin: .25rem 0 0; font-size: 1.05rem; }
+.dados-empilhados dd.tabela__mono { font-size: 1.1rem; }
 .primeira-senha__texto { margin: -.4rem 0 1.2rem; }
 
-@media (max-width: 900px) {
-  .te__cab { display: none; }
-  .te__linha { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nome acoes" "usuario funcao" "situacao situacao"; row-gap: .45rem; }
-  .te__linha > :nth-child(1) { grid-area: nome; }
-  .te__linha > :nth-child(2) { grid-area: usuario; }
-  .te__linha > :nth-child(3) { grid-area: funcao; justify-self: end; }
-  .te__linha > :nth-child(4) { grid-area: situacao; }
-  .te__linha > :nth-child(5) { display: none; }
-  .te__linha > :nth-child(6) { grid-area: acoes; }
+@media (max-width: 760px) {
+  .tabela__cab { display: none; }
+  .tabela--equipe .tabela__linha { grid-template-columns: minmax(0, 1fr) auto; padding-block: .7rem; }
+  .tabela--equipe .tabela__linha > :nth-child(n+2):nth-child(-n+5) { display: none; }
+  .tabela--equipe .so-celular { display: block; margin-top: .15rem; color: var(--texto-suave); font-size: .78rem; }
+  .tabela--atividades .tabela__linha { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "quem quando" "acao acao" "alvo alvo"; row-gap: .2rem; padding-block: .75rem; }
+  .tabela--atividades .tabela__linha > :nth-child(1) { grid-area: quando; justify-self: end; font-size: .76rem; }
+  .tabela--atividades .tabela__linha > :nth-child(2) { grid-area: quem; }
+  .tabela--atividades .tabela__linha > :nth-child(3) { grid-area: acao; }
+  .tabela--atividades .tabela__linha > :nth-child(4) { grid-area: alvo; font-size: .8rem; }
+  .secao-titulo { flex-wrap: wrap; }
 }
 @media (max-width: 560px) {
-  .atividades li { grid-template-columns: minmax(0, 1fr); gap: .15rem; }
+  /* 4 abas não cabem com nome: só o ícone, e o nome da aba aberta */
+  .abas-central__item:not(.abas-central__item--ativa) > span { display: none; }
+  .abas-central__item:not(.abas-central__item--ativa) { flex: 0 0 auto; padding-inline: .8rem; }
+  .abas-central__item--ativa { flex: 1; }
+  .tabela--equipe [data-copiar] { display: none; }
+  .tabela--equipe .so-celular { white-space: normal; }
+  .tabela--atividades .tabela__vazio { display: none; }
 }

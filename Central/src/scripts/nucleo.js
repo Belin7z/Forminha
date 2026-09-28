@@ -33,6 +33,13 @@ export const aviso = (tipo, conteudo) => html`<div class="aviso aviso--${tipo}">
 
 export const reais = (centavos) => (Number(centavos || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 export const quando = (iso) => (iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+/** "28/09 15:37" (com o ano só se for de outro ano): datas curtas para tabelas. */
+export function quandoCurto(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const data = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", ...(d.getFullYear() !== new Date().getFullYear() && { year: "2-digit" }) });
+  return `${data} ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+}
 export const dia = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : "");
 export const telefoneBonito = (t) => {
   const d = String(t ?? "").replace(/\D/g, "");

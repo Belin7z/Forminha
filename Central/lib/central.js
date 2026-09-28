@@ -141,7 +141,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
         throw new ErroHttp(401, "E-mail (ou usuário) ou senha incorretos.");
       }
       tentativas.delete(ip);
-      if (equipe) await equipe.registrar({ quem: quem.id, usuario: quem.usuario, acao: "Entrou na Central" }).catch(() => {});
+      if (equipe) await equipe.registrar({ quem: quem.id, usuario: quem.usuario, acao: "Entrou" }).catch(() => {});
       return { corpo: { ok: true, trocar_senha: Boolean(quem.trocar_senha) }, cookie: cookieDe(quem, versao, seguro) };
     }],
     ["POST", /^sair$/, false, async ({ seguro }) => ({ corpo: { ok: true }, cookie: cookieDeSaida(seguro) })],
@@ -167,44 +167,44 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["POST", /^senha$/, "dono", async ({ corpo, seguro }) => {
       const versao = await acesso.trocarSenha(corpo);
       return { corpo: { ok: true }, cookie: cookieDe(DONO, versao, seguro) };
-    }, "Trocou a senha da Central"],
+    }, "Trocou a senha"],
     ["GET", /^conta$/, "dono", async () => ({ corpo: await acesso.conta() })],
-    ["PUT", /^conta$/, "dono", async ({ corpo }) => ({ corpo: await acesso.salvarConta(corpo) }), "Mudou o e-mail ou o usuário de acesso"],
+    ["PUT", /^conta$/, "dono", async ({ corpo }) => ({ corpo: await acesso.salvarConta(corpo) }), "Alterou a conta"],
 
     /* ---------- a própria senha (funcionário) ---------- */
     ["POST", /^minha-senha$/, true, async ({ quem, corpo, seguro }) => {
       if (quem.tipo !== "funcionario") throw new ErroHttp(404, "Use Configurações → Senha de acesso.");
       const f = await exigirEquipe().trocarMinhaSenha(quem.id, corpo);
       return { corpo: { ok: true }, cookie: cookieDe(quem, f.versao, seguro) };
-    }, ({ quem }) => [quem.trocar_senha ? "Criou a própria senha" : "Trocou a própria senha"]],
+    }, ({ quem }) => [quem.trocar_senha ? "Criou a senha" : "Trocou a senha"]],
 
     /* ---------- clientes ---------- */
     ["GET", /^clientes$/, "clientes.ver", async () => ({ corpo: { clientes: await (await exigirClientes()).listar() } })],
-    ["POST", /^clientes$/, "clientes.cadastrar", async ({ corpo }) => ({ corpo: await (await exigirClientes()).cadastrar(corpo) }), "Cadastrou cliente e gerou a cobrança"],
+    ["POST", /^clientes$/, "clientes.cadastrar", async ({ corpo }) => ({ corpo: await (await exigirClientes()).cadastrar(corpo) }), "Cadastrou cliente"],
     ["GET", new RegExp(`^clientes/${ID}$`), "clientes.ver", async ({ m }) => ({ corpo: await (await exigirClientes()).detalhe(m[1]) })],
-    ["PUT", new RegExp(`^clientes/${ID}$`), "clientes.editar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).atualizar(m[1], corpo) }), "Editou os dados da cliente"],
+    ["PUT", new RegExp(`^clientes/${ID}$`), "clientes.editar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).atualizar(m[1], corpo) }), "Editou cliente"],
     ["POST", new RegExp(`^clientes/${ID}/notas$`), "clientes.notas", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).anotar(m[1], corpo) }), "Anotou na ficha"],
-    ["POST", new RegExp(`^clientes/${ID}/pagamento-recebido$`), "pagamentos.confirmar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).confirmarManual(m[1], corpo) }), "Confirmou pagamento recebido"],
+    ["POST", new RegExp(`^clientes/${ID}/pagamento-recebido$`), "pagamentos.confirmar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).confirmarManual(m[1], corpo) }), "Confirmou pagamento"],
     ["POST", new RegExp(`^clientes/${ID}/avancar$`), "clientes.ver", async ({ m }) => {
       const c = await exigirClientes();
       await c.avancar(m[1], { orcamento: 20_000 });
       return { corpo: await c.detalhe(m[1]) };
     }],
-    ["POST", new RegExp(`^clientes/${ID}/tentar-de-novo$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).retomar(m[1]) }), "Retomou a criação da loja"],
+    ["POST", new RegExp(`^clientes/${ID}/tentar-de-novo$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).retomar(m[1]) }), "Retomou a criação"],
     ["POST", new RegExp(`^clientes/${ID}/reenviar$`), true, async ({ m, corpo, quem }) => {
       // reenviar a cobrança é de quem cobra; reenviar o convite, de quem dá suporte
       const precisa = corpo.tipo === "cobranca" ? "pagamentos.cobrar" : "lojas.suporte";
       if (!quem.permissoes.includes(precisa)) throw new ErroHttp(403, "Sua função não permite fazer isso.");
       return { corpo: await (await exigirClientes()).reenviar(m[1], corpo) };
-    }, ({ corpo }) => [corpo.tipo === "cobranca" ? "Reenviou o e-mail de cobrança" : "Reenviou o convite por e-mail"]],
-    ["POST", new RegExp(`^clientes/${ID}/convite$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).novoConvite(m[1]) }), "Gerou link de acesso novo"],
-    ["POST", new RegExp(`^clientes/${ID}/redefinir-senha$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).redefinirSenha(m[1]) }), "Gerou link para a dona criar senha nova"],
-    ["POST", new RegExp(`^clientes/${ID}/cobrar$`), "pagamentos.cobrar", async ({ m }) => ({ corpo: await (await exigirClientes()).cobrarDeNovo(m[1]) }), "Gerou cobrança nova"],
-    ["POST", new RegExp(`^clientes/${ID}/cancelar$`), "pagamentos.cancelar", async ({ m }) => ({ corpo: await (await exigirClientes()).cancelar(m[1]) }), "Cancelou o cadastro"],
+    }, ({ corpo }) => [corpo.tipo === "cobranca" ? "Reenviou cobrança" : "Reenviou convite"]],
+    ["POST", new RegExp(`^clientes/${ID}/convite$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).novoConvite(m[1]) }), "Gerou link de acesso"],
+    ["POST", new RegExp(`^clientes/${ID}/redefinir-senha$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).redefinirSenha(m[1]) }), "Redefiniu senha da dona"],
+    ["POST", new RegExp(`^clientes/${ID}/cobrar$`), "pagamentos.cobrar", async ({ m }) => ({ corpo: await (await exigirClientes()).cobrarDeNovo(m[1]) }), "Gerou cobrança"],
+    ["POST", new RegExp(`^clientes/${ID}/cancelar$`), "pagamentos.cancelar", async ({ m }) => ({ corpo: await (await exigirClientes()).cancelar(m[1]) }), "Cancelou cadastro"],
 
     // o valor padrão aparece no cadastro de quem vende; mudar é só com você
     ["GET", /^configuracoes$/, true, async () => ({ corpo: await (await exigirClientes()).lerConfig() })],
-    ["PUT", /^configuracoes$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarConfig(corpo) }), "Mudou o valor da loja ou a chave PIX"],
+    ["PUT", /^configuracoes$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarConfig(corpo) }), "Alterou a cobrança"],
 
     /* ---------- equipe (só você) ---------- */
     ["GET", /^equipe$/, "equipe", async () => ({
@@ -216,7 +216,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
     })],
     ["POST", /^equipe$/, "equipe", async ({ corpo }) => ({ corpo: await exigirEquipe().criar(corpo) }), ({ r }) => ["Cadastrou funcionário", r.corpo.funcionario.usuario]],
     ["PUT", new RegExp(`^equipe/${ID}$`), "equipe", async ({ m, corpo }) => ({ corpo: await exigirEquipe().editar(m[1], corpo) }), ({ r }) => ["Editou funcionário", r.corpo.usuario]],
-    ["POST", new RegExp(`^equipe/${ID}/nova-senha$`), "equipe", async ({ m }) => ({ corpo: await exigirEquipe().novaSenha(m[1]) }), ({ r }) => ["Gerou senha temporária", r.corpo.funcionario.usuario]],
+    ["POST", new RegExp(`^equipe/${ID}/nova-senha$`), "equipe", async ({ m }) => ({ corpo: await exigirEquipe().novaSenha(m[1]) }), ({ r }) => ["Gerou senha nova", r.corpo.funcionario.usuario]],
     ["POST", new RegExp(`^equipe/${ID}/ativo$`), "equipe", async ({ m, corpo }) => ({ corpo: await exigirEquipe().definirAtivo(m[1], corpo.ativo) }),
       ({ r }) => [r.corpo.ativo ? "Reativou funcionário" : "Desativou funcionário", r.corpo.usuario]],
     ["DELETE", new RegExp(`^equipe/${ID}$`), "equipe", async ({ m }) => ({ corpo: await exigirEquipe().excluir(m[1]) }), ({ r }) => ["Excluiu funcionário", r.corpo.usuario]],
@@ -258,12 +258,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.publicar(loja), alvo: loja.nome };
-    }, "Publicou os sites da loja"],
+    }, "Publicou loja"],
     ["POST", /^lojas\/([a-z]+)\/convite$/, "lojas.suporte", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.convite(loja, corpo.email), alvo: loja.nome };
-    }, "Gerou convite da loja"],
+    }, "Gerou convite"],
     ["POST", /^lojas\/([a-z]+)\/reativar$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);

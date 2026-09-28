@@ -32,19 +32,19 @@ export const TODAS = Object.keys(PERMISSOES);
 
 export const FUNCOES = {
   gerente: {
-    nome: "Gerente", letra: "G", descricao: "Cuida de clientes, pagamentos e lojas. Não mexe na equipe, nas configurações nem exclui lojas.",
+    nome: "Gerente", letra: "G", descricao: "Clientes, pagamentos e lojas.",
     permissoes: ["clientes.ver", "clientes.cadastrar", "clientes.editar", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar", "lojas.ver", "lojas.suporte", "lojas.criar"],
   },
   vendedor: {
-    nome: "Vendedor", letra: "V", descricao: "Cadastra clientes, gera e reenvia cobranças.",
+    nome: "Vendedor", letra: "V", descricao: "Cadastra clientes e cobra.",
     permissoes: ["clientes.ver", "clientes.cadastrar", "clientes.editar", "clientes.notas", "pagamentos.cobrar"],
   },
   suporte: {
-    nome: "Suporte", letra: "S", descricao: "Ajuda as donas de loja: acesso, senha, convite e lojas.",
+    nome: "Suporte", letra: "S", descricao: "Atende as donas de loja.",
     permissoes: ["clientes.ver", "clientes.editar", "clientes.notas", "lojas.ver", "lojas.suporte"],
   },
   financeiro: {
-    nome: "Financeiro", letra: "F", descricao: "Confirma pagamentos, gera cobranças e cancela cadastros.",
+    nome: "Financeiro", letra: "F", descricao: "Confirma e cancela pagamentos.",
     permissoes: ["clientes.ver", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar"],
   },
 };

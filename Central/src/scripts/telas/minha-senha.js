@@ -7,9 +7,9 @@ import { api, marca, raiz } from "../nucleo.js";
 import { botaoTema } from "../claro-escuro.js";
 
 const campos = (primeira) => html`
-  ${campo({ nome: "atual", rotulo: primeira ? "Senha temporária (a que você recebeu)" : "Senha atual", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password" autofocus' })}
-  ${campo({ nome: "nova", rotulo: "Sua senha nova", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password" minlength="8"', ajuda: "8 caracteres ou mais. Só você vai saber." })}
-  ${campo({ nome: "repita", rotulo: "Repita a senha nova", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password"' })}`;
+  ${campo({ nome: "atual", rotulo: primeira ? "Senha temporária" : "Senha atual", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password" autofocus' })}
+  ${campo({ nome: "nova", rotulo: "Nova senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password" minlength="8"', ajuda: "8 caracteres ou mais." })}
+  ${campo({ nome: "repita", rotulo: "Repita a nova senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password"' })}`;
 
 /** 1º acesso (ou senha temporária nova): antes de qualquer coisa, a pessoa cria a própria senha. */
 export function telaPrimeiraSenha(eu, aoTerminar) {
@@ -26,11 +26,11 @@ export function telaPrimeiraSenha(eu, aoTerminar) {
         <div class="entrar__caixa">
           ${marca}
           <h1>Olá, ${String(q.nome).split(" ")[0]}!</h1>
-          <p class="texto-suave primeira-senha__texto">Seu usuário é <strong class="codigo codigo--texto">${q.usuario}</strong> (${q.funcao_nome}). Para começar, crie a sua senha.</p>
+          <p class="texto-suave primeira-senha__texto">Crie a sua senha para começar.</p>
           <form id="form-primeira" novalidate>
             <div class="form-erro" data-erro-geral hidden></div>
             ${campos(true)}
-            <button type="submit" class="btn btn--primario btn--grande btn--bloco">Criar senha e entrar ${icone("direita", { tamanho: 17 })}</button>
+            <button type="submit" class="btn btn--primario btn--grande btn--bloco">Entrar ${icone("direita", { tamanho: 17 })}</button>
           </form>
           <p class="entrar__ajuda"><button type="button" class="link" data-acao="sair">Sair</button></p>
         </div>
@@ -44,7 +44,7 @@ export function telaPrimeiraSenha(eu, aoTerminar) {
     await ocupado(form.querySelector("[type=submit]"), async () => {
       try {
         await api("POST", "minha-senha", dadosDe(form));
-        toast("Senha criada. Bem-vinda à equipe!");
+        toast("Senha criada.");
         await aoTerminar();
       } catch (erro) { mostrarErros(form, erro); }
     });
@@ -66,7 +66,7 @@ export function trocarMinhaSenha() {
       try {
         await api("POST", "minha-senha", dadosDe(form));
         modal.fechar();
-        toast("Senha trocada. Use a nova da próxima vez que entrar.");
+        toast("Senha trocada.");
       } catch (erro) { mostrarErros(form, erro); }
     });
   });
