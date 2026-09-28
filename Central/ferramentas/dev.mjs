@@ -13,6 +13,9 @@ import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { criarCentral } from "../lib/central.js";
 import { resumirSenha } from "../lib/sessao.js";
+import { novaChave } from "../lib/cofre.js";
+import { criarEmail } from "../lib/email.js";
+import { criarMercadoPago } from "../lib/mercadopago.js";
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 if (existsSync(join(raiz, ".env"))) {
@@ -27,10 +30,18 @@ let env = { ...process.env };
 let opcoes = {};
 const deVerdade = Boolean(env.SUPABASE_ACCESS_TOKEN && env.VERCEL_TOKEN);
 if (!deVerdade) {
-  const { criarSimulado } = await import("./simulado.js");
+  const { bancoDeTeste, criarSimulado } = await import("./simulado.js");
   const sim = criarSimulado({ prontoEmMs: 6000 });
-  env = { ...env, ...sim.env, CENTRAL_SENHA_HASH: await resumirSenha("forminha"), CRON_SECRET: "cron-local" };
-  opcoes = { fetchFn: sim.fetchFn, simulado: true };
+  env = {
+    ...env, ...sim.env, CENTRAL_SENHA_HASH: await resumirSenha("forminha"), CRON_SECRET: "cron-local",
+    CHAVE_CRIPTOGRAFIA: novaChave(), URL_CENTRAL: `http://localhost:${PORTA}`,
+  };
+  opcoes = {
+    fetchFn: sim.fetchFn, simulado: true, banco: await bancoDeTeste(), esperaBancoMs: 1500,
+    // e-mails de teste aparecem aqui no terminal, em vez de sair de verdade
+    email: criarEmail({ usuario: "forminha@teste.local", transporte: { sendMail: async (m) => console.log(`\n✉  E-mail (teste) para ${m.to}: ${m.subject}\n   ${String(m.text).split("\n").find((l) => l.includes("http")) ?? ""}\n`) } }),
+    mercadoPago: criarMercadoPago({ token: "mp-simulado", fetchFn: sim.fetchFn }),
+  };
 }
 env.SEGREDO_SESSAO ||= randomBytes(32).toString("hex");
 const central = criarCentral(env, opcoes);

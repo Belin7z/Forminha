@@ -61,6 +61,15 @@ export function criarSupabase({ token, base = "https://api.supabase.com", fetchF
       if (!/^(eyJ|sb_publishable_)/.test(String(escolhida?.api_key ?? ""))) throw new ErroProvedor("Supabase", 0, "não encontrei a chave pública do projeto");
       return escolhida.api_key;
     },
+    /** Chave ADMINISTRATIVA da loja: só para o suporte (link de redefinir senha). Usada na hora e descartada:
+        nunca é gravada, devolvida para a tela nem escrita em registro. */
+    async chaveSecreta(ref) {
+      const chaves = await api("GET", `/v1/projects/${encodeURIComponent(ref)}/api-keys?reveal=true`);
+      const lista = Array.isArray(chaves) ? chaves : [];
+      const escolhida = lista.find((k) => k.type === "secret") ?? lista.find((k) => k.name === "service_role");
+      if (!/^(eyJ|sb_secret_)/.test(String(escolhida?.api_key ?? ""))) throw new ErroProvedor("Supabase", 0, "não consegui a chave administrativa da loja");
+      return escolhida.api_key;
+    },
     configurarLogin: (ref, dados) => api("PATCH", `/v1/projects/${encodeURIComponent(ref)}/config/auth`, dados),
   };
 }

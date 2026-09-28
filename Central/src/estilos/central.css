@@ -125,3 +125,135 @@
   .central__titulo .btn { width: 100%; justify-content: center; }
   .entrar__caixa { padding: 2.2rem 1.4rem 1.6rem; }
 }
+
+/* ---------- abas do topo ---------- */
+.abas-central { display: flex; gap: .25rem; padding: .25rem; border-radius: 999px; background: var(--marca-50); border: 1px solid var(--borda); }
+.abas-central__item { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .95rem; border-radius: 999px; color: var(--texto-suave); font-size: .88rem; font-weight: 500; text-decoration: none; transition: background .2s, color .2s; }
+.abas-central__item:hover { color: var(--texto); }
+.abas-central__item--ativa { background: var(--superficie, #fff); color: var(--escura); box-shadow: var(--sombra-sm); }
+.central__titulo-acoes { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+.busca-central { display: flex; align-items: center; gap: .45rem; padding: 0 .85rem; height: 42px; border: 1px solid var(--borda); border-radius: 999px; background: var(--superficie, #fff); color: var(--texto-suave); }
+.busca-central:focus-within { border-color: var(--detalhe); }
+.busca-central input { border: 0; outline: 0; background: transparent; font: inherit; color: var(--texto); width: 14rem; max-width: 50vw; }
+
+/* ---------- lista de clientes ---------- */
+.tabela-clientes { border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie, #fff); overflow: hidden; }
+.tc__cab, .tc__linha { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) 7rem 7rem; gap: 1rem; align-items: center; padding: .85rem 1.2rem; }
+.tc__cab { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--detalhe); border-bottom: 1px solid var(--borda); }
+.tc__linha { width: 100%; border: 0; border-bottom: 1px solid var(--borda); background: none; font: inherit; color: var(--texto); text-align: left; cursor: pointer; transition: background .15s; }
+.tc__linha:last-child { border-bottom: 0; }
+.tc__linha:hover, .tc__linha:focus-visible { background: var(--marca-25); outline: 0; }
+.tc__cliente { display: grid; min-width: 0; }
+.tc__cliente strong, .tc__cliente small, .tc__loja { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tc__cliente small { color: var(--texto-suave); font-size: .8rem; }
+.tc__valor { font-variant-numeric: tabular-nums; }
+.tc__data { color: var(--texto-suave); font-size: .84rem; }
+
+/* ---------- formulários ---------- */
+.grade-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+.nota-seguranca { display: flex; align-items: center; gap: .4rem; margin: .2rem 0 0; font-size: .78rem; color: var(--texto-suave); }
+
+/* ---------- blocos de link (pagamento, convite, senha) ---------- */
+.bloco-link { margin-top: .8rem; }
+.bloco-link__rotulo { margin: 0 0 .35rem; font-size: .8rem; font-weight: 600; color: var(--texto); }
+.bloco-link__rotulo small { font-weight: 400; color: var(--texto-suave); }
+.bloco-link .convite-pronto__link { margin: 0 0 .6rem; }
+.bloco-link__nota { display: flex; align-items: center; gap: .35rem; margin: .6rem 0 0; font-size: .8rem; color: var(--texto-suave); }
+
+/* ---------- ficha da cliente ---------- */
+.ficha-modal .modal__corpo { background: var(--fundo); }
+.ficha__topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.1rem; }
+.ficha__loja { margin: 0 0 .2rem; font-family: var(--f-titulo); font-size: 1.35rem; color: var(--escura); }
+.ficha__contato { margin: 0; font-size: .88rem; color: var(--texto-suave); }
+.ficha__obs { margin: .5rem 0 0; font-size: .86rem; color: var(--texto-suave); white-space: pre-line; }
+.ficha__grade { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.ficha__grade > div { display: grid; gap: 1rem; }
+.ficha__cartao { padding: 1.05rem 1.15rem; border: 1px solid var(--borda); border-radius: var(--raio); background: var(--superficie, #fff); }
+.ficha__cartao h3 { display: flex; align-items: center; gap: .45rem; margin: 0 0 .7rem; font-family: var(--f-corpo); font-size: .95rem; font-weight: 600; color: var(--texto); }
+.ficha__cartao h3 .selo { margin-left: auto; }
+.ficha__valor { margin-left: auto; font-variant-numeric: tabular-nums; }
+.ficha__ok { display: flex; align-items: center; gap: .4rem; margin: 0; font-size: .88rem; color: var(--sucesso); }
+.ficha__acoes { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; }
+.ficha__pix { margin-top: .7rem; font-size: .84rem; }
+.ficha__pix summary { cursor: pointer; color: var(--texto-suave); }
+.ficha__pix .convite-pronto__link { margin: .5rem 0; }
+.ficha__codigo { margin: .6rem 0 0; font-size: .84rem; }
+.ficha__nota { display: grid; grid-template-columns: 1fr auto; gap: .5rem; align-items: end; margin-top: 1rem; }
+.ficha__nota textarea { resize: vertical; min-height: 2.6rem; }
+.passos-criacao--compacto { margin-top: .6rem; }
+.passos-criacao--compacto li { padding: .3rem 0; font-size: .88rem; }
+.passos-criacao--compacto .passos-criacao__marca { width: 18px; height: 18px; }
+
+.historico { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: .1rem; max-height: 260px; overflow-y: auto; }
+.historico__item { display: grid; grid-template-columns: 1fr auto; gap: .8rem; padding: .45rem 0 .45rem .8rem; border-left: 2px solid var(--borda-forte); font-size: .82rem; }
+.historico__item time { color: var(--texto-apagado); font-size: .74rem; white-space: nowrap; }
+.historico__item--pagamento { border-left-color: var(--sucesso); }
+.historico__item--loja { border-left-color: var(--detalhe); }
+.historico__item--nota { border-left-color: var(--info); background: var(--marca-25); }
+.historico__item--suporte { border-left-color: var(--aviso); }
+
+/* ---------- configurações ---------- */
+.config-grade { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+.config-grade .cartao { background: var(--superficie, #fff); }
+.conexoes { list-style: none; margin: 0 0 .6rem; padding: 0; display: grid; gap: .2rem; }
+.conexao { display: grid; grid-template-columns: auto 1fr auto; gap: .8rem; align-items: start; padding: .75rem 0; border-bottom: 1px solid var(--borda); }
+.conexao:last-child { border-bottom: 0; }
+.conexao strong { display: block; font-size: .92rem; }
+.conexao small { display: block; margin-top: .15rem; color: var(--texto-suave); font-size: .8rem; line-height: 1.5; }
+.conexao code { font-size: .88em; background: var(--neutro-bg); padding: .05rem .3rem; border-radius: 4px; }
+.conexao__ponto { width: 10px; height: 10px; margin-top: .4rem; border-radius: 50%; background: var(--borda-forte); }
+.conexao--on .conexao__ponto { background: var(--sucesso); box-shadow: 0 0 0 4px var(--sucesso-bg); }
+
+/* ---------- página de pagamento (pública) ---------- */
+.pagar { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: 1.2rem 1rem 2rem;
+  background: radial-gradient(60% 40% at 50% 0, var(--marca-100), transparent 70%), var(--fundo); }
+.pagar__topo { width: min(460px, 100%); display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; }
+.pagar__cartao { width: min(460px, 100%); padding: 2rem 1.8rem; border-radius: var(--raio-lg); background: var(--superficie, #fff); border: 1px solid var(--borda); box-shadow: var(--sombra); text-align: center; }
+.pagar__sobre { margin: 0; font-size: .7rem; letter-spacing: .3em; text-transform: uppercase; color: var(--detalhe); }
+.pagar__loja-titulo { margin: .3rem 0 .2rem; font-size: 2rem; }
+.pagar__valor { margin: 0 0 1.2rem; font-size: 1.9rem; font-weight: 600; color: var(--escura); font-variant-numeric: tabular-nums; }
+.pagar__qr { display: grid; place-items: center; width: 220px; height: 220px; margin: 0 auto 1.1rem; padding: 10px; border-radius: 14px; background: #fff; border: 1px solid var(--borda); }
+.pagar__qr svg, .pagar__qr img { width: 100%; height: 100%; }
+.pagar__passos { margin: 0 auto 1rem; padding-left: 1.2rem; max-width: 22rem; text-align: left; font-size: .86rem; color: var(--texto-suave); display: grid; gap: .2rem; }
+.pagar__codigo { margin: 0 0 .8rem; padding: .6rem .75rem; border-radius: var(--raio-sm); border: 1px dashed var(--borda-forte); background: var(--marca-25); max-height: 5.2rem; overflow: auto; text-align: left; overflow-wrap: anywhere; }
+.pagar__codigo code { font-size: .74rem; line-height: 1.5; }
+.pagar__espera { display: flex; align-items: center; justify-content: center; gap: .5rem; margin: 1rem 0 0; font-size: .84rem; color: var(--texto-suave); }
+.spinner--pequeno { width: 16px; height: 16px; border-width: 2px; }
+.pagar__estado { display: grid; justify-items: center; gap: .3rem; }
+.pagar__estado h1 { font-size: 1.9rem; margin: .4rem 0 0; }
+.pagar__estado p { margin: .2rem 0; }
+.pagar__loja { font-family: var(--f-titulo); font-size: 1.2rem; color: var(--marca-texto); }
+.pagar__check { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--sucesso-bg); color: var(--sucesso); }
+.pagar__barra { width: 100%; height: 8px; margin-top: 1rem; border-radius: 99px; background: var(--marca-100); overflow: hidden; }
+.pagar__barra span { display: block; height: 100%; border-radius: 99px; background: var(--detalhe); transition: width .6s ease; }
+.pagar__rodape { display: flex; align-items: center; gap: .35rem; margin-top: 1.2rem; font-size: .76rem; color: var(--texto-apagado); }
+
+@media (max-width: 900px) {
+  .ficha__grade, .config-grade { grid-template-columns: 1fr; }
+  .tc__cab { display: none; }
+  .tc__linha { grid-template-columns: 1fr auto; grid-template-areas: "cliente selo" "loja valor"; row-gap: .3rem; }
+  .tc__linha > :nth-child(1) { grid-area: cliente; }
+  .tc__linha > :nth-child(2) { grid-area: loja; color: var(--texto-suave); font-size: .84rem; }
+  .tc__linha > :nth-child(3) { grid-area: selo; }
+  .tc__linha > :nth-child(4) { grid-area: valor; font-size: .84rem; }
+  .tc__linha > :nth-child(5) { display: none; }
+}
+@media (max-width: 720px) {
+  .topo-central { flex-wrap: wrap; row-gap: .6rem; }
+  .abas-central { order: 3; width: 100%; justify-content: space-between; }
+  .abas-central__item { flex: 1; justify-content: center; padding: .45rem .5rem; }
+  .some-no-celular { display: none; }
+  .grade-2 { grid-template-columns: 1fr; }
+  .busca-central input { width: 100%; }
+  .central__titulo-acoes { width: 100%; }
+  .busca-central { flex: 1; }
+}
+
+/* superfícies claras (no escuro, escuro.css troca) */
+:root { --superficie: #ffffff; --superficie-alta: #ffffff; }
+
+/* cartões (o estilo vem do painel das lojas; a Central não usa aquele arquivo) */
+.cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio-lg); padding: 1.4rem 1.5rem; box-shadow: var(--sombra-sm); min-width: 0; }
+.cartao__cab { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.cartao__cab h2 { font-size: 1.5rem; margin: 0; }
+.cartao__rodape { display: flex; justify-content: flex-end; gap: .6rem; padding-top: .6rem; }
