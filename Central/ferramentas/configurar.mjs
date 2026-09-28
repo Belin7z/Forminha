@@ -31,8 +31,10 @@ function perguntar(texto, { secreto = false } = {}) {
   });
 }
 
+// os argumentos são sempre nossos (nomes de variável, "production"...); os valores secretos vão pela entrada, nunca aqui
 function vercel(args, entrada) {
-  const r = spawnSync("vercel", args, { cwd: RAIZ, input: entrada, encoding: "utf8", shell: process.platform === "win32" });
+  const comando = ["vercel", ...args.map((a) => (/^[\w.:/-]+$/.test(a) ? a : `"${a.replace(/"/g, '\\"')}"`))].join(" ");
+  const r = spawnSync(comando, { cwd: RAIZ, input: entrada, encoding: "utf8", shell: true });
   return { ok: r.status === 0, saida: `${r.stdout ?? ""}${r.stderr ?? ""}` };
 }
 
@@ -139,7 +141,13 @@ console.log("  3) PIX automático (Mercado Pago)");
 console.log("  4) Tudo");
 console.log("  5) Trocar só a chave do Supabase (quando vencer)");
 console.log("  6) Trocar só a chave da Vercel (quando vencer)");
-const opcao = await perguntar("\nEscolha (1-6): ");
+console.log("\nAgora digite SÓ O NÚMERO da opção (para a primeira vez: 4). As chaves são pedidas depois, uma de cada vez.");
+const opcao = await perguntar("Número da opção (aparece como •): ", { secreto: true }); // escondido: se colarem uma chave aqui, ela não aparece na tela
+if (opcao.length > 2) {
+  console.error("\n✖ Isso parece uma chave, não o número da opção. Nada foi gravado.");
+  console.error("  Por segurança, apague essa chave no site onde você a criou e crie outra. Depois rode de novo e digite só o número.");
+  process.exit(1);
+}
 if (!["1", "2", "3", "4", "5", "6"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 6."); process.exit(1); }
 if (["1", "4"].includes(opcao)) await senhaEChaves();
 if (opcao === "5") await chaveSupabase();
