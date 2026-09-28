@@ -416,3 +416,69 @@
   .ap { grid-template-columns: 1fr; }
   .ap__previa { position: static; max-width: 420px; }
 }
+
+
+/* ---------- Assistente de primeiros passos ---------- */
+.assistente { max-width: 880px; margin: 0 auto; display: grid; gap: 1.1rem; }
+.assistente__cab { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.assistente__cab h1 { margin: 0; font-size: clamp(1.5rem, 1.1rem + 1.4vw, 2.1rem); }
+.assistente__rotulo { margin: 0 0 .2rem; font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--texto-suave); }
+.assistente__trilha { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: .4rem; }
+.assistente__etapa { width: 100%; display: flex; align-items: center; gap: .5rem; padding: .55rem .6rem; border: 1px solid var(--borda); border-radius: var(--raio-sm); background: #fff; color: var(--texto-suave); font: inherit; font-size: .86rem; cursor: pointer; transition: border-color .15s, background .15s; }
+.assistente__etapa:hover { border-color: var(--escura); }
+.assistente__num { display: inline-grid; place-items: center; flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: 1px solid var(--borda); font-size: .78rem; font-weight: 600; }
+.assistente__etapa--feita .assistente__num { background: var(--sucesso); border-color: var(--sucesso); color: #fff; }
+.assistente__etapa--atual { border-color: var(--escura); color: var(--escura); box-shadow: 0 0 0 1px var(--escura); }
+.assistente__etapa--atual .assistente__num { background: var(--escura); border-color: var(--escura); color: #fff; }
+.assistente__nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistente__passo { padding: clamp(1.1rem, .8rem + 1.4vw, 2rem); }
+.assistente__titulo { margin-bottom: 1.2rem; }
+.assistente__titulo h2 { margin: 0 0 .25rem; font-size: clamp(1.25rem, 1.05rem + .8vw, 1.6rem); }
+.assistente__titulo p { margin: 0; }
+.assistente__cidade { grid-template-columns: minmax(0, 1fr) 96px; }
+.assistente__nota { margin: 1rem 0 0; font-size: .86rem; }
+.assistente__rodape { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin-top: 1.6rem; padding-top: 1.1rem; border-top: 1px solid var(--borda); }
+
+.assistente-logo { display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap; }
+.assistente-logo__previa { display: grid; place-items: center; width: 132px; height: 132px; border-radius: 50%; background: var(--marca-100); color: var(--escura); border: 1px dashed var(--detalhe); overflow: hidden; }
+.assistente-logo__previa span { font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-size: 2.6rem; text-transform: uppercase; }
+.assistente-logo__previa--img { border-radius: var(--raio); background: #fff; border-style: solid; border-color: var(--borda); }
+.assistente-logo__previa img { width: 100%; height: 100%; object-fit: contain; padding: .7rem; }
+.assistente-logo__acoes { display: grid; gap: .45rem; justify-items: start; }
+
+.assistente-cores { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.4rem; align-items: start; }
+.assistente-cores .ap-temas { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+
+.assistente-produto { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+.assistente-ok { display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem; padding: .75rem .9rem; border-radius: var(--raio-sm); background: var(--marca-50); border: 1px solid var(--borda); }
+.assistente-ok > svg { color: var(--sucesso); }
+
+.assistente-tipos { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 1rem; padding: 0; border: 0; }
+.assistente-tipos legend { padding: 0; margin-bottom: .45rem; font-size: .88rem; font-weight: 500; color: var(--escura); }
+.assistente-tipo { position: relative; cursor: pointer; }
+.assistente-tipo input { position: absolute; opacity: 0; pointer-events: none; }
+.assistente-tipo span { display: inline-block; padding: .45rem .9rem; border: 1px solid var(--borda); border-radius: 999px; background: #fff; font-size: .88rem; transition: border-color .15s, background .15s; }
+.assistente-tipo input:checked + span { border-color: var(--escura); background: var(--escura); color: #fff; }
+.assistente-tipo input:focus-visible + span { outline: 2px solid var(--marca-destaque); outline-offset: 2px; }
+.assistente-extras { display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; margin-top: .3rem; }
+
+.assistente-fim { display: grid; justify-items: center; gap: .6rem; text-align: center; padding: 1rem 0 .4rem; }
+.assistente-fim h2 { margin: .3rem 0 0; font-size: clamp(1.35rem, 1.1rem + 1vw, 1.8rem); }
+.assistente-fim > p { max-width: 46ch; margin: 0; }
+.assistente-fim__selo { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--marca-100); color: var(--detalhe); }
+.assistente-fim__selo--ok { background: var(--sucesso); color: #fff; }
+.assistente-fim__faltam { display: flex; flex-wrap: wrap; justify-content: center; gap: .45rem; margin-top: .3rem; }
+.assistente-fim__acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; margin-top: 1rem; }
+.assistente-fim > .assistente-fim__depois { max-width: none; margin-top: 1rem; font-size: .84rem; }
+
+@media (max-width: 860px) {
+  .assistente-cores { grid-template-columns: 1fr; }
+  .assistente-cores .ap__previa { position: static; max-width: 420px; }
+}
+@media (max-width: 640px) {
+  .assistente__trilha { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .assistente__etapa { justify-content: center; padding: .5rem .2rem; }
+  .assistente__nome { display: none; }
+  .assistente-produto { grid-template-columns: 1fr; }
+  .assistente__rodape .btn--primario { flex: 1 1 100%; justify-content: center; order: 3; }
+}

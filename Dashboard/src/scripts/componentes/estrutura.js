@@ -21,7 +21,8 @@ const MENU = [
   { grupo: "Loja", itens: [["/cupons", "Cupons", "percentual"], ["/entrega", "Entrega e mapa", "caminhao"], ["/configuracoes", "Configurações", "ajustes"], ["/equipe", "Equipe", "usuario"], ["/atividade", "Atividade", "relogio"]] },
 ];
 
-const TITULOS = { "/conta": "Minha conta" };
+const TITULOS = { "/conta": "Minha conta", "/primeiros-passos": "Primeiros passos" };
+const URL_LOJA = String(window.CONFIG_APP?.urlLoja ?? "").replace(/\/+$/, "");
 for (const g of MENU) for (const [caminho, titulo] of g.itens) TITULOS[caminho] = titulo;
 
 /** Título da página a partir do caminho ("/pedidos" -> "Pedidos"). */
@@ -72,7 +73,7 @@ export function montarEstrutura({ aoSair }) {
             </a>`)}`)}
       </nav>
       <div class="lateral__rodape">
-        <a href="/" target="_blank" rel="noopener" class="lateral__link">${icone("home", { tamanho: 19 })}<span>Ver a loja</span></a>
+        <a href="${URL_LOJA || "/"}" target="_blank" rel="noopener" class="lateral__link">${icone("home", { tamanho: 19 })}<span>Ver a loja</span></a>
         <div class="lateral__usuario">
           <a href="#/conta" class="lateral__perfil" aria-label="Minha conta">
             <span class="avatar">${iniciais(u.nome)}</span>

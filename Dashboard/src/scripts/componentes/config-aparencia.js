@@ -28,7 +28,7 @@ function amostra(tokens) {
   return html`<span class="ap-amostra">${["--marca-200", "--marca-destaque", "--escura", "--detalhe"].map((k) => html`<i style="background:${tokens[k]}"></i>`)}</span>`;
 }
 
-function cartaoTema(t, atual) {
+export function cartaoTema(t, atual) {
   const tokens = gerarTokens({ tema: t.id });
   return html`
     <label class="ap-tema">
@@ -43,7 +43,7 @@ function cartaoTema(t, atual) {
 }
 
 /** Mini-loja da prévia: usa o nome, a logo e os textos reais da loja. */
-function miniLoja(cfg) {
+export function miniLoja(cfg) {
   const nome = cfg.loja?.nome || "Minha Doceria";
   const titulo = cfg.textos?.hero_titulo || "Doces que transformam momentos em memórias";
   return html`
@@ -66,6 +66,16 @@ function miniLoja(cfg) {
       <div class="mini__aviso">Pedidos com <b>24 h</b> de antecedência. <u>Saiba mais</u></div>
       <div class="mini__rodape"><strong>${nome}</strong><small>Rodapé da loja · © 2026</small></div>
     </div>`;
+}
+
+/** As 4 famílias de letra carregadas, para os cartões e a prévia aparecerem com a letra certa. */
+export function carregarFontesDaPrevia() {
+  for (const [id, f] of Object.entries(FONTES)) {
+    if (document.getElementById(`fonte-previa-${id}`)) continue;
+    const link = document.createElement("link");
+    link.id = `fonte-previa-${id}`; link.rel = "stylesheet"; link.href = f.url;
+    document.head.append(link);
+  }
 }
 
 export function paginaAparencia(cfg) {
@@ -134,13 +144,7 @@ export function ligarAparencia(ctx, cfg, aoSalvar) {
   const inicial = normalizarAparencia(cfg.aparencia);
   const cores = { ...inicial.cores };
 
-  // as 4 famílias de letra carregadas, para os cartões e a prévia aparecerem com a letra certa
-  for (const [id, f] of Object.entries(FONTES)) {
-    if (document.getElementById(`fonte-previa-${id}`)) continue;
-    const link = document.createElement("link");
-    link.id = `fonte-previa-${id}`; link.rel = "stylesheet"; link.href = f.url;
-    document.head.append(link);
-  }
+  carregarFontesDaPrevia();
 
   const escolha = () => {
     const tema = form.querySelector('[name="tema"]:checked')?.value ?? inicial.tema;

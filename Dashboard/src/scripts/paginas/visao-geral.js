@@ -48,7 +48,8 @@ export async function visaoGeral(ctx) {
 
       ${mostrarPassos && html`<section class="cartao primeiros-passos" aria-label="Primeiros passos">
         <div class="cartao__cab"><div><h2>Primeiros passos</h2><small class="texto-suave">${feitos} de ${passos.length} concluídos — deixe a loja pronta para vender</small></div>
-          <button type="button" class="link" data-acao="ocultar-passos">Ocultar</button></div>
+          <div class="linha-flex"><a href="#/primeiros-passos" class="btn btn--primario btn--pequeno">${feitos ? "Continuar" : "Começar"} com o assistente</a>
+          <button type="button" class="link" data-acao="ocultar-passos">Ocultar</button></div></div>
         <div class="progresso" role="progressbar" aria-valuemin="0" aria-valuemax="${passos.length}" aria-valuenow="${feitos}"><span style="width:${Math.round((feitos / passos.length) * 100)}%"></span></div>
         <ul class="passos">${passos.map((i) => html`<li class="${i.feito && "passo--feito"}">
           <span class="passo__marca">${icone(i.feito ? "check" : "mais", { tamanho: 15 })}</span>

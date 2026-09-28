@@ -5,6 +5,7 @@ import { ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, interruptor, mostrarErros } from "/src/scripts/base/formularios.js";
 import { emReais, paraCentavos, telefone } from "/src/scripts/base/formatacao.js";
 import { DIAS_SEMANA, UFS } from "/src/scripts/base/dominio.js";
+import { normalizarChavePix } from "/src/scripts/base/chave-pix.js";
 import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina } from "../componentes/pagina.js";
 import { ligarImagens, ligarPerguntas, paginaImagens, paginaLegal, paginaPerguntas } from "../componentes/config-extras.js";
@@ -124,7 +125,10 @@ export async function configuracoes(ctx) {
   };
 
   montar(ctx.raiz, html`
-    ${cabecalhoPagina({ titulo: "Configurações", descricao: "Tudo o que a loja mostra e como ela recebe pedidos." })}
+    ${cabecalhoPagina({
+      titulo: "Configurações", descricao: "Tudo o que a loja mostra e como ela recebe pedidos.",
+      acoes: html`<a href="#/primeiros-passos" class="btn btn--suave btn--pequeno">${icone("estrela", { tamanho: 15 })} Assistente de primeiros passos</a>`,
+    })}
     <nav class="abas-status" aria-label="Seções">${ABAS.map(([id, texto, ic]) => html`
       <a href="#/configuracoes/${id}" class="aba-status ${id === aba && "aba-status--ativa"}">${icone(ic, { tamanho: 16 })} ${texto}</a>`)}</nav>
     <div class="coluna-form ${aba === "aparencia" && "coluna-form--larga"}">${paginas[aba]()}</div>`);
@@ -141,7 +145,17 @@ export async function configuracoes(ctx) {
   } else if (aba === "pedidos") {
     ligar($("#f-pedidos"), "pedidos", { aoSalvar: atualizar, preparar: (d) => ({ ...d, pedido_minimo: paraCentavos(d.pedido_minimo) }) });
   } else if (aba === "pagamento") {
-    ligar($("#f-pagamento"), "pagamento", { aoSalvar: atualizar });
+    ligar($("#f-pagamento"), "pagamento", {
+      aoSalvar: atualizar,
+      // chave no formato que o banco espera ("(11) 98765-4321" vira "+5511987654321")
+      preparar: (d) => {
+        if (!d.pix_chave.trim()) return d;
+        let chave;
+        try { chave = normalizarChavePix(d.pix_chave); } catch (erro) { throw Object.assign(new Error(erro.message), { campos: { pix_chave: erro.message } }); }
+        $("#f-pagamento").elements.pix_chave.value = chave;
+        return { ...d, pix_chave: chave };
+      },
+    });
     ligar($("#f-sinal"), "sinal", { aoSalvar: atualizar, preparar: (d) => ({ percentual: Number(d.percentual) || 0, acima_de: paraCentavos(d.acima_de) }) });
   } else if (aba === "aparencia") {
     ligarAparencia(ctx, cfg, atualizar);

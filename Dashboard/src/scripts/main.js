@@ -32,6 +32,7 @@ import { configuracoes } from "./paginas/configuracoes.js";
 import { equipe } from "./paginas/equipe.js";
 import { conta } from "./paginas/conta.js";
 import { atividade } from "./paginas/atividade.js";
+import { primeirosPassos } from "./paginas/primeiros-passos.js";
 
 const naoEncontrada = (ctx) => {
   ctx.raiz.innerHTML = String(html`<div class="vazio"><span class="vazio__ico">${icone("busca", { tamanho: 38 })}</span><h3>Página não encontrada</h3>
@@ -56,6 +57,7 @@ const ROTAS = {
   "/equipe": equipe,
   "/atividade": atividade,
   "/conta": conta,
+  "/primeiros-passos/:passo?": primeirosPassos,
 };
 
 // o atendente só tem estas telas (a página inicial dele é a de pedidos)
@@ -67,6 +69,10 @@ function abrirPainel(usuario) {
   estado.usuario = usuario;
   const inicial = usuario.papel === "admin" ? "#/" : "#/pedidos";
   if (!location.hash || location.hash === "#/entrar" || (usuario.papel !== "admin" && location.hash === "#/")) history.replaceState(null, "", inicial);
+  // acabou de aceitar o convite: o painel abre direto no assistente de primeiros passos
+  let novaLoja = false;
+  try { novaLoja = sessionStorage.getItem(BOAS_VINDAS) === "1"; sessionStorage.removeItem(BOAS_VINDAS); } catch { /* modo privado */ }
+  if (novaLoja && usuario.papel === "admin") history.replaceState(null, "", "#/primeiros-passos");
 
   const estrutura = montarEstrutura({ aoSair: () => mostrarTelaDeLogin() });
   const roteador = criarRoteador({
@@ -75,10 +81,7 @@ function abrirPainel(usuario) {
   });
   iniciarNotificacoes();
   roteador.iniciar();
-  // acabou de aceitar o convite: um recado curto de boas-vindas (a Visão geral mostra os primeiros passos)
-  let novaLoja = false;
-  try { novaLoja = sessionStorage.getItem(BOAS_VINDAS) === "1"; sessionStorage.removeItem(BOAS_VINDAS); } catch { /* modo privado */ }
-  if (novaLoja) toast("Tudo pronto! Siga os primeiros passos para deixar a loja com a sua cara.");
+  if (novaLoja) toast("Bem-vinda! Em 5 passos curtos a loja fica com a sua cara.");
   // computador esquecido aberto: encerra a sessão depois de 2 horas sem uso
   iniciarInatividade(async () => {
     pararNotificacoes();

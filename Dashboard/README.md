@@ -3,6 +3,10 @@
 Painel de **administração** da loja: pedidos, cardápio, clientes, cupons, entrega e configurações.
 Só entra quem tem papel `admin` no banco.
 
+Loja nova: depois do convite, o painel abre no **assistente de primeiros passos** (`#/primeiros-passos`) —
+nome e WhatsApp, logo, cores, primeiro doce e PIX, um passo por tela, cada um salvo na hora e com "Pular por
+agora". Ele pode ser reaberto pela Visão geral ou pelo botão no topo das Configurações.
+
 Cada loja tem dois sites — **Loja** e **Dashboard** — e cada um é uma pasta completa deste repositório, publicada
 num projeto próprio na Vercel (a Central cria os dois para cada loja nova).
 O Dashboard também guarda o que serve aos dois: o **banco de dados**, os **guias** e as **ferramentas de teste**
@@ -36,7 +40,7 @@ src/
 │  ├─ nucleo/       conexão configurada (api.js), estado, notificações de pedido novo
 │  ├─ componentes/  estrutura (menu/topo), gráfico, detalhe do pedido, formulário de produto…
 │  └─ paginas/      visão geral, pedidos, novo pedido, agenda, produção, produtos, categorias, clientes, avaliações,
-│                   favoritos, cupons, entrega, configurações, equipe, atividade, conta, entrar
+│                   favoritos, cupons, entrega, configurações, equipe, atividade, conta, entrar, primeiros passos
 ├─ vendor/          bibliotecas de terceiros sem alteração (supabase-js, Leaflet)
 └─ imagens/         favicon
 ```
