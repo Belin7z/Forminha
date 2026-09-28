@@ -82,7 +82,8 @@ async function email() {
   console.log("\nE-MAIL pelo Gmail");
   console.log("   1. Ative a verificação em duas etapas da conta Google.");
   console.log("   2. Crie a senha de app em https://myaccount.google.com/apppasswords (nome: Forminha).");
-  const usuario = await perguntar("   Seu Gmail (ex.: voce@gmail.com): ");
+  const usuario = await perguntar("   Seu Gmail (ex.: voce@gmail.com; Enter para pular): ");
+  if (!usuario) { console.log("   Pulei o e-mail: os links de acesso aparecem só na Central (dá para mandar pelo WhatsApp)."); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(usuario)) { console.error("✖ E-mail inválido."); process.exit(1); }
   const senhaApp = (await perguntar("   Senha de app (16 letras): ", { secreto: true })).replace(/\s/g, "");
   if (senhaApp.length !== 16) { console.error("✖ A senha de app tem 16 letras (sem espaços)."); process.exit(1); }
@@ -95,7 +96,8 @@ async function email() {
 async function mercadoPago() {
   console.log("\nPIX AUTOMÁTICO (Mercado Pago)");
   console.log("   Em https://www.mercadopago.com.br/developers/panel/app → sua aplicação → Credenciais de produção.");
-  const token = await perguntar("   Access Token (começa com APP_USR-): ", { secreto: true });
+  const token = await perguntar("   Access Token (começa com APP_USR-; Enter para pular): ", { secreto: true });
+  if (!token) { console.log("   Pulei o Mercado Pago: o PIX fica manual (botão \"Pagamento recebido\" na ficha da cliente)."); return; }
   if (!/^APP_USR-/.test(token)) { console.error("✖ Use o Access Token de PRODUÇÃO (começa com APP_USR-)."); process.exit(1); }
   console.log("   Agora, na mesma aplicação: Webhooks → Modo produção → URL: https://forminha.vercel.app/api/webhook/mercadopago");
   console.log("   Marque o evento \"Pagamentos\", salve e copie a \"Assinatura secreta\".");
