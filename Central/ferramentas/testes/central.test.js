@@ -91,6 +91,11 @@ describe("entrada", () => {
     assert.equal((await api("GET", "lojas", undefined, { semCookie: true, cabecalhos: { cookie: `forminha_sessao=${outro}.${assinatura}` } })).status, 401);
     assert.ok(corpo);
   });
+  it("rota pública não conta ao visitante o que falta configurar", async () => {
+    const r = await api("GET", "publico/pagamento/abcdefghijklmnopqrstuvwx", undefined, { semCookie: true });
+    assert.equal(r.status, 503);
+    assert.doesNotMatch(r.dados.erro, /DATABASE_URL|CHAVE|TOKEN/);
+  });
   it("pedido vindo de outro site é barrado", async () => {
     const r = await api("POST", "lojas", { nome: "Loja", email: "a@b.com" }, { cabecalhos: { origin: "https://site-malicioso.com" } });
     assert.equal(r.status, 403);

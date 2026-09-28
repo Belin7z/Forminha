@@ -66,6 +66,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
     return clientes;
   };
   const autorizadoInterno = (cabecalhos) => env.CRON_SECRET && cabecalhos.authorization === `Bearer ${env.CRON_SECRET}`;
+  /** Para rotas públicas: se faltar configuração, não conta ao visitante o que falta. */
+  const clientesParaPublico = () => exigirClientes().catch((e) => {
+    if (e instanceof ErroHttp && e.status === 503) throw new ErroHttp(503, "Página indisponível no momento. Tente de novo mais tarde.");
+    throw e;
+  });
 
   /* ---------- rotas: [método, caminho, protegida?, função] ---------- */
   const rotas = [
@@ -115,11 +120,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["PUT", /^configuracoes$/, true, async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarConfig(corpo) })],
 
     /* ---------- público: página de pagamento (pelo link único) ---------- */
-    ["GET", /^publico\/pagamento\/([A-Za-z0-9_-]{20,64})$/, false, async ({ m }) => ({ corpo: await (await exigirClientes()).paginaDePagamento(m[1]) })],
+    ["GET", /^publico\/pagamento\/([A-Za-z0-9_-]{20,64})$/, false, async ({ m }) => ({ corpo: await (await clientesParaPublico()).paginaDePagamento(m[1]) })],
 
     /* ---------- Mercado Pago avisa que um PIX foi pago ---------- */
     ["POST", /^webhook\/mercadopago$/, false, async ({ url, corpo, cabecalhos }) => {
-      const c = await exigirClientes();
+      const c = await clientesParaPublico();
       return { corpo: await c.receberAvisoMercadoPago({ url, corpo, cabecalhos, segredoAssinatura: env.MP_WEBHOOK_SECRET }) };
     }],
 
