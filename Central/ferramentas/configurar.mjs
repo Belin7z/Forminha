@@ -8,6 +8,7 @@
      4. Tudo
      5. Trocar só a chave do Supabase (quando vencer)
      6. Trocar só a chave da Vercel (quando vencer)
+     7. Trocar só a senha da Central (também serve se você esqueceu)
    A chave de criptografia dos dados é criada UMA vez, sozinha. Nada do
    que você digita aparece na tela nem fica salvo no computador: vai
    direto para as variáveis secretas do projeto "forminha" na Vercel.
@@ -18,6 +19,7 @@ import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { resumirSenha } from "../lib/sessao.js";
 import { novaChave } from "../lib/cofre.js";
+import { SENHA_MINIMA } from "../lib/acesso.js";
 
 const PROJETO = process.env.PROJETO_VERCEL || "forminha";
 // o projeto na Vercel usa a pasta "Central" como raiz: os comandos precisam rodar da RAIZ do repositório
@@ -47,17 +49,22 @@ function gravar(nome, valor) {
 
 const existe = (nome) => new RegExp(`\\b${nome}\\b`).test(vercel(["env", "ls", "production"]).saida);
 
-async function senhaEChaves() {
-  console.log("\nSENHA da Central (mínimo 12 caracteres; use uma frase que só você saiba).");
+/** Senha da Central. Também é o caminho para quem esqueceu: vale mais que a trocada pelo painel. */
+async function senhaDaCentral() {
+  console.log(`\nSENHA da Central (${SENHA_MINIMA} caracteres ou mais; depois dá para trocar pelo painel, em Configurações).`);
   let senha = "";
   for (;;) {
     senha = await perguntar("   Senha: ", { secreto: true });
-    if (senha.length < 12) { console.log("   Muito curta: use 12 caracteres ou mais."); continue; }
+    if (senha.length < SENHA_MINIMA) { console.log(`   Muito curta: use ${SENHA_MINIMA} caracteres ou mais.`); continue; }
     if ((await perguntar("   Repita: ", { secreto: true })) !== senha) { console.log("   As duas não conferem. De novo."); continue; }
     break;
   }
   gravar("CENTRAL_SENHA_HASH", await resumirSenha(senha));
-  gravar("SEGREDO_SESSAO", randomBytes(32).toString("hex"));
+  gravar("SEGREDO_SESSAO", randomBytes(32).toString("hex")); // quem estava logado sai
+}
+
+async function senhaEChaves() {
+  await senhaDaCentral();
   gravar("CRON_SECRET", randomBytes(24).toString("hex"));
   await chaveSupabase();
   await chaveVercel();
@@ -141,17 +148,19 @@ console.log("  3) PIX automático (Mercado Pago)");
 console.log("  4) Tudo");
 console.log("  5) Trocar só a chave do Supabase (quando vencer)");
 console.log("  6) Trocar só a chave da Vercel (quando vencer)");
-console.log("\nAgora digite SÓ O NÚMERO da opção (para a primeira vez: 4). As chaves são pedidas depois, uma de cada vez.");
+console.log("  7) Trocar só a senha da Central (também serve se você esqueceu)");
+console.log("\nAgora digite SÓ O NÚMERO da opção (para a primeira vez: 1). As chaves são pedidas depois, uma de cada vez.");
 const opcao = await perguntar("Número da opção (aparece como •): ", { secreto: true }); // escondido: se colarem uma chave aqui, ela não aparece na tela
 if (opcao.length > 2) {
   console.error("\n✖ Isso parece uma chave, não o número da opção. Nada foi gravado.");
   console.error("  Por segurança, apague essa chave no site onde você a criou e crie outra. Depois rode de novo e digite só o número.");
   process.exit(1);
 }
-if (!["1", "2", "3", "4", "5", "6"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 6."); process.exit(1); }
+if (!["1", "2", "3", "4", "5", "6", "7"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 7."); process.exit(1); }
 if (["1", "4"].includes(opcao)) await senhaEChaves();
 if (opcao === "5") await chaveSupabase();
 if (opcao === "6") await chaveVercel();
+if (opcao === "7") await senhaDaCentral();
 await criptografia(); // sempre confere: cria só se ainda não existir
 if (["2", "4"].includes(opcao)) await email();
 if (["3", "4"].includes(opcao)) await mercadoPago();

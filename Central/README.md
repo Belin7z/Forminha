@@ -24,6 +24,13 @@ link novo), **Redefinir senha da dona** (link por e-mail, que vale pouco tempo),
 A aba **Lojas** mostra todas as lojas e serve para criar uma loja **sem cobrança** (teste ou
 cortesia), atualizar o banco, reativar e excluir.
 
+## Senha de acesso
+
+Criada no `npm run configurar` (8 caracteres ou mais). Depois, troque quando quiser em **Configurações →
+Senha de acesso**: pede a senha atual, e quem estiver com a Central aberta em outro aparelho sai na hora.
+No banco fica só o resumo (scrypt), nunca a senha. Esqueceu? `npm run configurar`, opção **7** — essa
+sempre vale mais que a trocada pelo painel. Senha errada 5 vezes seguidas dá uma pausa crescente.
+
 ## Segurança dos dados
 
 - **Dados pessoais cifrados** (AES-256-GCM): nome, e-mail, WhatsApp, CPF/CNPJ, observações, notas,
@@ -46,7 +53,7 @@ npm run configurar
 
 Menu: **1** senha da Central + chaves do Supabase e da Vercel · **2** e-mail (Gmail com
 "senha de app") · **3** PIX automático (Mercado Pago) · **4** tudo · **5** trocar só a chave do Supabase ·
-**6** trocar só a chave da Vercel. E-mail e Mercado Pago podem ser pulados com Enter. A chave de
+**6** trocar só a chave da Vercel · **7** trocar só a senha da Central (serve também para quem esqueceu). E-mail e Mercado Pago podem ser pulados com Enter. A chave de
 criptografia é criada sozinha **uma vez** (guarde a cópia que aparece na tela). Nada do que você digita
 aparece na tela nem fica no computador.
 

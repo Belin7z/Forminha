@@ -28,7 +28,7 @@ export function telaEntrar(aoEntrar, aviso = "") {
           </form>
           <details class="entrar__ajuda">
             <summary>Esqueceu a senha?</summary>
-            <p>Crie uma nova no computador: na pasta <code>Central</code>, rode <code>npm run configurar</code>.</p>
+            <p>Crie uma nova no computador: na pasta <code>Central</code>, rode <code>npm run configurar</code> e escolha a opção 7.</p>
           </details>
         </div>
         <p class="entrar__copy">© ${new Date().getFullYear()} Forminha</p>

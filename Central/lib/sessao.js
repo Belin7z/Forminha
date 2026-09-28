@@ -30,19 +30,26 @@ export const DURACAO_S = 8 * 60 * 60;
 
 const assinar = (texto, segredo) => createHmac("sha256", segredo).update(texto).digest("base64url");
 
-export function criarSessao(segredo, agora = Date.now()) {
-  const corpo = Buffer.from(JSON.stringify({ exp: Math.floor(agora / 1000) + DURACAO_S })).toString("base64url");
+/** `versao` = versão da senha (muda a cada troca): cookie de uma senha antiga deixa de valer. */
+export function criarSessao(segredo, { agora = Date.now(), versao = 0 } = {}) {
+  const corpo = Buffer.from(JSON.stringify({ exp: Math.floor(agora / 1000) + DURACAO_S, v: versao })).toString("base64url");
   return `${corpo}.${assinar(corpo, segredo)}`;
 }
 
-export function sessaoValida(valor, segredo, agora = Date.now()) {
+/** Conteúdo do cookie ({ exp, v }) se a assinatura confere e não venceu; senão null. */
+export function lerSessao(valor, segredo, agora = Date.now()) {
   const [corpo, assinatura] = String(valor ?? "").split(".");
-  if (!corpo || !assinatura || !segredo) return false;
+  if (!corpo || !assinatura || !segredo) return null;
   const esperado = Buffer.from(assinar(corpo, segredo));
   const recebido = Buffer.from(assinatura);
-  if (esperado.length !== recebido.length || !timingSafeEqual(esperado, recebido)) return false;
-  try { return JSON.parse(Buffer.from(corpo, "base64url").toString()).exp > agora / 1000; } catch { return false; }
+  if (esperado.length !== recebido.length || !timingSafeEqual(esperado, recebido)) return null;
+  try {
+    const dados = JSON.parse(Buffer.from(corpo, "base64url").toString());
+    return dados.exp > agora / 1000 ? { exp: dados.exp, v: Number(dados.v ?? 0) } : null;
+  } catch { return null; }
 }
+
+export const sessaoValida = (valor, segredo, agora = Date.now()) => lerSessao(valor, segredo, agora) !== null;
 
 export function lerCookie(cabecalho, nome) {
   for (const parte of String(cabecalho ?? "").split(";")) {

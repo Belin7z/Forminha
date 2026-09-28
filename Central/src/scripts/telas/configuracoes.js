@@ -1,4 +1,4 @@
-/* TELA — Configurações: valor da loja, sua chave PIX e o que está ligado (banco, criptografia, e-mail, Mercado Pago) */
+/* TELA — Configurações: valor da loja, sua chave PIX, o que está ligado (banco, criptografia, e-mail, Mercado Pago) e a senha de acesso */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { ocupado, toast } from "/src/scripts/base/ui.js";
@@ -56,7 +56,36 @@ export async function telaConfiguracoes(conteiner, eu) {
             <button type="button" class="btn btn--suave btn--pequeno" data-copiar="${webhook}">${icone("copiar", { tamanho: 15 })} Copiar</button>
           </div>`}
       </section>
+
+      <form class="cartao" id="f-senha" novalidate>
+        <div class="cartao__cab"><h2>Senha de acesso</h2></div>
+        ${r.trocar_senha ? html`
+          <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "atual", rotulo: "Senha atual", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password"' })}
+          <div class="grade-2">
+            ${campo({ nome: "nova", rotulo: "Nova senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password" minlength="8"', ajuda: "8 caracteres ou mais." })}
+            ${campo({ nome: "repita", rotulo: "Repita a nova", tipo: "password", obrigatorio: true, atributos: 'autocomplete="new-password"' })}
+          </div>
+          <p class="texto-suave">Quem estiver com a Central aberta em outro aparelho sai na hora. Esqueceu a senha? No computador, rode <code>npm run configurar</code> (opção 7).</p>
+          <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Trocar senha</button></div>`
+        : aviso("aviso", "Para trocar a senha por aqui, ligue o banco da Central (veja Conexões).")}
+      </form>
     </div>`);
+
+  const formSenha = conteiner.querySelector("#f-senha");
+  if (r.trocar_senha) {
+    ativarCampos(formSenha);
+    formSenha.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      await ocupado(formSenha.querySelector("[type=submit]"), async () => {
+        try {
+          await api("POST", "senha", dadosDe(formSenha));
+          formSenha.reset();
+          toast("Senha trocada. Use a nova da próxima vez que entrar.");
+        } catch (erro) { mostrarErros(formSenha, erro); }
+      });
+    });
+  }
 
   const form = conteiner.querySelector("#f-cobranca");
   if (!form) return;

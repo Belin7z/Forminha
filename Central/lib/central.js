@@ -17,7 +17,8 @@ import { bancoNeon, preparadorDeEsquema } from "./dados.js";
 import { criarEmail, modelos } from "./email.js";
 import { chavesVencendo, mensagemDeChaveRecusada, textoDoPrazo } from "./chaves.js";
 import { criarMercadoPago } from "./mercadopago.js";
-import { NOME_COOKIE, conferirSenha, cookieDeSaida, cookieDeSessao, criarSessao, lerCookie, sessaoValida } from "./sessao.js";
+import { NOME_COOKIE, cookieDeSaida, cookieDeSessao, criarSessao, lerCookie, lerSessao } from "./sessao.js";
+import { criarAcesso } from "./acesso.js";
 
 export { ErroHttp };
 const OBRIGATORIAS = ["CENTRAL_SENHA_HASH", "SEGREDO_SESSAO", "SUPABASE_ACCESS_TOKEN", "VERCEL_TOKEN", "FORMINHA_ORG", "DATABASE_URL", "CHAVE_CRIPTOGRAFIA"];
@@ -56,6 +57,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   });
   if (erroCofre) faltando.push("CHAVE_CRIPTOGRAFIA (inválida)");
   const tentativas = new Map(); // freio de senha errada (por endereço, nesta instância)
+  const acesso = criarAcesso({ banco, preparar: garantirEsquema ?? undefined, hashInicial: env.CENTRAL_SENHA_HASH });
 
   const exigirLojas = () => {
     if (!lojas) throw new ErroHttp(503, `A Central ainda não está configurada (falta: ${faltando.join(", ")}). Rode "npm run configurar".`);
@@ -86,7 +88,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       if (!env.CENTRAL_SENHA_HASH || !env.SEGREDO_SESSAO) throw new ErroHttp(503, 'A senha da Central ainda não foi criada. Rode "npm run configurar".');
       const t = tentativas.get(ip) ?? { n: 0, ate: 0 };
       if (t.ate > Date.now()) throw new ErroHttp(429, `Muitas tentativas. Aguarde ${Math.ceil((t.ate - Date.now()) / 1000)} segundos.`);
-      if (!(await conferirSenha(corpo.senha ?? "", env.CENTRAL_SENHA_HASH))) {
+      if (!(await acesso.conferir(String(corpo.senha ?? "")))) {
         t.n += 1;
         if (t.n >= 5) t.ate = Date.now() + 60_000 * Math.min(15, 2 ** (Math.floor(t.n / 5) - 1));
         tentativas.set(ip, t);
@@ -94,7 +96,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
         throw new ErroHttp(401, "Senha incorreta.", { senha: "Senha incorreta." });
       }
       tentativas.delete(ip);
-      return { corpo: { ok: true }, cookie: cookieDeSessao(criarSessao(env.SEGREDO_SESSAO), seguro) };
+      return { corpo: { ok: true }, cookie: cookieDeSessao(criarSessao(env.SEGREDO_SESSAO, { versao: (await acesso.versao()) ?? 0 }), seguro) };
+    }],
+    // trocar a senha pelo painel: pede a atual; quem estava logado em outro aparelho sai
+    ["POST", /^senha$/, true, async ({ corpo, seguro }) => {
+      const versao = await acesso.trocar(corpo);
+      return { corpo: { ok: true }, cookie: cookieDeSessao(criarSessao(env.SEGREDO_SESSAO, { versao }), seguro) };
     }],
     ["POST", /^sair$/, false, async ({ seguro }) => ({ corpo: { ok: true }, cookie: cookieDeSaida(seguro) })],
     ["GET", /^eu$/, false, async ({ logado }) => ({
@@ -102,7 +109,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
         logado, simulado: Boolean(opcoes.simulado),
         faltando: logado ? faltando : [],
         chaves: logado ? chavesVencendo(env).map((c) => ({ ...c, texto: textoDoPrazo(c) })) : [],
-        recursos: logado ? { clientes: Boolean(clientes), email: Boolean(email), mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET) } : null,
+        recursos: logado ? { clientes: Boolean(clientes), email: Boolean(email), mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET), trocar_senha: Boolean(banco) } : null,
       },
     })],
 
@@ -208,7 +215,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const metodo = req.method;
       const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v[0] : v]));
       const seguro = cabecalhos["x-forwarded-proto"] === "https" || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(cabecalhos.host ?? "");
-      logado = sessaoValida(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO);
+      const sessao = lerSessao(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO);
+      if (sessao) {
+        const versao = await acesso.versao(); // null = banco fora do ar: não derruba quem já entrou
+        logado = versao === null || sessao.v === versao;
+      }
 
       const achada = rotas.map(([met, re, protegida, fn]) => met === metodo && re.exec(rota) && { m: re.exec(rota), protegida, fn }).find(Boolean);
       if (!achada) throw new ErroHttp(404, "Caminho não encontrado.");
