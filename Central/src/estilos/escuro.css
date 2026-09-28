@@ -75,7 +75,7 @@
 
 /* troca suave entre claro e escuro */
 @media (prefers-reduced-motion: no-preference) {
-  body, .loja, .modal__caixa, .campo input, .topo-central { transition: background-color .25s, color .25s, border-color .25s; }
+  body, .loja, .modal__caixa, .campo input, .topo { transition: background-color .25s, color .25s, border-color .25s; }
 }
 
 /* campos soltos (fora de .campo): anotação da ficha, busca */

@@ -1,35 +1,71 @@
 /* ==========================================================
-   CENTRAL DA FORMINHA — decide qual tela mostrar.
+   CENTRAL DA FORMINHA — estrutura do painel e qual tela mostrar.
      #/pagar/<link>   página de pagamento da cliente (pública)
      sem login        entrar
      senha temporária funcionário cria a própria senha
-     #/clientes · #/lojas · #/equipe · #/configuracoes  (cada aba só
-     aparece para quem tem a permissão; o servidor confere de novo)
+     logado           menu lateral + topo com o perfil (Configurações, Sair)
+   Cada item do menu só aparece para quem tem a permissão; o servidor
+   confere de novo em toda requisição.
    ========================================================== */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { copiar, toast } from "/src/scripts/base/ui.js";
+import { iniciais } from "/src/scripts/base/formatacao.js";
 import { api, aviso, marca, pode, quandoExpirar, raiz } from "./nucleo.js";
 import { botaoTema } from "./claro-escuro.js";
 import { telaEntrar } from "./telas/entrar.js";
+import { telaVisaoGeral } from "./telas/visao-geral.js";
 import { telaClientes } from "./telas/clientes.js";
+import { telaPagamentos } from "./telas/pagamentos.js";
 import { telaLojas } from "./telas/lojas.js";
 import { telaEquipe } from "./telas/equipe.js";
+import { telaAtividade } from "./telas/atividade.js";
 import { telaConfiguracoes } from "./telas/configuracoes.js";
 import { telaPagar } from "./telas/pagar.js";
 import { telaPrimeiraSenha, trocarMinhaSenha } from "./telas/minha-senha.js";
 
-const ABAS = [
-  ["clientes", "Clientes", "usuarios", "clientes.ver"], ["lojas", "Lojas", "home", "lojas.ver"],
-  ["equipe", "Equipe", "usuario", "equipe"], ["configuracoes", "Configurações", "ajustes", "configuracoes"],
+// [endereço, nome, ícone, permissão (null = todos), tela]
+const MENU = [
+  { itens: [["visao-geral", "Visão geral", "grafico", null, telaVisaoGeral]] },
+  { grupo: "Vendas", itens: [["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos]] },
+  { grupo: "Lojas", itens: [["lojas", "Lojas", "home", "lojas.ver", telaLojas]] },
+  { grupo: "Administração", itens: [["equipe", "Equipe", "usuario", "equipe", telaEquipe], ["atividade", "Atividade", "relogio", "equipe", telaAtividade]] },
 ];
+const TELAS = Object.fromEntries(MENU.flatMap((g) => g.itens).map(([id, nome, , permissao, tela]) => [id, { nome, permissao, tela }]));
+TELAS.configuracoes = { nome: "Configurações", permissao: "configuracoes", tela: telaConfiguracoes };
 
-/** Quem está usando: "Dono" ou "Ana · FMV-0427 · Vendedor" (funcionário troca a própria senha por aqui). */
-function quemEsta(eu) {
-  if (eu.quem?.tipo !== "funcionario") return html`<span class="quem-esta quem-esta--dono">${icone("usuario", { tamanho: 15 })}<span class="some-no-celular">Dono</span></span>`;
+function lateral(eu, atual) {
+  return html`
+    <aside class="lateral" aria-label="Menu">
+      <a class="lateral__marca" href="#/visao-geral">${marca}</a>
+      <nav class="lateral__menu">
+        ${MENU.map((g) => ({ ...g, itens: g.itens.filter(([, , , p]) => !p || pode(eu, p)) })).filter((g) => g.itens.length).map((g) => html`
+          ${g.grupo && html`<p class="lateral__grupo">${g.grupo}</p>`}
+          ${g.itens.map(([id, nome, ic]) => html`
+            <a href="#/${id}" class="lateral__link ${id === atual && "lateral__link--ativo"}" ${id === atual && html`aria-current="page"`}>${icone(ic, { tamanho: 18 })}<span>${nome}</span></a>`)}`)}
+      </nav>
+      ${eu.simulado && html`<p class="lateral__teste">Modo de teste</p>`}
+    </aside>`;
+}
+
+function perfil(eu) {
   const q = eu.quem;
-  return html`<button type="button" class="quem-esta" data-acao="minha-senha" title="Trocar minha senha">
-    ${icone("usuario", { tamanho: 15 })}<span><strong>${String(q.nome).split(" ")[0]}</strong><small class="some-no-celular">${q.usuario} · ${q.funcao_nome}</small></span></button>`;
+  const dono = q.tipo === "dono";
+  const detalhe = dono ? q.usuario : `${q.usuario} · ${q.funcao_nome}`;
+  return html`
+    <div class="perfil">
+      <button type="button" class="perfil__botao" data-acao="perfil" aria-haspopup="menu" aria-expanded="false">
+        <span class="avatar">${iniciais(q.nome)}</span>
+        <span class="perfil__nome"><strong>${q.nome}</strong><small>${dono ? "Dono" : q.funcao_nome}</small></span>
+        ${icone("baixo", { tamanho: 16 })}
+      </button>
+      <div class="perfil__menu" role="menu" hidden>
+        <div class="perfil__cab"><strong>${q.nome}</strong>${detalhe && html`<small>${detalhe}</small>`}</div>
+        ${pode(eu, "configuracoes") && html`<a role="menuitem" href="#/configuracoes" class="perfil__item">${icone("ajustes", { tamanho: 17 })} Configurações</a>`}
+        ${!dono && html`<button type="button" role="menuitem" class="perfil__item" data-acao="minha-senha">${icone("cadeado", { tamanho: 17 })} Trocar minha senha</button>`}
+        <button type="button" role="menuitem" class="perfil__item" data-acao="sair">${icone("sair", { tamanho: 17 })} Sair</button>
+      </div>
+    </div>`;
 }
 
 async function rotear() {
@@ -38,36 +74,64 @@ async function rotear() {
   const eu = await api("GET", "eu").catch(() => ({ logado: false }));
   if (!eu.logado) return telaEntrar(rotear);
   if (eu.quem?.trocar_senha) return telaPrimeiraSenha(eu, rotear);
-  const abas = ABAS.filter(([, , , permissao]) => pode(eu, permissao));
-  const aba = abas.find(([id]) => location.hash.startsWith(`#/${id}`))?.[0] ?? abas[0]?.[0];
+
+  const pedida = location.hash.replace(/^#\/?/, "").split("/")[0];
+  const atual = TELAS[pedida] && (!TELAS[pedida].permissao || pode(eu, TELAS[pedida].permissao)) ? pedida : "visao-geral";
   montar(raiz, html`
-    <div class="central">
-      <header class="topo-central">
-        ${marca}
-        <nav class="abas-central" aria-label="Seções">${abas.map(([id, texto, ic]) => html`
-          <a href="#/${id}" class="abas-central__item ${id === aba && "abas-central__item--ativa"}" ${id === aba && html`aria-current="page"`}>${icone(ic, { tamanho: 16 })}<span>${texto}</span></a>`)}</nav>
-        <div class="topo-central__acoes">${botaoTema()}${quemEsta(eu)}<button type="button" class="btn btn--suave btn--pequeno" data-acao="sair">${icone("sair", { tamanho: 15 })}<span class="some-no-celular">Sair</span></button></div>
-      </header>
-      <main class="central__corpo">
-        ${eu.simulado && aviso("info", html`<strong>Modo de teste:</strong> nada é criado de verdade no Supabase, na Vercel nem no Mercado Pago; e-mails aparecem só no terminal.`)}
-        ${eu.faltando?.length > 0 && !eu.simulado && aviso("aviso", html`Falta configurar: <strong>${eu.faltando.join(", ")}</strong>. Veja em <a class="link" href="#/configuracoes">Configurações</a>.`)}
-        ${eu.chaves?.map((c) => aviso(c.dias <= 7 ? "perigo" : "aviso", html`<strong>${c.texto}.</strong> Crie uma nova e rode <code>npm run configurar</code> na pasta Central (opção ${c.opcao}).`))}
-        <div data-conteudo></div>
-      </main>
+    <div class="app">
+      ${lateral(eu, atual)}
+      <div class="app__fundo" data-acao="fechar-menu"></div>
+      <div class="app__corpo">
+        <header class="topo">
+          <button type="button" class="btn-icone topo__menu" data-acao="abrir-menu" aria-label="Abrir menu">${icone("menu", { tamanho: 20 })}</button>
+          <p class="topo__secao">${TELAS[atual].nome}</p>
+          <span class="espaco"></span>
+          ${botaoTema()}
+          ${perfil(eu)}
+        </header>
+        <main class="app__pagina">
+          ${eu.faltando?.length > 0 && !eu.simulado && aviso("aviso", html`Falta configurar: <strong>${eu.faltando.join(", ")}</strong>.`)}
+          ${eu.chaves?.map((c) => aviso(c.dias <= 7 ? "perigo" : "aviso", html`<strong>${c.texto}.</strong> Rode <code>npm run configurar</code> (opção ${c.opcao}).`))}
+          <div data-conteudo></div>
+        </main>
+      </div>
     </div>`);
-  const conteudo = raiz.querySelector("[data-conteudo]");
-  if (aba === "clientes") await telaClientes(conteudo, eu);
-  else if (aba === "lojas") await telaLojas(conteudo, eu);
-  else if (aba === "equipe") await telaEquipe(conteudo, eu);
-  else if (aba === "configuracoes") await telaConfiguracoes(conteudo, eu);
+  await TELAS[atual].tela(raiz.querySelector("[data-conteudo]"), eu);
+}
+
+/* ---------- menu do perfil e menu lateral no celular ---------- */
+function fecharPerfil() {
+  const menu = raiz.querySelector(".perfil__menu");
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  raiz.querySelector('[data-acao="perfil"]')?.setAttribute("aria-expanded", "false");
 }
 
 raiz.addEventListener("click", async (ev) => {
-  if (ev.target.closest('[data-acao="minha-senha"]')) return trocarMinhaSenha();
-  if (!ev.target.closest('[data-acao="sair"]')) return;
-  await api("POST", "sair", {}).catch(() => {});
-  history.replaceState(null, "", "#/");
-  telaEntrar(rotear);
+  const alvo = ev.target.closest("[data-acao]");
+  const acao = alvo?.dataset.acao;
+  if (acao !== "perfil" && !ev.target.closest(".perfil__menu")) fecharPerfil();
+  if (ev.target.closest(".lateral__link")) raiz.querySelector(".app")?.classList.remove("app--menu");
+  if (ev.target.closest(".perfil__item")) fecharPerfil();
+  if (acao === "perfil") {
+    const menu = raiz.querySelector(".perfil__menu");
+    menu.hidden = !menu.hidden;
+    alvo.setAttribute("aria-expanded", String(!menu.hidden));
+    if (!menu.hidden) menu.querySelector(".perfil__item")?.focus();
+  }
+  if (acao === "abrir-menu") raiz.querySelector(".app")?.classList.add("app--menu");
+  if (acao === "fechar-menu") raiz.querySelector(".app")?.classList.remove("app--menu");
+  if (acao === "minha-senha") return trocarMinhaSenha();
+  if (acao === "sair") {
+    await api("POST", "sair", {}).catch(() => {});
+    history.replaceState(null, "", "#/");
+    telaEntrar(rotear);
+  }
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape") return;
+  fecharPerfil();
+  raiz.querySelector(".app")?.classList.remove("app--menu");
 });
 // qualquer botão com data-copiar copia o texto dele
 document.addEventListener("click", async (ev) => {

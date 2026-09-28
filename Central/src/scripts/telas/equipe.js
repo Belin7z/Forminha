@@ -1,7 +1,7 @@
 /* ==========================================================
    TELA — Equipe (só o dono): funcionários com usuário próprio
    (FMV-0427) e função. Cadastrar, editar, senha nova, desativar,
-   excluir. Embaixo, a atividade: quem fez o quê.
+   excluir. (O que cada um fez fica na página Atividade.)
    ========================================================== */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
@@ -16,19 +16,13 @@ const ponto = ([texto, tom]) => html`<span class="ponto ponto--${tom}">${texto}<
 export async function telaEquipe(conteiner) {
   document.title = "Equipe — Forminha";
   let dados = { funcionarios: [], funcoes: [] };
-  let filtro = "";
 
   montar(conteiner, html`
     <div class="central__titulo">
       <div><h1>Equipe</h1><p class="texto-suave" data-resumo></p></div>
       <button type="button" class="btn btn--primario" data-acao="novo">${icone("mais", { tamanho: 17 })} Novo funcionário</button>
     </div>
-    <section data-lista><div class="carregando-pagina"><div class="spinner"></div></div></section>
-    <div class="secao-titulo">
-      <h2>Atividade</h2>
-      <select class="entrada entrada--compacta" data-filtro aria-label="Filtrar por pessoa"><option value="">Todos</option></select>
-    </div>
-    <section data-atividades></section>`);
+    <section data-lista><div class="carregando-pagina"><div class="spinner"></div></div></section>`);
 
   const $ = (s) => conteiner.querySelector(s);
 
@@ -56,37 +50,14 @@ export async function telaEquipe(conteiner) {
           </div>`)}
       </div>` : html`
       <div class="vazio"><span class="vazio__ico">${icone("usuarios", { tamanho: 36 })}</span><h3>Ninguém na equipe ainda</h3></div>`);
-
-    const select = $("[data-filtro]");
-    montar(select, html`<option value="">Todos</option><option value="dono">Dono</option>${dados.funcionarios.map((f) => html`<option value="${f.id}">${f.usuario} · ${primeiroNome(f.nome)}</option>`)}`);
-    select.value = filtro;
   }
 
-  async function carregarAtividades() {
-    const lista = $("[data-atividades]");
-    try {
-      const { atividades } = await api("GET", `atividades${filtro ? `?quem=${encodeURIComponent(filtro)}` : ""}`);
-      montar(lista, atividades.length ? html`
-        <div class="tabela tabela--atividades" role="table" aria-label="Atividade">
-          <div class="tabela__linha tabela__cab" role="row"><span>Quando</span><span>Quem</span><span>Ação</span><span>Loja / pessoa</span></div>
-          ${atividades.map((a) => html`
-            <div class="tabela__linha" role="row">
-              <span class="tabela__suave">${quandoCurto(a.em)}</span>
-              <span class="tabela__mono">${a.usuario}</span>
-              <span>${a.acao}</span>
-              <span class="tabela__suave ${!a.alvo && "tabela__vazio"}">${a.alvo || "—"}</span>
-            </div>`)}
-        </div>` : html`<p class="texto-suave">Nada por aqui ainda.</p>`);
-    } catch (erro) { montar(lista, aviso("perigo", erro.message)); }
-  }
 
   async function carregar() {
     try { dados = await api("GET", "equipe"); desenhar(); }
     catch (erro) { montar($("[data-lista]"), aviso("perigo", erro.message)); }
-    carregarAtividades();
   }
 
-  $("[data-filtro]").addEventListener("change", (ev) => { filtro = ev.target.value; carregarAtividades(); });
   conteiner.addEventListener("click", async (ev) => {
     const alvo = ev.target.closest("[data-acao]");
     if (!alvo || !conteiner.contains(alvo)) return;

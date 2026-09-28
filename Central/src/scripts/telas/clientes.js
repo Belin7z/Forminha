@@ -16,7 +16,7 @@ const ETAPAS_LOJA = [
   ["criar_projeto", "Criar o banco"], ["aguardar_banco", "Banco ficando pronto"], ["preparar", "Preparar as tabelas"],
   ["publicar", "Publicar a loja e o painel"], ["convite", "Gerar o convite"], ["email", "Enviar o e-mail"],
 ];
-function situacaoDe(c) {
+export function situacaoDe(c) {
   if (c.situacao === "cancelado") return ["Cancelado", "neutro"];
   if (c.situacao === "aguardando_pagamento") return ["Aguardando pagamento", "aviso"];
   if (c.etapa === "pronta") return ["Loja pronta", "sucesso"];
@@ -87,7 +87,7 @@ export async function telaClientes(conteiner, eu) {
 }
 
 /* ---------- nova cliente ---------- */
-async function novaCliente(depois, eu) {
+export async function novaCliente(depois, eu) {
   let padrao = 0;
   try { padrao = (await api("GET", "configuracoes")).valor_padrao_centavos; } catch { /* segue sem valor padrão */ }
   const modal = abrirModal({

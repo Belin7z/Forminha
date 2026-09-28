@@ -6,6 +6,15 @@ Cada loja é independente: tem o **próprio banco** no Supabase (organização "
 com o nome `<código> · <nome da loja>`, ex.: `7XT-Tna-dRe · Doce da Ana`) e **dois sites** na Vercel
 (a loja e o painel da dona). Excluir a loja apaga tudo isso junto.
 
+## O painel
+
+Menu lateral com **Visão geral** (faturamento do mês, clientes, lojas no ar, cobranças esperando,
+vendas dos 6 últimos meses, o que precisa de atenção, últimas clientes e atividade), **Clientes**,
+**Pagamentos** (tudo o que foi cobrado, com total recebido e pendente), **Lojas**, **Equipe** e
+**Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
+financeiro). No topo, o **perfil**: ao clicar, Configurações (dono) ou Trocar minha senha (equipe) e
+Sair. No celular, o menu abre pelo botão ☰.
+
 ## Vender uma loja
 
 1. **Clientes → Nova cliente**: nome, e-mail, WhatsApp, CPF/CNPJ (opcional), nome da loja e valor.

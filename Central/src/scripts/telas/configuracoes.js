@@ -19,7 +19,7 @@ export async function telaConfiguracoes(conteiner, eu) {
   const webhook = `${location.origin}/api/webhook/mercadopago`;
   let cfg = null;
   if (r.clientes) { try { cfg = await api("GET", "configuracoes"); } catch { /* mostra só as conexões */ } }
-  const conta = await api("GET", "conta").catch(() => ({ email: "", usuario: "" }));
+  const conta = await api("GET", "conta").catch(() => ({ nome: "", email: "", usuario: "" }));
 
   montar(conteiner, html`
     <div class="central__titulo"><div><h1>Configurações</h1></div></div>
@@ -60,6 +60,7 @@ export async function telaConfiguracoes(conteiner, eu) {
         <div class="cartao__cab"><h2>Conta de acesso</h2></div>
         ${r.trocar_senha ? html`
           <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "nome", rotulo: "Seu nome", valor: conta.nome, placeholder: "Aparece no seu perfil", atributos: 'autocomplete="name" maxlength="60"' })}
           ${campo({ nome: "email", rotulo: "E-mail", tipo: "email", valor: conta.email, obrigatorio: true, atributos: 'autocomplete="email"' })}
           ${campo({ nome: "usuario", rotulo: "Usuário (opcional)", valor: conta.usuario, placeholder: "ex.: ana", atributos: 'autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30"' })}
           ${campo({ nome: "senha", rotulo: "Senha atual", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password"' })}
@@ -89,7 +90,8 @@ export async function telaConfiguracoes(conteiner, eu) {
         try {
           const salvo = await api("PUT", "conta", dadosDe(formConta));
           formConta.senha.value = "";
-          toast(`Pronto. Entre com ${salvo.usuario ? `${salvo.email} ou ${salvo.usuario}` : salvo.email}.`);
+          toast("Salvo.");
+          window.dispatchEvent(new Event("hashchange")); // o perfil no topo mostra o nome novo
         } catch (erro) { mostrarErros(formConta, erro); }
       });
     });

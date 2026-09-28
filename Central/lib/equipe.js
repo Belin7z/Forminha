@@ -21,6 +21,7 @@ export const PERMISSOES = {
   "pagamentos.cobrar": "Reenviar cobrança e gerar cobrança nova",
   "pagamentos.confirmar": "Confirmar pagamento recebido",
   "pagamentos.cancelar": "Cancelar cadastro",
+  "financeiro.ver": "Ver faturamento e a lista de pagamentos",
   "lojas.ver": "Ver as lojas",
   "lojas.suporte": "Suporte da loja: convite, link novo, redefinir senha da dona, retomar criação, atualizar e reativar",
   "lojas.criar": "Criar loja sem cobrança",
@@ -33,7 +34,7 @@ export const TODAS = Object.keys(PERMISSOES);
 export const FUNCOES = {
   gerente: {
     nome: "Gerente", letra: "G", descricao: "Clientes, pagamentos e lojas.",
-    permissoes: ["clientes.ver", "clientes.cadastrar", "clientes.editar", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar", "lojas.ver", "lojas.suporte", "lojas.criar"],
+    permissoes: ["clientes.ver", "clientes.cadastrar", "clientes.editar", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar", "financeiro.ver", "lojas.ver", "lojas.suporte", "lojas.criar"],
   },
   vendedor: {
     nome: "Vendedor", letra: "V", descricao: "Cadastra clientes e cobra.",
@@ -45,7 +46,7 @@ export const FUNCOES = {
   },
   financeiro: {
     nome: "Financeiro", letra: "F", descricao: "Confirma e cancela pagamentos.",
-    permissoes: ["clientes.ver", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar"],
+    permissoes: ["clientes.ver", "clientes.notas", "pagamentos.cobrar", "pagamentos.confirmar", "pagamentos.cancelar", "financeiro.ver"],
   },
 };
 

@@ -147,10 +147,14 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["POST", /^sair$/, false, async ({ seguro }) => ({ corpo: { ok: true }, cookie: cookieDeSaida(seguro) })],
     ["GET", /^eu$/, false, async ({ quem }) => {
       const dono = quem?.tipo === "dono";
+      const conta = dono ? await acesso.conta().catch(() => null) : null;
       return {
         corpo: {
           logado: Boolean(quem), simulado: Boolean(opcoes.simulado),
-          quem: quem ? { tipo: quem.tipo, usuario: quem.usuario, nome: quem.nome, funcao: quem.funcao, funcao_nome: quem.funcao_nome, trocar_senha: quem.trocar_senha } : null,
+          quem: quem ? {
+            tipo: quem.tipo, usuario: dono ? conta?.usuario || conta?.email || "" : quem.usuario, nome: dono ? conta?.nome || "Dono" : quem.nome,
+            funcao: quem.funcao, funcao_nome: quem.funcao_nome, trocar_senha: quem.trocar_senha,
+          } : null,
           permissoes: quem ? quem.permissoes : [],
           faltando: dono ? faltando : [],
           chaves: dono ? chavesVencendo(env).map((c) => ({ ...c, texto: textoDoPrazo(c) })) : [],
@@ -201,6 +205,14 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["POST", new RegExp(`^clientes/${ID}/redefinir-senha$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).redefinirSenha(m[1]) }), "Redefiniu senha da dona"],
     ["POST", new RegExp(`^clientes/${ID}/cobrar$`), "pagamentos.cobrar", async ({ m }) => ({ corpo: await (await exigirClientes()).cobrarDeNovo(m[1]) }), "Gerou cobrança"],
     ["POST", new RegExp(`^clientes/${ID}/cancelar$`), "pagamentos.cancelar", async ({ m }) => ({ corpo: await (await exigirClientes()).cancelar(m[1]) }), "Cancelou cadastro"],
+
+    /* ---------- visão geral e pagamentos ---------- */
+    ["GET", /^resumo$/, true, async ({ quem }) => {
+      const r = await (await exigirClientes()).visaoGeral({ financeiro: quem.permissoes.includes("financeiro.ver") });
+      if (quem.permissoes.includes("equipe") && equipe) r.atividades = await equipe.atividades({ limite: 6 });
+      return { corpo: r };
+    }],
+    ["GET", /^pagamentos$/, "financeiro.ver", async ({ url }) => ({ corpo: await (await exigirClientes()).listarPagamentos({ situacao: url.searchParams.get("situacao") ?? "" }) })],
 
     // o valor padrão aparece no cadastro de quem vende; mudar é só com você
     ["GET", /^configuracoes$/, true, async () => ({ corpo: await (await exigirClientes()).lerConfig() })],

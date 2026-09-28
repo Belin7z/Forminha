@@ -55,7 +55,7 @@ describe("entrar com e-mail ou usuário", () => {
     const r = await central.entrar("  DONA@Teste.local ", "doce1234");
     assert.equal(r.status, 200);
     assert.equal(await central.logado(r.cookie), true);
-    assert.deepEqual((await central.api("GET", "conta", undefined, r.cookie)).dados, { email: EMAIL, usuario: "" });
+    assert.deepEqual((await central.api("GET", "conta", undefined, r.cookie)).dados, { nome: "", email: EMAIL, usuario: "" });
     assert.equal((await central.api("GET", "conta")).status, 401, "sem login, não mostra a conta");
   });
 
@@ -69,7 +69,7 @@ describe("entrar com e-mail ou usuário", () => {
     assert.equal(r.status, 422); assert.ok(r.dados.campos.email);
     r = await central.api("PUT", "conta", { email: EMAIL, usuario: "Ana", senha: "doce1234" }, cookie);
     assert.equal(r.status, 200);
-    assert.deepEqual(r.dados, { email: EMAIL, usuario: "ana" });
+    assert.deepEqual(r.dados, { nome: "", email: EMAIL, usuario: "ana" });
     assert.equal((await central.entrar("ana", "doce1234")).status, 200);
     assert.equal((await central.entrar(EMAIL, "doce1234")).status, 200, "o e-mail continua valendo");
     assert.equal(await central.logado(cookie), true, "mudar a conta não desconecta ninguém");
@@ -121,7 +121,7 @@ describe("sem o banco da Central", () => {
       assert.equal((await central.api("GET", "eu", undefined, cookie)).dados.recursos.trocar_senha, false);
       assert.equal((await central.api("POST", "senha", { atual: "doce1234", nova: "brigadeiro9", repita: "brigadeiro9" }, cookie)).status, 503);
       assert.equal((await central.api("PUT", "conta", { email: EMAIL, usuario: "ana", senha: "doce1234" }, cookie)).status, 503);
-      assert.deepEqual((await central.api("GET", "conta", undefined, cookie)).dados, { email: EMAIL, usuario: "" });
+      assert.deepEqual((await central.api("GET", "conta", undefined, cookie)).dados, { nome: "", email: EMAIL, usuario: "" });
     } finally { central.fechar(); await sim.fechar(); }
   });
 

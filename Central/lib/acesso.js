@@ -38,7 +38,7 @@ export function criarAcesso({ banco = null, preparar = async () => {}, hashInici
   async function gravar(v) {
     await banco.consultar("insert into configuracoes (chave, valor) values ('acesso', $1::jsonb) on conflict (chave) do update set valor = excluded.valor", [JSON.stringify(v)]);
   }
-  const contaDe = (r) => ({ email: r?.email ?? limpar(emailInicial), usuario: r?.usuario ?? "" });
+  const contaDe = (r) => ({ nome: r?.nome ?? "", email: r?.email ?? limpar(emailInicial), usuario: r?.usuario ?? "" });
   const senhaCerta = async (r, senha) => conferirSenha(String(senha ?? ""), r?.hash ?? hashInicial);
 
   /** Login: e-mail ou usuário + senha. Sem conta cadastrada (instalação antiga), vale só a senha. */
@@ -76,12 +76,13 @@ export function criarAcesso({ banco = null, preparar = async () => {}, hashInici
     return v.versao;
   }
 
-  /** E-mail (obrigatório) e usuário (opcional) de acesso; pede a senha para confirmar. */
-  async function salvarConta({ senha, email, usuario }) {
+  /** Nome (opcional, aparece no perfil), e-mail (obrigatório) e usuário (opcional); pede a senha para confirmar. */
+  async function salvarConta({ senha, nome, email, usuario }) {
     exigirBanco();
     const r = await ler();
-    const novo = { email: limpar(email), usuario: limpar(usuario) };
+    const novo = { nome: String(nome ?? "").replace(/\s+/g, " ").trim(), email: limpar(email), usuario: limpar(usuario) };
     const campos = {};
+    if (novo.nome.length > 60) campos.nome = "Nome: até 60 letras.";
     if (!(await senhaCerta(r, senha))) campos.senha = "Senha incorreta.";
     if (!EMAIL.test(novo.email) || novo.email.length > 120) campos.email = "E-mail inválido.";
     if (novo.usuario && !USUARIO.test(novo.usuario)) campos.usuario = "De 3 a 30 letras, números, ponto, traço ou sublinhado (sem espaço e sem @).";

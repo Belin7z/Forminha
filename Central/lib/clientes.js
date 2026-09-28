@@ -450,8 +450,82 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return paradas.length;
   }
 
+  /* ---------- visão geral e pagamentos (meses no horário de Brasília) ---------- */
+  const LOCAL = "at time zone 'America/Sao_Paulo'";
+  const INICIO_DO_MES = `date_trunc('month', now() ${LOCAL})`;
+  const nomeDe = (c) => { try { return abrir(c).nome; } catch { return "(não foi possível abrir)"; } };
+
+  /** Números do negócio. `financeiro`: inclui faturamento e cobranças (só para quem pode ver dinheiro). */
+  async function visaoGeral({ financeiro = false } = {}) {
+    const [n] = await sql(`select count(*)::int as clientes,
+        count(*) filter (where criado_em ${LOCAL} >= ${INICIO_DO_MES})::int as novas_no_mes,
+        count(*) filter (where situacao = 'aguardando_pagamento')::int as aguardando,
+        count(*) filter (where situacao = 'pago' and etapa = 'pronta')::int as lojas_prontas,
+        count(*) filter (where situacao = 'pago' and etapa <> 'pronta')::int as criando
+      from clientes`);
+    const paradas = await sql(`select id, nome_loja, etapa, etapa_erro from clientes
+      where situacao = 'pago' and etapa <> 'pronta' and tentativas >= $1 order by atualizado_em desc limit 5`, [MAX_TENTATIVAS]);
+    const esperando = await sql(`select c.id, c.nome_loja, p.valor_centavos, p.criado_em from pagamentos p join clientes c on c.id = p.cliente_id
+      where p.situacao = 'pendente' and p.criado_em < now() - interval '2 days' order by p.criado_em limit 5`);
+    const recentes = (await sql("select * from clientes order by criado_em desc limit 5")).map((c) => ({
+      id: c.id, nome: nomeDe(c), nome_loja: c.nome_loja, situacao: c.situacao, etapa: c.etapa, parada: c.tentativas >= MAX_TENTATIVAS, criado_em: c.criado_em,
+    }));
+    const r = {
+      numeros: n,
+      atencao: [
+        ...paradas.map((c) => ({ tipo: "parada", cliente_id: c.id, nome_loja: c.nome_loja, texto: "A criação da loja parou" })),
+        ...esperando.map((c) => ({ tipo: "pagamento", cliente_id: c.id, nome_loja: c.nome_loja, texto: "Pagamento pendente há mais de 2 dias", valor_centavos: c.valor_centavos })),
+      ],
+      recentes,
+    };
+    if (!financeiro) return r;
+    const [f] = await sql(`select
+        coalesce(sum(valor_centavos) filter (where situacao = 'aprovado' and confirmado_em ${LOCAL} >= ${INICIO_DO_MES}), 0)::bigint as mes,
+        coalesce(sum(valor_centavos) filter (where situacao = 'aprovado' and confirmado_em ${LOCAL} >= ${INICIO_DO_MES} - interval '1 month'
+          and confirmado_em ${LOCAL} < ${INICIO_DO_MES}), 0)::bigint as mes_anterior,
+        coalesce(sum(valor_centavos) filter (where situacao = 'aprovado'), 0)::bigint as total,
+        coalesce(sum(valor_centavos) filter (where situacao = 'pendente'), 0)::bigint as pendente,
+        count(*) filter (where situacao = 'aprovado')::int as vendas
+      from pagamentos`);
+    const porMes = await sql(`select to_char(date_trunc('month', confirmado_em ${LOCAL}), 'YYYY-MM') as mes, sum(valor_centavos)::bigint as total, count(*)::int as vendas
+      from pagamentos where situacao = 'aprovado' and confirmado_em ${LOCAL} >= ${INICIO_DO_MES} - interval '5 months' group by 1`);
+    // os 6 últimos meses, mesmo os sem venda (barra zerada)
+    const [{ atual }] = await sql(`select to_char(${INICIO_DO_MES}, 'YYYY-MM') as atual`);
+    const [ano, mes] = atual.split("-").map(Number);
+    const meses = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(Date.UTC(ano, mes - 1 - (5 - i), 1));
+      const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      const achado = porMes.find((m) => m.mes === chave);
+      return { mes: chave, total: Number(achado?.total ?? 0), vendas: achado?.vendas ?? 0 };
+    });
+    return {
+      ...r,
+      financeiro: { mes: Number(f.mes), mes_anterior: Number(f.mes_anterior), total: Number(f.total), pendente: Number(f.pendente), vendas: f.vendas, meses },
+    };
+  }
+
+  /** Todas as cobranças (as mais novas primeiro), com o total recebido e o pendente. */
+  async function listarPagamentos({ situacao = "" } = {}) {
+    const filtro = ["pendente", "aprovado", "cancelado"].includes(situacao) ? situacao : null;
+    const linhas = await sql(`select p.id, p.cliente_id, p.valor_centavos, p.situacao, p.criado_em, p.confirmado_em, p.confirmado_por, p.mp_id,
+        c.nome_loja, c.dados, c.id as cid
+      from pagamentos p join clientes c on c.id = p.cliente_id ${filtro ? "where p.situacao = $1" : ""}
+      order by coalesce(p.confirmado_em, p.criado_em) desc limit 300`, filtro ? [filtro] : []);
+    const [t] = await sql(`select coalesce(sum(valor_centavos) filter (where situacao = 'aprovado'), 0)::bigint as recebido,
+      coalesce(sum(valor_centavos) filter (where situacao = 'pendente'), 0)::bigint as pendente from pagamentos`);
+    return {
+      totais: { recebido: Number(t.recebido), pendente: Number(t.pendente) },
+      pagamentos: linhas.map((p) => ({
+        id: p.id, cliente_id: p.cliente_id, cliente: nomeDe({ id: p.cid, dados: p.dados }), nome_loja: p.nome_loja, valor_centavos: p.valor_centavos,
+        situacao: p.situacao, criado_em: p.criado_em, confirmado_em: p.confirmado_em, automatico: Boolean(p.mp_id),
+        confirmado_por: p.confirmado_por === "mercado_pago" ? "Mercado Pago" : p.confirmado_por === "admin" ? "Manual" : p.confirmado_por,
+      })),
+    };
+  }
+
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
+    visaoGeral, listarPagamentos,
   };
 }
