@@ -34,6 +34,7 @@ async function rotear() {
       <main class="central__corpo">
         ${eu.simulado && aviso("info", html`<strong>Modo de teste:</strong> nada é criado de verdade no Supabase, na Vercel nem no Mercado Pago; e-mails aparecem só no terminal.`)}
         ${eu.faltando?.length > 0 && !eu.simulado && aviso("aviso", html`Falta configurar: <strong>${eu.faltando.join(", ")}</strong>. Veja em <a class="link" href="#/configuracoes">Configurações</a>.`)}
+        ${eu.chaves?.map((c) => aviso(c.dias <= 7 ? "perigo" : "aviso", html`<strong>${c.texto}.</strong> Crie uma nova e rode <code>npm run configurar</code> na pasta Central (opção ${c.opcao}).`))}
         <div data-conteudo></div>
       </main>
     </div>`);

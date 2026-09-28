@@ -70,7 +70,7 @@ describe("entrada", () => {
   it("sem login, nada de lojas", async () => {
     assert.equal((await api("GET", "lojas")).status, 401);
     assert.equal((await api("POST", "lojas", { nome: "X", email: "x@y.com" })).status, 401);
-    assert.deepEqual((await api("GET", "eu")).dados, { logado: false, faltando: [], simulado: false, recursos: null });
+    assert.deepEqual((await api("GET", "eu")).dados, { logado: false, faltando: [], chaves: [], simulado: false, recursos: null });
   });
   it("senha errada é recusada e, depois de várias, dá um tempo", async () => {
     const r = await api("POST", "entrar", { senha: "errada" });
@@ -206,7 +206,7 @@ describe("criar uma loja do começo ao fim", () => {
     sim.pausar(loja.ref);
     const r = await api("GET", "manter-ativo", undefined, { cabecalhos: { authorization: "Bearer cron-de-teste" } });
     assert.equal(r.status, 200);
-    assert.deepEqual(r.dados, { cutucadas: 1, reativadas: 1, falhas: 0 });
+    assert.deepEqual(r.dados, { cutucadas: 1, reativadas: 1, falhas: 0, aviso_de_chave: false });
     assert.equal((await api("GET", `lojas/${loja.ref}`)).dados.etapa, "pronta", "voltou");
   });
 

@@ -6,6 +6,8 @@
      2. E-mail (Gmail, com "senha de app")
      3. PIX automático (Mercado Pago)
      4. Tudo
+     5. Trocar só a chave do Supabase (quando vencer)
+     6. Trocar só a chave da Vercel (quando vencer)
    A chave de criptografia dos dados é criada UMA vez, sozinha. Nada do
    que você digita aparece na tela nem fica salvo no computador: vai
    direto para as variáveis secretas do projeto "forminha" na Vercel.
@@ -52,19 +54,39 @@ async function senhaEChaves() {
     if ((await perguntar("   Repita: ", { secreto: true })) !== senha) { console.log("   As duas não conferem. De novo."); continue; }
     break;
   }
-  console.log("\nCHAVE DO SUPABASE — crie em https://supabase.com/dashboard/account/tokens");
-  console.log("   Se aparecer a opção de limitar a chave, deixe só a organização \"Forminha\".");
-  const chaveSupabase = await perguntar("   Cole a chave (começa com sbp_): ", { secreto: true });
-  if (!/^sbp_/.test(chaveSupabase)) { console.error("✖ Essa não parece uma chave do Supabase (deveria começar com sbp_)."); process.exit(1); }
-  console.log("\nCHAVE DA VERCEL — crie em https://vercel.com/account/tokens (validade: sem vencimento ou a mais longa)");
-  const chaveVercel = await perguntar("   Cole a chave: ", { secreto: true });
-  if (chaveVercel.length < 20) { console.error("✖ Essa chave parece curta demais."); process.exit(1); }
-  console.log("\nGravando…");
   gravar("CENTRAL_SENHA_HASH", await resumirSenha(senha));
-  gravar("SUPABASE_ACCESS_TOKEN", chaveSupabase);
-  gravar("VERCEL_TOKEN", chaveVercel);
   gravar("SEGREDO_SESSAO", randomBytes(32).toString("hex"));
   gravar("CRON_SECRET", randomBytes(24).toString("hex"));
+  await chaveSupabase();
+  await chaveVercel();
+}
+
+/** Validade da chave em dias -> data de vencimento guardada (a Central avisa antes). Enter = não vence. */
+async function validade(nome, variavel) {
+  const resposta = await perguntar(`   Validade que você escolheu para a chave do ${nome}, em dias (ex.: 90 ou 365; Enter se não vence): `);
+  if (!resposta) { vercel(["env", "rm", variavel, "production", "--yes"]); return; }
+  const dias = Number(resposta);
+  if (!Number.isInteger(dias) || dias < 1 || dias > 3650) { console.error("✖ Use só o número de dias, por exemplo 90."); process.exit(1); }
+  const vence = new Date(Date.now() + dias * 86_400_000).toISOString().slice(0, 10);
+  gravar(variavel, vence);
+  console.log(`     A Central vai te avisar antes de ${vence.split("-").reverse().join("/")}.`);
+}
+
+async function chaveSupabase() {
+  console.log("\nCHAVE DO SUPABASE — crie em https://supabase.com/dashboard/account/tokens");
+  console.log("   Resource access: Organization → Forminha · Permissions: acesso total · Expires in: o maior prazo.");
+  const chave = await perguntar("   Cole a chave (começa com sbp_): ", { secreto: true });
+  if (!/^sbp_/.test(chave)) { console.error("✖ Essa não parece uma chave do Supabase (deveria começar com sbp_)."); process.exit(1); }
+  gravar("SUPABASE_ACCESS_TOKEN", chave);
+  await validade("Supabase", "SUPABASE_CHAVE_VENCE");
+}
+
+async function chaveVercel() {
+  console.log("\nCHAVE DA VERCEL — crie em https://vercel.com/account/tokens (validade: sem vencimento ou a mais longa)");
+  const chave = await perguntar("   Cole a chave: ", { secreto: true });
+  if (chave.length < 20) { console.error("✖ Essa chave parece curta demais."); process.exit(1); }
+  gravar("VERCEL_TOKEN", chave);
+  await validade("Vercel", "VERCEL_CHAVE_VENCE");
 }
 
 async function criptografia() {
@@ -115,8 +137,13 @@ console.log("\n  1) Senha da Central + chaves do Supabase e da Vercel");
 console.log("  2) E-mail (Gmail)");
 console.log("  3) PIX automático (Mercado Pago)");
 console.log("  4) Tudo");
-const opcao = await perguntar("\nEscolha (1-4): ");
+console.log("  5) Trocar só a chave do Supabase (quando vencer)");
+console.log("  6) Trocar só a chave da Vercel (quando vencer)");
+const opcao = await perguntar("\nEscolha (1-6): ");
+if (!["1", "2", "3", "4", "5", "6"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 6."); process.exit(1); }
 if (["1", "4"].includes(opcao)) await senhaEChaves();
+if (opcao === "5") await chaveSupabase();
+if (opcao === "6") await chaveVercel();
 await criptografia(); // sempre confere: cria só se ainda não existir
 if (["2", "4"].includes(opcao)) await email();
 if (["3", "4"].includes(opcao)) await mercadoPago();

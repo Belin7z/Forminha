@@ -71,4 +71,16 @@ export const modelos = {
       botao: { texto: "Criar senha nova", link },
     }),
   }),
+  /** Para você (dona da Central): uma chave vai vencer ou foi recusada. `linhas` já vêm prontas. */
+  alertaChaves: ({ linhas, urlCentral }) => ({
+    assunto: `Forminha: ${linhas[0]}`,
+    texto: `${linhas.join("\n")}\n\nEnquanto isso não for resolvido, a Central pode parar de criar lojas.\nCrie uma chave nova e rode "npm run configurar" na pasta Central (opção 5 para o Supabase, 6 para a Vercel).\n\n${urlCentral}`,
+    html: moldura({
+      titulo: "Hora de trocar uma chave",
+      paragrafos: [...linhas.map((l) => `<strong>${esc(l)}</strong>`), "Enquanto isso não for resolvido, a Central pode parar de criar lojas.",
+        `Crie uma chave nova e rode <code>npm run configurar</code> na pasta Central: opção 5 para o Supabase, 6 para a Vercel.`],
+      botao: { texto: "Abrir a Central", link: urlCentral },
+      rodape: "Aviso automático da sua Central da Forminha.",
+    }),
+  }),
 };

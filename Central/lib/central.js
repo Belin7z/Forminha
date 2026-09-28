@@ -14,7 +14,8 @@ import { criarLojas } from "./lojas.js";
 import { criarClientes } from "./clientes.js";
 import { ErroCofre, criarCofre } from "./cofre.js";
 import { bancoNeon, preparadorDeEsquema } from "./dados.js";
-import { criarEmail } from "./email.js";
+import { criarEmail, modelos } from "./email.js";
+import { chavesVencendo, mensagemDeChaveRecusada, textoDoPrazo } from "./chaves.js";
 import { criarMercadoPago } from "./mercadopago.js";
 import { NOME_COOKIE, conferirSenha, cookieDeSaida, cookieDeSessao, criarSessao, lerCookie, sessaoValida } from "./sessao.js";
 
@@ -71,6 +72,13 @@ export function criarCentral(env = process.env, opcoes = {}) {
     if (e instanceof ErroHttp && e.status === 503) throw new ErroHttp(503, "Página indisponível no momento. Tente de novo mais tarde.");
     throw e;
   });
+  const chaveRecusada = (e) => e instanceof ErroProvedor && ["Supabase", "Vercel"].includes(e.quem) && [401, 403].includes(e.status);
+  /** Aviso para você (o Gmail da Central): chave vencendo ou recusada. Sem e-mail configurado, fica só o aviso no painel. */
+  async function avisarDaChave(linhas) {
+    if (!email || !env.SMTP_USUARIO || !linhas.length) return false;
+    await email.enviar({ para: env.SMTP_USUARIO, ...modelos.alertaChaves({ linhas, urlCentral: urlBase }) });
+    return true;
+  }
 
   /* ---------- rotas: [método, caminho, protegida?, função] ---------- */
   const rotas = [
@@ -93,6 +101,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       corpo: {
         logado, simulado: Boolean(opcoes.simulado),
         faltando: logado ? faltando : [],
+        chaves: logado ? chavesVencendo(env).map((c) => ({ ...c, texto: textoDoPrazo(c) })) : [],
         recursos: logado ? { clientes: Boolean(clientes), email: Boolean(email), mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET) } : null,
       },
     })],
@@ -160,8 +169,16 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["GET", /^manter-ativo$/, false, async ({ cabecalhos }) => {
       if (!autorizadoInterno(cabecalhos)) throw new ErroHttp(401, "Não autorizado.");
       exigirLojas();
-      const resultado = await lojas.manterAtivas();
+      let resultado;
+      try { resultado = await lojas.manterAtivas(); }
+      catch (e) {
+        if (chaveRecusada(e)) await avisarDaChave([mensagemDeChaveRecusada(e.quem, e.status)]).catch(() => {});
+        throw e;
+      }
       if (clientes) { await garantirEsquema(); resultado.criacoes_retomadas = await clientes.retomarParadas(); }
+      // chave perto de vencer: um e-mail 15 dias antes e todo dia na última semana
+      const vencendo = chavesVencendo(env).filter((c) => c.dias <= 7 || c.dias === 15);
+      resultado.aviso_de_chave = await avisarDaChave(vencendo.map(textoDoPrazo)).catch(() => false);
       return { corpo: resultado };
     }],
   ];
@@ -184,13 +201,14 @@ export function criarCentral(env = process.env, opcoes = {}) {
   }
 
   async function tratar(req, res) {
+    let logado = false;
     try {
       const url = new URL(req.url, "http://central");
       const rota = (url.searchParams.get("rota") ?? url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
       const metodo = req.method;
       const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v[0] : v]));
       const seguro = cabecalhos["x-forwarded-proto"] === "https" || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(cabecalhos.host ?? "");
-      const logado = sessaoValida(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO);
+      logado = sessaoValida(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO);
 
       const achada = rotas.map(([met, re, protegida, fn]) => met === metodo && re.exec(rota) && { m: re.exec(rota), protegida, fn }).find(Boolean);
       if (!achada) throw new ErroHttp(404, "Caminho não encontrado.");
@@ -207,7 +225,8 @@ export function criarCentral(env = process.env, opcoes = {}) {
       responder(res, 200, r.corpo, r.cookie);
     } catch (erro) {
       if (erro instanceof ErroHttp) return responder(res, erro.status, { erro: erro.message, campos: erro.campos });
-      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: erro.message });
+      // chave vencida ou sem permissão: para você, diz o que fazer; para visitantes, nada muda
+      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: logado && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status) : erro.message });
       if (erro instanceof ErroCofre) { console.error("[cofre]", erro.message); return responder(res, 500, { erro: "Não foi possível abrir os dados protegidos (confira a CHAVE_CRIPTOGRAFIA)." }); }
       console.error(erro);
       responder(res, 500, { erro: "Erro inesperado na Central. Tente de novo." });

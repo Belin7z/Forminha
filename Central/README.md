@@ -45,9 +45,15 @@ npm run configurar
 ```
 
 Menu: **1** senha da Central + chaves do Supabase e da Vercel · **2** e-mail (Gmail com
-"senha de app") · **3** PIX automático (Mercado Pago) · **4** tudo. A chave de criptografia é criada
-sozinha **uma vez** (guarde a cópia que aparece na tela). Nada do que você digita aparece na tela
-nem fica no computador.
+"senha de app") · **3** PIX automático (Mercado Pago) · **4** tudo · **5** trocar só a chave do Supabase ·
+**6** trocar só a chave da Vercel. E-mail e Mercado Pago podem ser pulados com Enter. A chave de
+criptografia é criada sozinha **uma vez** (guarde a cópia que aparece na tela). Nada do que você digita
+aparece na tela nem fica no computador.
+
+**Chaves com prazo:** a chave do Supabase vence (não existe "nunca"). Ao colar, informe a validade em
+dias: a Central mostra um aviso no topo do painel 15 dias antes e manda e-mail para o seu Gmail 15 dias
+antes e todo dia na última semana. Para renovar, crie uma chave nova (Organization → Forminha, acesso
+total) e rode `npm run configurar`, opção **5**. Se a chave for recusada, a Central diz isso na tela.
 
 O **banco da Central** é ligado na Vercel: projeto `forminha` → **Storage → Create Database → Neon**
 → conectar ao projeto (grátis). Depois, publique de novo.
@@ -63,4 +69,5 @@ O **banco da Central** é ligado na Vercel: projeto `forminha` → **Storage →
 Variáveis na Vercel — secretas (pelo `npm run configurar`): `CENTRAL_SENHA_HASH`, `SEGREDO_SESSAO`,
 `CRON_SECRET`, `CHAVE_CRIPTOGRAFIA`, `SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`, `SMTP_USUARIO`,
 `SMTP_SENHA`, `EMAIL_NOME`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`; do Neon: `DATABASE_URL`;
-não secretas: `FORMINHA_ORG`, `VERCEL_TIME`, `REPO_LOJA`, `REPO_PAINEL`.
+não secretas: `FORMINHA_ORG`, `VERCEL_TIME`, `REPO_LOJA`, `REPO_PAINEL`, `SUPABASE_CHAVE_VENCE`,
+`VERCEL_CHAVE_VENCE` (datas AAAA-MM-DD gravadas pelo configurar).
