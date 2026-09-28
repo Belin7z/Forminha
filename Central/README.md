@@ -24,12 +24,14 @@ link novo), **Redefinir senha da dona** (link por e-mail, que vale pouco tempo),
 A aba **Lojas** mostra todas as lojas e serve para criar uma loja **sem cobrança** (teste ou
 cortesia), atualizar o banco, reativar e excluir.
 
-## Senha de acesso
+## Acesso (e-mail ou usuário + senha)
 
-Criada no `npm run configurar` (8 caracteres ou mais). Depois, troque quando quiser em **Configurações →
-Senha de acesso**: pede a senha atual, e quem estiver com a Central aberta em outro aparelho sai na hora.
-No banco fica só o resumo (scrypt), nunca a senha. Esqueceu? `npm run configurar`, opção **7** — essa
-sempre vale mais que a trocada pelo painel. Senha errada 5 vezes seguidas dá uma pausa crescente.
+E-mail e senha nascem no `npm run configurar` (senha com 8 caracteres ou mais). Na Central, em
+**Configurações**: **Conta de acesso** muda o e-mail e cria um nome de usuário (pede a senha para
+confirmar); **Senha de acesso** troca a senha (pede a atual, e quem estiver com a Central aberta em outro
+aparelho sai na hora). No banco fica só o resumo da senha (scrypt), nunca a senha. Esqueceu?
+`npm run configurar`, opção **7** — vale mais que o que foi mudado pelo painel. Errar 5 vezes seguidas dá
+uma pausa crescente, e a mensagem de erro não diz se foi o e-mail ou a senha.
 
 ## Segurança dos dados
 
@@ -53,7 +55,7 @@ npm run configurar
 
 Menu: **1** senha da Central + chaves do Supabase e da Vercel · **2** e-mail (Gmail com
 "senha de app") · **3** PIX automático (Mercado Pago) · **4** tudo · **5** trocar só a chave do Supabase ·
-**6** trocar só a chave da Vercel · **7** trocar só a senha da Central (serve também para quem esqueceu). E-mail e Mercado Pago podem ser pulados com Enter. A chave de
+**6** trocar só a chave da Vercel · **7** trocar só o e-mail e a senha da Central (serve também para quem esqueceu). E-mail e Mercado Pago podem ser pulados com Enter. A chave de
 criptografia é criada sozinha **uma vez** (guarde a cópia que aparece na tela). Nada do que você digita
 aparece na tela nem fica no computador.
 
@@ -69,11 +71,11 @@ O **banco da Central** é ligado na Vercel: projeto `forminha` → **Storage →
 
 | Comando | O que faz |
 |---|---|
-| `npm run dev` | Central em <http://localhost:3100>, **modo de teste** (nada é criado de verdade; e-mails aparecem no terminal). Senha `forminha`. |
+| `npm run dev` | Central em <http://localhost:3100>, **modo de teste** (nada é criado de verdade; e-mails aparecem no terminal). Entrar com `teste@forminha.local` / `forminha`. |
 | `npm test` | Tudo com Supabase, Vercel, Mercado Pago e e-mail simulados e bancos de verdade em memória. |
 | `npm run copiar-sql` | Traz as migrações do `Dashboard/supabase` (a fonte da verdade). Depois publique a Central e use **Atualizar banco** nas lojas. |
 
-Variáveis na Vercel — secretas (pelo `npm run configurar`): `CENTRAL_SENHA_HASH`, `SEGREDO_SESSAO`,
+Variáveis na Vercel — secretas (pelo `npm run configurar`): `CENTRAL_EMAIL`, `CENTRAL_SENHA_HASH`, `SEGREDO_SESSAO`,
 `CRON_SECRET`, `CHAVE_CRIPTOGRAFIA`, `SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`, `SMTP_USUARIO`,
 `SMTP_SENHA`, `EMAIL_NOME`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`; do Neon: `DATABASE_URL`;
 não secretas: `FORMINHA_ORG`, `VERCEL_TIME`, `REPO_LOJA`, `REPO_PAINEL`, `SUPABASE_CHAVE_VENCE`,

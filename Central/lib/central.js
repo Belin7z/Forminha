@@ -57,7 +57,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   });
   if (erroCofre) faltando.push("CHAVE_CRIPTOGRAFIA (inválida)");
   const tentativas = new Map(); // freio de senha errada (por endereço, nesta instância)
-  const acesso = criarAcesso({ banco, preparar: garantirEsquema ?? undefined, hashInicial: env.CENTRAL_SENHA_HASH });
+  const acesso = criarAcesso({ banco, preparar: garantirEsquema ?? undefined, hashInicial: env.CENTRAL_SENHA_HASH, emailInicial: env.CENTRAL_EMAIL });
 
   const exigirLojas = () => {
     if (!lojas) throw new ErroHttp(503, `A Central ainda não está configurada (falta: ${faltando.join(", ")}). Rode "npm run configurar".`);
@@ -88,21 +88,23 @@ export function criarCentral(env = process.env, opcoes = {}) {
       if (!env.CENTRAL_SENHA_HASH || !env.SEGREDO_SESSAO) throw new ErroHttp(503, 'A senha da Central ainda não foi criada. Rode "npm run configurar".');
       const t = tentativas.get(ip) ?? { n: 0, ate: 0 };
       if (t.ate > Date.now()) throw new ErroHttp(429, `Muitas tentativas. Aguarde ${Math.ceil((t.ate - Date.now()) / 1000)} segundos.`);
-      if (!(await acesso.conferir(String(corpo.senha ?? "")))) {
+      if (!(await acesso.entrar(corpo.usuario ?? corpo.email ?? "", corpo.senha))) {
         t.n += 1;
         if (t.n >= 5) t.ate = Date.now() + 60_000 * Math.min(15, 2 ** (Math.floor(t.n / 5) - 1));
         tentativas.set(ip, t);
         await new Promise((ok) => setTimeout(ok, 400));
-        throw new ErroHttp(401, "Senha incorreta.", { senha: "Senha incorreta." });
+        throw new ErroHttp(401, "E-mail (ou usuário) ou senha incorretos.");
       }
       tentativas.delete(ip);
       return { corpo: { ok: true }, cookie: cookieDeSessao(criarSessao(env.SEGREDO_SESSAO, { versao: (await acesso.versao()) ?? 0 }), seguro) };
     }],
     // trocar a senha pelo painel: pede a atual; quem estava logado em outro aparelho sai
     ["POST", /^senha$/, true, async ({ corpo, seguro }) => {
-      const versao = await acesso.trocar(corpo);
+      const versao = await acesso.trocarSenha(corpo);
       return { corpo: { ok: true }, cookie: cookieDeSessao(criarSessao(env.SEGREDO_SESSAO, { versao }), seguro) };
     }],
+    ["GET", /^conta$/, true, async () => ({ corpo: await acesso.conta() })],
+    ["PUT", /^conta$/, true, async ({ corpo }) => ({ corpo: await acesso.salvarConta(corpo) })],
     ["POST", /^sair$/, false, async ({ seguro }) => ({ corpo: { ok: true }, cookie: cookieDeSaida(seguro) })],
     ["GET", /^eu$/, false, async ({ logado }) => ({
       corpo: {

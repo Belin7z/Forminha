@@ -1,7 +1,7 @@
 /* ==========================================================
    DEV — a Central no seu computador: npm run dev  ->  http://localhost:3100
    • Sem chaves no .env: MODO DE TESTE (Supabase e Vercel imitados, nada é
-     criado de verdade). Senha: forminha
+     criado de verdade). Entrar com: teste@forminha.local / forminha
    • Com SUPABASE_ACCESS_TOKEN, VERCEL_TOKEN, FORMINHA_ORG e CENTRAL_SENHA_HASH
      no .env: usa as contas DE VERDADE (cuidado: cria lojas reais).
    ========================================================== */
@@ -33,7 +33,7 @@ if (!deVerdade) {
   const { bancoDeTeste, criarSimulado } = await import("./simulado.js");
   const sim = criarSimulado({ prontoEmMs: 6000 });
   env = {
-    ...env, ...sim.env, CENTRAL_SENHA_HASH: await resumirSenha("forminha"), CRON_SECRET: "cron-local",
+    ...env, ...sim.env, CENTRAL_EMAIL: "teste@forminha.local", CENTRAL_SENHA_HASH: await resumirSenha("forminha"), CRON_SECRET: "cron-local",
     CHAVE_CRIPTOGRAFIA: novaChave(), URL_CENTRAL: `http://localhost:${PORTA}`,
   };
   opcoes = {
@@ -64,5 +64,5 @@ createServer(async (req, res) => {
 }).listen(PORTA, "127.0.0.1", () => {
   console.log(`\n✔ Central no ar → http://localhost:${PORTA}\n`);
   console.log(deVerdade ? "   ATENÇÃO: usando o Supabase e a Vercel DE VERDADE (cria lojas reais).\n"
-    : "   Modo de teste: nada é criado de verdade.  Senha: forminha\n");
+    : "   Modo de teste: nada é criado de verdade.  Entrar com: teste@forminha.local / forminha\n");
 });

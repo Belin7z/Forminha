@@ -19,6 +19,7 @@ export async function telaConfiguracoes(conteiner, eu) {
   const webhook = `${location.origin}/api/webhook/mercadopago`;
   let cfg = null;
   if (r.clientes) { try { cfg = await api("GET", "configuracoes"); } catch { /* mostra só as conexões */ } }
+  const conta = await api("GET", "conta").catch(() => ({ email: "", usuario: "" }));
 
   montar(conteiner, html`
     <div class="central__titulo"><div><h1>Configurações</h1></div></div>
@@ -57,6 +58,17 @@ export async function telaConfiguracoes(conteiner, eu) {
           </div>`}
       </section>
 
+      <form class="cartao" id="f-conta" novalidate>
+        <div class="cartao__cab"><h2>Conta de acesso</h2></div>
+        ${r.trocar_senha ? html`
+          <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "email", rotulo: "E-mail", tipo: "email", valor: conta.email, obrigatorio: true, atributos: 'autocomplete="email"' })}
+          ${campo({ nome: "usuario", rotulo: "Usuário (opcional)", valor: conta.usuario, placeholder: "ex.: ana", atributos: 'autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30"', ajuda: "Para entrar sem digitar o e-mail inteiro. Letras, números, ponto ou traço." })}
+          ${campo({ nome: "senha", rotulo: "Sua senha, para confirmar", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password"' })}
+          <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>`
+        : html`<p>Entrada com: <strong>${conta.email || "só a senha"}</strong></p>${aviso("aviso", "Para mudar por aqui, ligue o banco da Central (veja Conexões).")}`}
+      </form>
+
       <form class="cartao" id="f-senha" novalidate>
         <div class="cartao__cab"><h2>Senha de acesso</h2></div>
         ${r.trocar_senha ? html`
@@ -73,7 +85,19 @@ export async function telaConfiguracoes(conteiner, eu) {
     </div>`);
 
   const formSenha = conteiner.querySelector("#f-senha");
+  const formConta = conteiner.querySelector("#f-conta");
   if (r.trocar_senha) {
+    ativarCampos(formConta);
+    formConta.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      await ocupado(formConta.querySelector("[type=submit]"), async () => {
+        try {
+          const salvo = await api("PUT", "conta", dadosDe(formConta));
+          formConta.senha.value = "";
+          toast(`Pronto. Entre com ${salvo.usuario ? `${salvo.email} ou ${salvo.usuario}` : salvo.email}.`);
+        } catch (erro) { mostrarErros(formConta, erro); }
+      });
+    });
     ativarCampos(formSenha);
     formSenha.addEventListener("submit", async (ev) => {
       ev.preventDefault();

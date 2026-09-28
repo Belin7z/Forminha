@@ -2,13 +2,13 @@
    CONFIGURAR — guarda na Vercel as chaves e a senha da Central.
      npm run configurar      (na pasta Central, no SEU terminal)
    Menu:
-     1. Senha da Central + chaves do Supabase e da Vercel
+     1. E-mail e senha da Central + chaves do Supabase e da Vercel
      2. E-mail (Gmail, com "senha de app")
      3. PIX automático (Mercado Pago)
      4. Tudo
      5. Trocar só a chave do Supabase (quando vencer)
      6. Trocar só a chave da Vercel (quando vencer)
-     7. Trocar só a senha da Central (também serve se você esqueceu)
+     7. Trocar só o e-mail e a senha da Central (também serve se você esqueceu)
    A chave de criptografia dos dados é criada UMA vez, sozinha. Nada do
    que você digita aparece na tela nem fica salvo no computador: vai
    direto para as variáveis secretas do projeto "forminha" na Vercel.
@@ -49,8 +49,12 @@ function gravar(nome, valor) {
 
 const existe = (nome) => new RegExp(`\\b${nome}\\b`).test(vercel(["env", "ls", "production"]).saida);
 
-/** Senha da Central. Também é o caminho para quem esqueceu: vale mais que a trocada pelo painel. */
+/** E-mail e senha da Central. Também é o caminho para quem esqueceu: vale mais que o que foi trocado pelo painel. */
 async function senhaDaCentral() {
+  console.log("\nE-MAIL de acesso à Central (é com ele que você entra).");
+  const email = (await perguntar("   Seu e-mail: ")).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { console.error("✖ E-mail inválido."); process.exit(1); }
+  gravar("CENTRAL_EMAIL", email);
   console.log(`\nSENHA da Central (${SENHA_MINIMA} caracteres ou mais; depois dá para trocar pelo painel, em Configurações).`);
   let senha = "";
   for (;;) {
@@ -142,13 +146,13 @@ if (!vercel(["whoami"]).ok) { console.error("✖ Entre na Vercel primeiro: rode 
 const link = vercel(["link", "--yes", "--project", PROJETO]);
 if (!link.ok) { console.error(`✖ Não achei o projeto "${PROJETO}" na Vercel:\n${link.saida}`); process.exit(1); }
 
-console.log("\n  1) Senha da Central + chaves do Supabase e da Vercel");
+console.log("\n  1) E-mail e senha da Central + chaves do Supabase e da Vercel");
 console.log("  2) E-mail (Gmail)");
 console.log("  3) PIX automático (Mercado Pago)");
 console.log("  4) Tudo");
 console.log("  5) Trocar só a chave do Supabase (quando vencer)");
 console.log("  6) Trocar só a chave da Vercel (quando vencer)");
-console.log("  7) Trocar só a senha da Central (também serve se você esqueceu)");
+console.log("  7) Trocar só o e-mail e a senha da Central (também serve se você esqueceu)");
 console.log("\nAgora digite SÓ O NÚMERO da opção (para a primeira vez: 1). As chaves são pedidas depois, uma de cada vez.");
 const opcao = await perguntar("Número da opção (aparece como •): ", { secreto: true }); // escondido: se colarem uma chave aqui, ela não aparece na tela
 if (opcao.length > 2) {

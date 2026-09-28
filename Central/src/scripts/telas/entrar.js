@@ -1,4 +1,4 @@
-/* TELA — entrar na Central (senha) */
+/* TELA — entrar na Central (e-mail ou usuário + senha) */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { ocupado } from "/src/scripts/base/ui.js";
@@ -22,7 +22,8 @@ export function telaEntrar(aoEntrar, aviso = "") {
           ${aviso && caixaAviso("aviso", aviso)}
           <form id="form-entrar" novalidate>
             <div class="form-erro" data-erro-geral hidden></div>
-            ${campo({ nome: "senha", rotulo: "Senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password" autofocus' })}
+            ${campo({ nome: "usuario", rotulo: "E-mail ou usuário", obrigatorio: true, atributos: 'autocomplete="username" autocapitalize="none" spellcheck="false" autofocus' })}
+            ${campo({ nome: "senha", rotulo: "Senha", tipo: "password", obrigatorio: true, atributos: 'autocomplete="current-password"' })}
             <p class="entrar__caps" data-caps hidden>${icone("alerta", { tamanho: 14 })} Caps Lock ligado</p>
             <button type="submit" class="btn btn--primario btn--grande btn--bloco">Entrar ${icone("direita", { tamanho: 17 })}</button>
           </form>
