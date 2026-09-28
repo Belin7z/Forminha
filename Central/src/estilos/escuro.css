@@ -81,3 +81,5 @@
 /* campos soltos (fora de .campo): anotação da ficha, busca */
 [data-tema="escuro"] .entrada { background: #15130f; color: var(--texto); border-color: var(--borda-forte); }
 [data-tema="escuro"] .entrada::placeholder, [data-tema="escuro"] .busca-central input::placeholder { color: var(--texto-apagado); }
+[data-tema="escuro"] .funcoes-escolha__item:has(input:checked) { background: var(--superficie-alta); border-color: var(--detalhe); }
+[data-tema="escuro"] .acesso-pronto__linha { background: var(--superficie-alta); }

@@ -18,6 +18,7 @@ import { gerarPix } from "./pix.js";
 import { modelos } from "./email.js";
 import { mascararEmail } from "./cofre.js";
 import { assinaturaValida } from "./mercadopago.js";
+import { autorAtual } from "./autoria.js";
 
 const resumo = (t) => createHash("sha256").update(String(t)).digest("hex");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -94,8 +95,12 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return lerConfig();
   }
 
+  // ações de pessoas (não as etapas automáticas da loja nem os e-mails) dizem quem fez
+  const COM_AUTOR = new Set(["cadastro", "pagamento", "suporte", "nota"]);
   async function anotarHistorico(clienteId, tipo, mensagem) {
-    await sql("insert into historico (cliente_id, tipo, texto) values ($1, $2, $3)", [clienteId, tipo, cofre.cifrar(mensagem, `historico:${clienteId}`)]);
+    const autor = COM_AUTOR.has(tipo) ? autorAtual() : null;
+    const texto = autor ? `${mensagem} (${autor})` : mensagem;
+    await sql("insert into historico (cliente_id, tipo, texto) values ($1, $2, $3)", [clienteId, tipo, cofre.cifrar(texto, `historico:${clienteId}`)]);
   }
 
   async function linha(id) {
@@ -231,7 +236,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     }
     await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now()
       where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id]);
-    await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "por você"}.`);
+    await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "manualmente"}.`);
     return { cliente_id: p.cliente_id, ja_estava: false };
   }
 
@@ -239,7 +244,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const c = await linha(id);
     const [p] = corpo.pagamento_id ? [{ id: corpo.pagamento_id }] : await sql("select id from pagamentos where cliente_id = $1 and situacao = 'pendente' order by criado_em desc limit 1", [id]);
     if (!p) throw new ErroHttp(409, c.situacao === "pago" ? "O pagamento já está confirmado." : "Não há cobrança pendente.");
-    const r = await confirmarPagamento(p.id, "admin");
+    const r = await confirmarPagamento(p.id, autorAtual() ?? "admin"); // quem confirmou fica guardado no pagamento
     if (r.cliente_id !== id) throw new ErroHttp(404, "Pagamento não encontrado.");
     await avancar(id, { orcamento: Math.min(orcamentoMs, 20_000) }); // cria o banco já e pede para outra execução seguir
     return detalhe(id);

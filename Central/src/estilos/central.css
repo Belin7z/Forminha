@@ -257,3 +257,60 @@
 .cartao__cab { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .cartao__cab h2 { font-size: 1.5rem; margin: 0; }
 .cartao__rodape { display: flex; justify-content: flex-end; gap: .6rem; padding-top: .6rem; }
+
+/* ---------- quem está usando (topo) ---------- */
+.quem-esta { display: inline-flex; align-items: center; gap: .45rem; padding: .3rem .75rem .3rem .55rem; border: 1px solid var(--borda); border-radius: 999px; background: var(--superficie); color: var(--texto); font: inherit; font-size: .82rem; line-height: 1.15; }
+button.quem-esta { cursor: pointer; }
+button.quem-esta:hover { border-color: var(--detalhe); }
+.quem-esta > span { display: grid; text-align: left; }
+.quem-esta small { color: var(--texto-suave); font-size: .7rem; }
+.quem-esta--dono { color: var(--texto-suave); }
+
+/* ---------- equipe ---------- */
+.tabela-equipe { border: 1px solid var(--borda); border-radius: var(--raio-lg); background: var(--superficie); overflow: hidden; }
+.te__cab, .te__linha { display: grid; grid-template-columns: minmax(0, 1.8fr) 7.5rem minmax(0, 1fr) minmax(0, 1.3fr) 9rem auto; gap: 1rem; align-items: center; padding: .8rem 1.2rem; }
+.te__cab { font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; color: var(--detalhe); border-bottom: 1px solid var(--borda); }
+.te__linha { border-bottom: 1px solid var(--borda); }
+.te__linha:last-child { border-bottom: 0; }
+.te__linha--inativa { opacity: .62; }
+.te__nome { display: grid; min-width: 0; }
+.te__nome strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.te__nome small, .te__data { color: var(--texto-suave); font-size: .8rem; }
+.te__acoes { display: flex; gap: .15rem; justify-content: flex-end; }
+.equipe__extras { margin-top: 1.4rem; }
+.equipe__extras .cartao__cab select { width: auto; max-width: 12rem; padding: .35rem .6rem; font-size: .85rem; }
+.funcoes { list-style: none; margin: 0; padding: 0; display: grid; gap: .9rem; }
+.funcoes li p { margin: .3rem 0 0; font-size: .86rem; color: var(--texto-suave); }
+.funcoes__cab { display: flex; align-items: center; gap: .5rem; }
+.atividades { list-style: none; margin: 0; padding: 0; display: grid; max-height: 26rem; overflow: auto; }
+.atividades li { display: grid; grid-template-columns: 5.6rem minmax(0, 1fr) auto; gap: .7rem; align-items: baseline; padding: .55rem 0; border-bottom: 1px solid var(--borda); font-size: .86rem; }
+.atividades li:last-child { border-bottom: 0; }
+.atividades__quem { font: 500 .78rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--detalhe); }
+.atividades time { color: var(--texto-suave); font-size: .74rem; white-space: nowrap; }
+.funcoes-escolha { display: grid; gap: .5rem; margin: .4rem 0 1rem; padding: 0; border: 0; }
+.funcoes-escolha legend { margin-bottom: .5rem; font-size: .88rem; font-weight: 500; }
+.funcoes-escolha__item { display: flex; gap: .7rem; align-items: flex-start; padding: .7rem .85rem; border: 1px solid var(--borda); border-radius: var(--raio); cursor: pointer; transition: border-color .15s, background .15s; }
+.funcoes-escolha__item:hover { border-color: var(--detalhe); }
+.funcoes-escolha__item:has(input:checked) { border-color: var(--escura); background: var(--marca-25); }
+.funcoes-escolha__item input { margin-top: .25rem; accent-color: var(--escura); }
+.funcoes-escolha__item > span { display: grid; gap: .15rem; }
+.funcoes-escolha__item small { color: var(--texto-suave); font-size: .82rem; }
+.acesso-pronto { display: grid; gap: .1rem; margin-bottom: 1rem; border: 1px solid var(--borda); border-radius: var(--raio); overflow: hidden; }
+.acesso-pronto__linha { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .7rem .9rem; background: var(--marca-25); }
+.acesso-pronto__linha span { color: var(--texto-suave); font-size: .85rem; }
+.acesso-pronto__linha .codigo { font-size: 1rem; }
+.primeira-senha__texto { margin: -.4rem 0 1.2rem; }
+
+@media (max-width: 900px) {
+  .te__cab { display: none; }
+  .te__linha { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nome acoes" "usuario funcao" "situacao situacao"; row-gap: .45rem; }
+  .te__linha > :nth-child(1) { grid-area: nome; }
+  .te__linha > :nth-child(2) { grid-area: usuario; }
+  .te__linha > :nth-child(3) { grid-area: funcao; justify-self: end; }
+  .te__linha > :nth-child(4) { grid-area: situacao; }
+  .te__linha > :nth-child(5) { display: none; }
+  .te__linha > :nth-child(6) { grid-area: acoes; }
+}
+@media (max-width: 560px) {
+  .atividades li { grid-template-columns: minmax(0, 1fr); gap: .15rem; }
+}

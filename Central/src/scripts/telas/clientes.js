@@ -9,7 +9,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, confirmar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { paraCentavos, emReais } from "/src/scripts/base/formatacao.js";
-import { api, aviso, dia, documentoBonito, linkWhats, quando, reais, telefoneBonito } from "../nucleo.js";
+import { api, aviso, dia, documentoBonito, linkWhats, pode, quando, reais, telefoneBonito } from "../nucleo.js";
 
 /* ---------- situação ---------- */
 const ETAPAS_LOJA = [
@@ -34,10 +34,10 @@ export async function telaClientes(conteiner, eu) {
       <div><h1>Clientes</h1><p class="texto-suave" data-resumo>Carregando…</p></div>
       <div class="central__titulo-acoes">
         <label class="busca-central">${icone("busca", { tamanho: 16 })}<input type="search" data-busca placeholder="Buscar cliente ou loja" aria-label="Buscar cliente ou loja"></label>
-        <button type="button" class="btn btn--primario" data-acao="novo" ${!eu.recursos?.clientes && "disabled"}>${icone("mais", { tamanho: 17 })} Nova cliente</button>
+        ${pode(eu, "clientes.cadastrar") && html`<button type="button" class="btn btn--primario" data-acao="novo" ${!eu.recursos?.clientes && "disabled"}>${icone("mais", { tamanho: 17 })} Nova cliente</button>`}
       </div>
     </div>
-    ${!eu.recursos?.clientes && aviso("aviso", html`Para cadastrar clientes, falta ligar o banco da Central e a chave de criptografia. Veja em <a class="link" href="#/configuracoes">Configurações</a>.`)}
+    ${!eu.recursos?.clientes && aviso("aviso", pode(eu, "configuracoes") ? html`Para cadastrar clientes, falta ligar o banco da Central e a chave de criptografia. Veja em <a class="link" href="#/configuracoes">Configurações</a>.` : "A Central ainda não está pronta para clientes. Fale com o dono.")}
     <section data-lista><div class="carregando-pagina"><div class="spinner"></div></div></section>`);
 
   const lista = conteiner.querySelector("[data-lista]");
@@ -80,14 +80,14 @@ export async function telaClientes(conteiner, eu) {
   conteiner.addEventListener("click", (ev) => {
     const alvo = ev.target.closest("[data-acao]");
     if (!alvo || !conteiner.contains(alvo)) return;
-    if (alvo.dataset.acao === "novo") novaCliente(carregar);
-    if (alvo.dataset.acao === "abrir") abrirFicha(alvo.dataset.id, carregar);
+    if (alvo.dataset.acao === "novo") novaCliente(carregar, eu);
+    if (alvo.dataset.acao === "abrir") abrirFicha(alvo.dataset.id, carregar, eu);
   });
   await carregar();
 }
 
 /* ---------- nova cliente ---------- */
-async function novaCliente(depois) {
+async function novaCliente(depois, eu) {
   let padrao = 0;
   try { padrao = (await api("GET", "configuracoes")).valor_padrao_centavos; } catch { /* segue sem valor padrão */ }
   const modal = abrirModal({
@@ -103,7 +103,7 @@ async function novaCliente(depois) {
           ${campo({ nome: "nome_loja", rotulo: "Nome da loja", obrigatorio: true, placeholder: "Ex.: Doce da Ana", atributos: 'maxlength="60"' })}
           ${campo({ nome: "valor", rotulo: "Valor (R$)", mascara: "moeda", valor: padrao ? emReais(padrao) : "", obrigatorio: true })}
         </div>
-        ${campo({ nome: "observacoes", rotulo: "Observações", tipo: "textarea", linhas: 2, atributos: 'maxlength="1000"', ajuda: "Só você vê. Fica guardado criptografado." })}
+        ${campo({ nome: "observacoes", rotulo: "Observações", tipo: "textarea", linhas: 2, atributos: 'maxlength="1000"', ajuda: "Só a equipe da Forminha vê. Fica guardado criptografado." })}
         <p class="nota-seguranca">${icone("cadeado", { tamanho: 14 })} Nome, e-mail, WhatsApp, CPF/CNPJ e observações são guardados criptografados.</p>
       </form>`,
     rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-cliente" class="btn btn--primario">Cadastrar e gerar PIX</button>`,
@@ -123,7 +123,7 @@ async function novaCliente(depois) {
           ${aviso("sucesso", html`<strong>${c.nome}</strong> cadastrada. Cobrança de <strong>${reais(c.valor_centavos)}</strong> criada.`)}
           ${painelCobranca({ link: r.link_pagamento, cliente: c, emailEnviado: r.email_enviado })}`);
         montar(modal.rodape, html`<button type="button" class="btn btn--suave" data-fechar>Fechar</button><button type="button" class="btn btn--primario" data-ficha>Abrir ficha</button>`);
-        modal.rodape.querySelector("[data-ficha]").addEventListener("click", () => { modal.fechar(); abrirFicha(c.id, depois); });
+        modal.rodape.querySelector("[data-ficha]").addEventListener("click", () => { modal.fechar(); abrirFicha(c.id, depois, eu); });
         depois();
       } catch (erro) { mostrarErros(form, erro); }
     });
@@ -148,7 +148,8 @@ function painelCobranca({ link, cliente, emailEnviado }) {
 }
 
 /* ---------- ficha ---------- */
-export function abrirFicha(id, depois) {
+export function abrirFicha(id, depois, eu) {
+  const p = (permissao) => pode(eu, permissao);
   let d = null;
   let parar = false;
   const modal = abrirModal({ titulo: "Cliente", largura: 880, classe: "ficha-modal", corpo: html`<div class="carregando-pagina"><div class="spinner"></div></div>`, aoFechar: () => { parar = true; depois?.(); } });
@@ -160,17 +161,17 @@ export function abrirFicha(id, depois) {
     return html`
       <section class="ficha__cartao">
         <h3>${icone("dinheiro", { tamanho: 17 })} Pagamento <span class="ficha__valor">${reais(c.valor_centavos)}</span></h3>
-        ${aprovado && html`<p class="ficha__ok">${icone("checkCirculo", { tamanho: 16 })} Pago em ${quando(aprovado.confirmado_em)} · ${aprovado.confirmado_por === "mercado_pago" ? "confirmado pelo Mercado Pago" : "confirmado por você"}</p>`}
+        ${aprovado && html`<p class="ficha__ok">${icone("checkCirculo", { tamanho: 16 })} Pago em ${quando(aprovado.confirmado_em)} · ${aprovado.confirmado_por === "mercado_pago" ? "confirmado pelo Mercado Pago" : !aprovado.confirmado_por || aprovado.confirmado_por === "admin" ? "confirmado manualmente" : `confirmado por ${aprovado.confirmado_por}`}</p>`}
         ${c.situacao === "cancelado" && html`<p class="texto-suave">Cadastro cancelado.</p>`}
         ${pendente && html`
           ${painelCobranca({ link: pendente.link, cliente: c })}
           <details class="ficha__pix"><summary>PIX copia e cola (com a sua chave)</summary><div class="convite-pronto__link"><code>${pendente.pix_copia_cola}</code></div>
             <button type="button" class="btn btn--suave btn--pequeno" data-copiar="${pendente.pix_copia_cola}">${icone("copiar", { tamanho: 14 })} Copiar PIX</button></details>
           <div class="ficha__acoes">
-            <button type="button" class="btn btn--primario btn--pequeno" data-acao="pago">${icone("check", { tamanho: 15 })} Pagamento recebido</button>
-            ${d.email_configurado && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reenviar-cobranca">${icone("email", { tamanho: 15 })} Reenviar e-mail</button>`}
-            <button type="button" class="btn btn--suave btn--pequeno" data-acao="cobrar">${icone("atualizar", { tamanho: 15 })} Nova cobrança</button>
-            <button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="cancelar">Cancelar cadastro</button>
+            ${p("pagamentos.confirmar") && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="pago">${icone("check", { tamanho: 15 })} Pagamento recebido</button>`}
+            ${p("pagamentos.cobrar") && d.email_configurado && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reenviar-cobranca">${icone("email", { tamanho: 15 })} Reenviar e-mail</button>`}
+            ${p("pagamentos.cobrar") && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="cobrar">${icone("atualizar", { tamanho: 15 })} Nova cobrança</button>`}
+            ${p("pagamentos.cancelar") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="cancelar">Cancelar cadastro</button>`}
           </div>`}
       </section>`;
   };
@@ -183,7 +184,7 @@ export function abrirFicha(id, depois) {
       const atual = ETAPAS_LOJA.findIndex(([e]) => e === c.etapa);
       return html`<section class="ficha__cartao" data-secao-loja><h3>${icone("home", { tamanho: 17 })} Loja</h3>
         ${c.parada ? html`${aviso("perigo", html`A criação parou: ${c.etapa_erro ?? "erro desconhecido"}`)}
-          <div class="ficha__acoes"><button type="button" class="btn btn--primario btn--pequeno" data-acao="tentar">Tentar de novo</button></div>`
+          ${p("lojas.suporte") && html`<div class="ficha__acoes"><button type="button" class="btn btn--primario btn--pequeno" data-acao="tentar">Tentar de novo</button></div>`}`
         : html`<p class="texto-suave">Criando a loja — leva de 3 a 6 minutos. Pode fechar: continua sozinha.</p>`}
         <ol class="passos-criacao passos-criacao--compacto">${ETAPAS_LOJA.map(([e, t], i) => html`
           <li class="${i < atual ? "passo--feito" : i === atual ? (c.parada ? "passo--erro" : "passo--fazendo") : ""}"><span class="passos-criacao__marca"></span><div><strong>${t}</strong></div></li>`)}</ol>
@@ -203,8 +204,8 @@ export function abrirFicha(id, depois) {
           <div class="convite-pronto__botoes">
             <button type="button" class="btn btn--primario btn--pequeno" data-copiar="${c.convite}">${icone("copiar", { tamanho: 15 })} Copiar</button>
             <a class="btn btn--whats btn--pequeno" href="${linkWhats(`Olá, ${c.nome.split(" ")[0]}! Sua loja ${c.nome_loja} está pronta. Crie seu acesso ao painel por este link (vale 7 dias e funciona uma vez): ${c.convite}`, c.telefone)}" target="_blank" rel="noopener">${icone("mensagem", { tamanho: 15 })} WhatsApp</a>
-            ${d.email_configurado && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reenviar-convite">${icone("email", { tamanho: 15 })} Reenviar</button>`}
-            <button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("atualizar", { tamanho: 15 })} Link novo</button>
+            ${p("lojas.suporte") && d.email_configurado && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reenviar-convite">${icone("email", { tamanho: 15 })} Reenviar</button>`}
+            ${p("lojas.suporte") && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("atualizar", { tamanho: 15 })} Link novo</button>`}
           </div>
         </div>`}
     </section>`;
@@ -214,14 +215,14 @@ export function abrirFicha(id, depois) {
     <section class="ficha__cartao">
       <h3>${icone("ajuda", { tamanho: 17 })} Suporte</h3>
       <div class="ficha__acoes">
-        <button type="button" class="btn btn--suave btn--pequeno" data-acao="senha" ${d.cliente.etapa !== "pronta" && "disabled"}>${icone("cadeado", { tamanho: 15 })} Redefinir senha da dona</button>
-        <button type="button" class="btn btn--suave btn--pequeno" data-acao="editar">${icone("editar", { tamanho: 15 })} Editar dados</button>
+        ${p("lojas.suporte") && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="senha" ${d.cliente.etapa !== "pronta" && "disabled"}>${icone("cadeado", { tamanho: 15 })} Redefinir senha da dona</button>`}
+        ${p("clientes.editar") && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="editar">${icone("editar", { tamanho: 15 })} Editar dados</button>`}
       </div>
       <div data-resultado-suporte></div>
-      <form class="ficha__nota" data-nota novalidate>
-        <textarea class="entrada" name="texto" rows="2" maxlength="2000" placeholder="Anotar algo sobre esta cliente (só você vê)"></textarea>
+      ${p("clientes.notas") && html`<form class="ficha__nota" data-nota novalidate>
+        <textarea class="entrada" name="texto" rows="2" maxlength="2000" placeholder="Anotar algo sobre esta cliente (só a equipe vê)"></textarea>
         <button type="submit" class="btn btn--suave btn--pequeno">Anotar</button>
-      </form>
+      </form>`}
       <ol class="historico">${d.historico.map((h) => html`<li class="historico__item historico__item--${h.tipo}"><span>${h.texto}</span><time>${quando(h.quando)}</time></li>`)}</ol>
     </section>`;
 

@@ -81,6 +81,11 @@ export function abrirModal({ titulo, corpo = "", rodape = "", largura = 520, aoF
   return controle;
 }
 
+/** Fecha todas as janelas abertas (ex.: a sessão acabou e volta a tela de entrar). */
+export function fecharJanelas() {
+  for (const c of [...abertos]) c.fechar();
+}
+
 /** Pergunta "tem certeza?". Devolve uma Promise<boolean>. */
 export function confirmar({ titulo = "Confirmar", mensagem = "", rotulo = "Confirmar", perigo = false }) {
   return new Promise((resolver) => {

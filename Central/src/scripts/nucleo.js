@@ -46,3 +46,6 @@ export const documentoBonito = (d) => {
 };
 /** Link do WhatsApp com a mensagem pronta (para a cliente, se tiver o número). */
 export const linkWhats = (mensagem, telefone = "") => `https://wa.me/${telefone ? `55${String(telefone).replace(/\D/g, "")}` : ""}?text=${encodeURIComponent(mensagem)}`;
+
+/** A pessoa logada pode fazer isto? (o dono pode tudo; o servidor confere de novo) */
+export const pode = (eu, permissao) => Boolean(eu?.permissoes?.includes(permissao));

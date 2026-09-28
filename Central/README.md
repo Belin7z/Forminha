@@ -24,6 +24,26 @@ link novo), **Redefinir senha da dona** (link por e-mail, que vale pouco tempo),
 A aba **Lojas** mostra todas as lojas e serve para criar uma loja **sem cobrança** (teste ou
 cortesia), atualizar o banco, reativar e excluir.
 
+## Equipe (aba Equipe — só o dono)
+
+Cada funcionário entra com um **usuário próprio da Forminha**, nunca com e-mail: **FM** + a letra da
+função + um número — `FMG` gerente, `FMV` vendedor, `FMS` suporte, `FMF` financeiro (ex.: `FMV-0427`).
+Mudar a função troca só a letra; o número fica.
+
+| Função | Pode |
+|---|---|
+| Gerente | clientes, cobranças, confirmar/cancelar pagamento, suporte e criar loja sem cobrança |
+| Vendedor | ver/cadastrar/editar clientes, anotar, gerar e reenviar cobrança |
+| Suporte | ver/editar clientes, anotar, lojas: convite, link novo, redefinir senha da dona, retomar, reativar |
+| Financeiro | ver clientes, anotar, gerar cobrança, confirmar e cancelar pagamento |
+| Dono (você) | tudo, inclusive equipe, configurações e excluir lojas |
+
+Ao cadastrar, aparece **uma vez** a senha temporária (copiar ou WhatsApp); no 1º acesso a pessoa só
+consegue criar a própria senha. Senha temporária nova, desativar e excluir derrubam a sessão na hora.
+Cada botão só aparece para quem pode, e o servidor confere de novo em toda requisição. O histórico da
+cliente diz quem fez (ex.: "Pagamento confirmado manualmente. (FMF-2231 · Carla)") e **Atividade
+recente** lista quem entrou e o que fez (sem dados pessoais). Nomes da equipe ficam cifrados.
+
 ## Acesso (e-mail ou usuário + senha)
 
 E-mail e senha nascem no `npm run configurar` (senha com 8 caracteres ou mais). Na Central, em

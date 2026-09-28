@@ -75,7 +75,7 @@ describe("configuração e travas", () => {
   });
   it("mostra que banco, e-mail e Mercado Pago estão ligados", async () => {
     const { dados } = await api("GET", "eu");
-    assert.deepEqual(dados.recursos, { clientes: true, email: true, mercado_pago: true, assinatura_mp: true, trocar_senha: true });
+    assert.deepEqual(dados.recursos, { clientes: true, email: true, mercado_pago: true, assinatura_mp: true, trocar_senha: true, equipe: true });
   });
   it("sem a sua chave PIX, não dá para cadastrar", async () => {
     const r = await api("POST", "clientes", { nome: "Ana Souza", email: "ana@doceria.com", nome_loja: "Doce da Ana", valor_centavos: 19900 });
@@ -251,7 +251,7 @@ describe("PIX manual (você confirma) e a trava contra loja duplicada", () => {
     const ok = await api("POST", `clientes/${r.dados.cliente.id}/pagamento-recebido`, {});
     assert.equal(ok.status, 200, ok.texto);
     assert.equal(ok.dados.cliente.situacao, "pago");
-    assert.ok(ok.dados.historico.some((h) => /confirmado por você/.test(h.texto)));
+    assert.ok(ok.dados.historico.some((h) => /confirmado manualmente\. \(Dono\)/.test(h.texto)), "o histórico diz quem confirmou");
     assert.equal((await api("POST", `clientes/${r.dados.cliente.id}/pagamento-recebido`, {})).status, 409, "não confirma duas vezes");
   });
 

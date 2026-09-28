@@ -70,7 +70,7 @@ describe("entrada", () => {
   it("sem login, nada de lojas", async () => {
     assert.equal((await api("GET", "lojas")).status, 401);
     assert.equal((await api("POST", "lojas", { nome: "X", email: "x@y.com" })).status, 401);
-    assert.deepEqual((await api("GET", "eu")).dados, { logado: false, faltando: [], chaves: [], simulado: false, recursos: null });
+    assert.deepEqual((await api("GET", "eu")).dados, { logado: false, quem: null, permissoes: [], faltando: [], chaves: [], simulado: false, recursos: null });
   });
   it("senha errada é recusada e, depois de várias, dá um tempo", async () => {
     const r = await api("POST", "entrar", { senha: "errada" });

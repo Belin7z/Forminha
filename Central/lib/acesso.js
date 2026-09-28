@@ -11,10 +11,11 @@
      aparelho sai na hora.
    ========================================================== */
 import { createHash } from "node:crypto";
-import { conferirSenha, resumirSenha } from "./sessao.js";
+import { SENHA_MINIMA, conferirSenha, resumirSenha } from "./sessao.js";
 import { ErroHttp } from "./erros.js";
+import { lerUsuario } from "./equipe.js";
 
-export const SENHA_MINIMA = 8;
+export { SENHA_MINIMA };
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USUARIO = /^[a-z0-9._-]{3,30}$/;
 const limpar = (t) => String(t ?? "").trim().toLowerCase();
@@ -84,6 +85,7 @@ export function criarAcesso({ banco = null, preparar = async () => {}, hashInici
     if (!(await senhaCerta(r, senha))) campos.senha = "Senha incorreta.";
     if (!EMAIL.test(novo.email) || novo.email.length > 120) campos.email = "E-mail inválido.";
     if (novo.usuario && !USUARIO.test(novo.usuario)) campos.usuario = "De 3 a 30 letras, números, ponto, traço ou sublinhado (sem espaço e sem @).";
+    else if (lerUsuario(novo.usuario)) campos.usuario = "Esse formato (FM + letra + número) é reservado para a equipe.";
     if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
     await gravar({ ...r, ...novo, base: marca(hashInicial), versao: r?.versao ?? 0 });
     return novo;

@@ -3,7 +3,7 @@ import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
-import { api, aviso, dorme } from "../nucleo.js";
+import { api, aviso, dorme, pode } from "../nucleo.js";
 
 const ETAPAS = {
   pronta: ["Pronta", "sucesso"], criando: ["Criando o banco", "info"], tabelas: ["Preparando", "info"], sites: ["Falta publicar", "aviso"],
@@ -11,7 +11,8 @@ const ETAPAS = {
 };
 const incompleta = (l) => ["criando", "tabelas", "sites"].includes(l.etapa);
 
-function cartaoLoja(l) {
+function cartaoLoja(l, eu) {
+  const suporte = pode(eu, "lojas.suporte");
   const [rotulo, tom] = ETAPAS[l.etapa] ?? ["—", "neutro"];
   return html`
     <article class="loja" data-ref="${l.ref}">
@@ -28,11 +29,11 @@ function cartaoLoja(l) {
         ${l.painel && html`<a href="${l.painel}" target="_blank" rel="noopener" class="link">${icone("grade", { tamanho: 15 })} ${l.painel.replace("https://", "")}</a>`}
       </div>`}
       <footer class="loja__acoes">
-        ${incompleta(l) && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="continuar">Continuar criação</button>`}
-        ${l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("email", { tamanho: 15 })} Convite da dona</button>`}
-        ${l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
-        ${l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
-        <button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>
+        ${suporte && incompleta(l) && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="continuar">Continuar criação</button>`}
+        ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("email", { tamanho: 15 })} Convite da dona</button>`}
+        ${suporte && l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
+        ${suporte && l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
+        ${pode(eu, "lojas.excluir") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
       </footer>
     </article>`;
 }
@@ -54,13 +55,13 @@ export function painelConvite({ link, email, loja, urlLoja, urlPainel, vale_dias
     </div>`;
 }
 
-export async function telaLojas(conteiner) {
+export async function telaLojas(conteiner, eu) {
   document.title = "Lojas — Forminha";
   let lojas = [];
   montar(conteiner, html`
     <div class="central__titulo">
       <div><h1>Lojas</h1><p class="texto-suave" data-resumo>Carregando…</p></div>
-      <button type="button" class="btn btn--suave" data-acao="nova">${icone("mais", { tamanho: 17 })} Loja sem cobrança</button>
+      ${pode(eu, "lojas.criar") && html`<button type="button" class="btn btn--suave" data-acao="nova">${icone("mais", { tamanho: 17 })} Loja sem cobrança</button>`}
     </div>
     <section class="lojas" data-lista><div class="carregando-pagina"><div class="spinner"></div></div></section>`);
 
@@ -76,7 +77,7 @@ export async function telaLojas(conteiner) {
     const prontas = lojas.filter((l) => l.etapa === "pronta").length;
     conteiner.querySelector("[data-resumo]").textContent = lojas.length
       ? `${lojas.length} ${lojas.length === 1 ? "loja" : "lojas"} · ${prontas} ${prontas === 1 ? "pronta" : "prontas"}` : "Nenhuma loja ainda.";
-    montar(lista, lojas.length ? html`${lojas.map(cartaoLoja)}` : html`
+    montar(lista, lojas.length ? html`${lojas.map((l) => cartaoLoja(l, eu))}` : html`
       <div class="vazio">
         <span class="vazio__ico">${icone("cupcake", { tamanho: 38 })}</span>
         <h3>Nenhuma loja ainda</h3>

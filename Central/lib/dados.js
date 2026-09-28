@@ -61,6 +61,30 @@ export const ESQUEMA = [
   )`,
   `create index if not exists historico_cliente_idx on historico (cliente_id, id desc)`,
   `create table if not exists configuracoes (chave text primary key, valor jsonb not null)`,
+  // equipe da Forminha: entra com usuário próprio (ex.: FMV-0427), nunca com e-mail
+  `create table if not exists funcionarios (
+    id uuid primary key,
+    numero int not null unique check (numero between 1000 and 9999),
+    funcao text not null check (funcao in ('gerente', 'vendedor', 'suporte', 'financeiro')),
+    nome text not null,                         -- CIFRADO
+    senha_hash text not null,                   -- só o resumo (scrypt)
+    trocar_senha boolean not null default true, -- senha temporária: cria a própria no 1º acesso
+    ativo boolean not null default true,
+    versao int not null default 0,              -- muda ao trocar a senha ou desativar: derruba as sessões
+    criado_em timestamptz not null default now(),
+    ultimo_acesso timestamptz
+  )`,
+  // quem fez o quê na Central (sem dados pessoais: usuário, ação e o nome da loja)
+  `create table if not exists atividades (
+    id bigint generated always as identity primary key,
+    em timestamptz not null default now(),
+    quem text not null,                         -- 'dono' ou o id do funcionário
+    usuario text not null,                      -- 'Dono' ou o usuário (FMV-0427)
+    acao text not null,
+    alvo text not null default ''
+  )`,
+  `create index if not exists atividades_em_idx on atividades (em desc)`,
+  `create index if not exists atividades_quem_idx on atividades (quem, em desc)`,
 ];
 
 /** Cria as tabelas uma vez por instância (a primeira requisição paga o custo, as outras não). */

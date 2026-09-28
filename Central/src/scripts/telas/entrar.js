@@ -1,13 +1,14 @@
 /* TELA — entrar na Central (e-mail ou usuário + senha) */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
-import { ocupado } from "/src/scripts/base/ui.js";
+import { fecharJanelas, ocupado } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { api, aviso as caixaAviso, marca, raiz } from "../nucleo.js";
 import { botaoTema } from "../claro-escuro.js";
 
 export function telaEntrar(aoEntrar, aviso = "") {
   document.title = "Entrar — Forminha";
+  fecharJanelas(); // sessão acabou com uma ficha aberta: a janela não fica por cima do login
   montar(raiz, html`
     <main class="entrar">
       <section class="entrar__arte" aria-hidden="true">
