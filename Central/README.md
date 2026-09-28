@@ -9,9 +9,11 @@ com o nome `<código> · <nome da loja>`, ex.: `7XT-Tna-dRe · Doce da Ana`) e *
 ## O painel
 
 Menu lateral com **Visão geral** (faturamento do mês, clientes, lojas no ar, cobranças esperando,
-vendas dos 6 últimos meses, o que precisa de atenção, últimas clientes e atividade), **Clientes**,
-**Pagamentos** (tudo o que foi cobrado, com total recebido e pendente), **Lojas**, **Equipe** e
-**Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
+vendas do mês dia a dia ou dos 12 meses, o que precisa de atenção, últimas clientes e atividade),
+**Clientes** (filtros por situação e planilha), **Vendas** (Hoje, 7 dias, 30 dias, Este mês, 12 meses,
+Por ano ou de um dia até outro: faturamento, vendas e ticket médio comparados com o período anterior,
+gráfico por hora/dia/mês/ano e cada venda, com planilha), **Pagamentos** (tudo o que foi cobrado, com
+total recebido e pendente), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
 financeiro). No topo, o **perfil**: ao clicar, Configurações (dono) ou Trocar minha senha (equipe) e
 Sair. No celular, o menu abre pelo botão ☰.
 
@@ -100,6 +102,7 @@ O **banco da Central** é ligado na Vercel: projeto `forminha` → **Storage →
 
 | Comando | O que faz |
 |---|---|
+| `EXEMPLO=1 npm run dev` | O mesmo modo de teste, já com 20 clientes e vendas nos últimos meses (para ver os gráficos). |
 | `npm run dev` | Central em <http://localhost:3100>, **modo de teste** (nada é criado de verdade; e-mails aparecem no terminal). Entrar com `teste@forminha.local` / `forminha`. |
 | `npm test` | Tudo com Supabase, Vercel, Mercado Pago e e-mail simulados e bancos de verdade em memória. |
 | `npm run copiar-sql` | Traz as migrações do `Dashboard/supabase` (a fonte da verdade). Depois publique a Central e use **Atualizar banco** nas lojas. |

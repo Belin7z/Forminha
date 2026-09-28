@@ -56,3 +56,24 @@ export const linkWhats = (mensagem, telefone = "") => `https://wa.me/${telefone 
 
 /** A pessoa logada pode fazer isto? (o dono pode tudo; o servidor confere de novo) */
 export const pode = (eu, permissao) => Boolean(eu?.permissoes?.includes(permissao));
+
+/**
+ * Baixa uma planilha (CSV com ";" e acentos certos no Excel). `linhas[0]` é o cabeçalho.
+ * Texto que começa com = + - @ ganha um ' na frente: a planilha não roda como fórmula.
+ */
+export function baixarPlanilha(nome, linhas) {
+  const celula = (v) => {
+    let t = String(v ?? "");
+    if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+    return /[;"\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const texto = "﻿" + linhas.map((l) => l.map(celula).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob([texto], { type: "text/csv;charset=utf-8" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: nome });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+/** "199,00" (valor para planilha, sem "R$"). */
+export const valorPlanilha = (centavos) => (Number(centavos || 0) / 100).toFixed(2).replace(".", ",");

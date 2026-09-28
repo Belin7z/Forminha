@@ -92,5 +92,15 @@ export function criarAcesso({ banco = null, preparar = async () => {}, hashInici
     return novo;
   }
 
-  return { entrar, versao, conta, trocarSenha, salvarConta };
+  /** Só o nome que aparece no perfil (não é dado de acesso: não pede senha). */
+  async function salvarNome(nome) {
+    exigirBanco();
+    const n = String(nome ?? "").replace(/\s+/g, " ").trim();
+    if (n.length < 2 || n.length > 60) throw new ErroHttp(422, "Nome: de 2 a 60 letras.", { nome: "Nome: de 2 a 60 letras." });
+    const r = await ler();
+    await gravar({ ...r, nome: n, base: marca(hashInicial), versao: r?.versao ?? 0 });
+    return contaDe({ ...r, nome: n });
+  }
+
+  return { entrar, versao, conta, trocarSenha, salvarConta, salvarNome };
 }

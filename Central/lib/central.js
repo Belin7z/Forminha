@@ -152,7 +152,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
         corpo: {
           logado: Boolean(quem), simulado: Boolean(opcoes.simulado),
           quem: quem ? {
-            tipo: quem.tipo, usuario: dono ? conta?.usuario || conta?.email || "" : quem.usuario, nome: dono ? conta?.nome || "Dono" : quem.nome,
+            tipo: quem.tipo, usuario: dono ? conta?.usuario || conta?.email || "" : quem.usuario, nome: dono ? conta?.nome || "" : quem.nome,
             funcao: quem.funcao, funcao_nome: quem.funcao_nome, trocar_senha: quem.trocar_senha,
           } : null,
           permissoes: quem ? quem.permissoes : [],
@@ -173,6 +173,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       return { corpo: { ok: true }, cookie: cookieDe(DONO, versao, seguro) };
     }, "Trocou a senha"],
     ["GET", /^conta$/, "dono", async () => ({ corpo: await acesso.conta() })],
+    ["PUT", /^perfil$/, "dono", async ({ corpo }) => ({ corpo: await acesso.salvarNome(corpo.nome) }), "Alterou o nome do perfil"],
     ["PUT", /^conta$/, "dono", async ({ corpo }) => ({ corpo: await acesso.salvarConta(corpo) }), "Alterou a conta"],
 
     /* ---------- a própria senha (funcionário) ---------- */
@@ -211,6 +212,10 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const r = await (await exigirClientes()).visaoGeral({ financeiro: quem.permissoes.includes("financeiro.ver") });
       if (quem.permissoes.includes("equipe") && equipe) r.atividades = await equipe.atividades({ limite: 6 });
       return { corpo: r };
+    }],
+    ["GET", /^vendas$/, "financeiro.ver", async ({ url }) => {
+      const q = url.searchParams;
+      return { corpo: await (await exigirClientes()).vendas({ de: q.get("de"), ate: q.get("ate"), agrupar: q.get("agrupar") }) };
     }],
     ["GET", /^pagamentos$/, "financeiro.ver", async ({ url }) => ({ corpo: await (await exigirClientes()).listarPagamentos({ situacao: url.searchParams.get("situacao") ?? "" }) })],
 

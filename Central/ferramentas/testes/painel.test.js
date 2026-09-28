@@ -108,3 +108,77 @@ describe("pagamentos", () => {
     assert.ok(pendentes.length > 0 && pendentes.every((p) => p.situacao === "pendente"));
   });
 });
+
+describe("relatório de vendas", () => {
+  const hojeEmBrasilia = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const menosDias = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+  let hoje, ontem;
+
+  before(async () => {
+    hoje = hojeEmBrasilia();
+    ontem = menosDias(hoje, 1);
+    // uma segunda venda, confirmada ontem
+    const id = await cadastrar("Carla Bolos", "Cia do Bolo", 30000);
+    await api("POST", `clientes/${id}/pagamento-recebido`, {});
+    await banco.consultar("update pagamentos set confirmado_em = now() - interval '1 day' where cliente_id = $1 and situacao = 'aprovado'", [id]);
+  });
+
+  it("hoje: por hora, com o que foi vendido e a comparação com ontem", async () => {
+    const r = await api("GET", `vendas?de=${hoje}&ate=${hoje}`);
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+    assert.equal(r.dados.agrupamento, "hora");
+    assert.equal(r.dados.serie.length, 24);
+    assert.equal(r.dados.resumo.total, 19900);
+    assert.equal(r.dados.resumo.vendas, 1);
+    assert.deepEqual(r.dados.resumo.anterior, { de: ontem, ate: ontem, total: 30000, vendas: 1 });
+    assert.equal(r.dados.itens[0].nome_loja, "Doce da Maria");
+    assert.equal(r.dados.itens[0].cliente, "Maria Doces");
+  });
+
+  it("de um dia até outro: por dia, com total e ticket médio", async () => {
+    const r = (await api("GET", `vendas?de=${ontem}&ate=${hoje}`)).dados;
+    assert.equal(r.agrupamento, "dia");
+    assert.deepEqual(r.serie.map((s) => [s.chave, s.total]), [[ontem, 30000], [hoje, 19900]]);
+    assert.equal(r.resumo.total, 49900);
+    assert.equal(r.resumo.ticket, 24950);
+  });
+
+  it("mês a mês e por ano (os meses e anos sem venda aparecem zerados)", async () => {
+    const ano = Number(hoje.slice(0, 4));
+    const porAno = (await api("GET", `vendas?de=${ano - 4}-01-01&ate=${hoje}&agrupar=ano`)).dados;
+    assert.equal(porAno.agrupamento, "ano");
+    assert.deepEqual(porAno.serie.map((s) => s.chave), [ano - 4, ano - 3, ano - 2, ano - 1, ano].map(String));
+    assert.equal(porAno.serie.reduce((t, s) => t + s.total, 0), 49900);
+    const porMes = (await api("GET", `vendas?de=${menosDias(hoje, 330)}&ate=${hoje}`)).dados;
+    assert.equal(porMes.agrupamento, "mes");
+    assert.ok(porMes.serie.length >= 11 && porMes.serie.length <= 12);
+    assert.equal(porMes.serie.reduce((t, s) => t + s.total, 0), 49900);
+  });
+
+  it("recusa período errado e fica fechado para quem não vê dinheiro", async () => {
+    assert.equal((await api("GET", `vendas?de=${hoje}&ate=${ontem}`)).status, 422);
+    assert.equal((await api("GET", "vendas?de=2026-02-31&ate=2026-03-01")).status, 422);
+    assert.equal((await api("GET", "vendas")).status, 422);
+    const vendedor = await contratar("Vitor Nunes", "vendedor");
+    assert.equal((await api("GET", `vendas?de=${hoje}&ate=${hoje}`, undefined, vendedor)).status, 403);
+  });
+
+  it("os baldes do gráfico cobrem o período inteiro", async () => {
+    const { baldesDoPeriodo } = await import("../../lib/clientes.js");
+    assert.deepEqual(baldesDoPeriodo("mes", "2025-11-15", "2026-02-01"), ["2025-11", "2025-12", "2026-01", "2026-02"]);
+    assert.deepEqual(baldesDoPeriodo("dia", "2026-02-27", "2026-03-02"), ["2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02"]);
+    assert.equal(baldesDoPeriodo("hora", "2026-09-28", "2026-09-28").length, 24);
+  });
+});
+
+describe("nome no perfil", () => {
+  it("o dono define o nome sem pedir senha; aparece completo no topo", async () => {
+    assert.equal((await api("GET", "eu")).dados.quem.nome, "", "sem nome ainda: a tela pergunta");
+    assert.equal((await api("PUT", "perfil", { nome: "A" })).status, 422);
+    const r = await api("PUT", "perfil", { nome: "  Ana   Maria de Souza " });
+    assert.equal(r.status, 200);
+    assert.equal((await api("GET", "eu")).dados.quem.nome, "Ana Maria de Souza");
+    const vendedor = await contratar("Rita Alves", "vendedor");
+    assert.equal((await api("PUT", "perfil", { nome: "Outra" }, vendedor)).status, 403);
+  });
+});

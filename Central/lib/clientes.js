@@ -523,9 +523,85 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     };
   }
 
+  /**
+   * Relatório de vendas de um período (datas AAAA-MM-DD, no horário de Brasília): total, quantidade,
+   * ticket médio, comparação com o período anterior do mesmo tamanho, a série para o gráfico
+   * (por hora, dia, mês ou ano — com os buracos zerados) e cada venda.
+   */
+  async function vendas({ de, ate, agrupar } = {}) {
+    if (!DATA_ISO.test(String(de)) || !DATA_ISO.test(String(ate)) || !dataValida(de) || !dataValida(ate)) throw new ErroHttp(422, "Escolha as datas do período.");
+    const inicio = Date.parse(`${de}T00:00:00Z`), fim = Date.parse(`${ate}T00:00:00Z`);
+    if (inicio > fim) throw new ErroHttp(422, "A data inicial precisa ser antes da final.");
+    const dias = Math.round((fim - inicio) / UM_DIA) + 1;
+    if (dias > 3700) throw new ErroHttp(422, "Período longo demais (até 10 anos).");
+    const g = GRUPOS[agrupar] ? agrupar : dias <= 1 ? "hora" : dias <= 92 ? "dia" : dias <= 1100 ? "mes" : "ano";
+    const baldes = baldesDoPeriodo(g, de, ate);
+    if (baldes.length > 400) throw new ErroHttp(422, "Período longo demais para esse agrupamento.");
+
+    const NO_PERIODO = `(p.confirmado_em ${LOCAL}) >= $1::date and (p.confirmado_em ${LOCAL}) < $2::date + 1`;
+    const linhas = await sql(`select p.id, p.cliente_id, p.valor_centavos, p.confirmado_em, p.confirmado_por, p.mp_id, c.nome_loja, c.dados, c.id as cid,
+        to_char(date_trunc('${GRUPOS[g].unidade}', p.confirmado_em ${LOCAL}), '${GRUPOS[g].formato}') as chave
+      from pagamentos p join clientes c on c.id = p.cliente_id
+      where p.situacao = 'aprovado' and ${NO_PERIODO} order by p.confirmado_em desc`, [de, ate]);
+    const antesDe = isoDoDia(inicio - dias * UM_DIA), antesAte = isoDoDia(inicio - UM_DIA);
+    const [antes] = await sql(`select coalesce(sum(p.valor_centavos), 0)::bigint as total, count(*)::int as vendas from pagamentos p
+      where p.situacao = 'aprovado' and ${NO_PERIODO}`, [antesDe, antesAte]);
+
+    const somas = new Map();
+    for (const l of linhas) {
+      const s = somas.get(l.chave) ?? { total: 0, vendas: 0 };
+      s.total += l.valor_centavos; s.vendas += 1;
+      somas.set(l.chave, s);
+    }
+    const total = linhas.reduce((t, l) => t + l.valor_centavos, 0);
+    return {
+      de, ate, agrupamento: g,
+      resumo: {
+        total, vendas: linhas.length, ticket: linhas.length ? Math.round(total / linhas.length) : 0,
+        anterior: { de: antesDe, ate: antesAte, total: Number(antes.total), vendas: antes.vendas },
+      },
+      serie: baldes.map((chave) => ({ chave, ...(somas.get(chave) ?? { total: 0, vendas: 0 }) })),
+      itens: linhas.slice(0, 1000).map((l) => ({
+        id: l.id, cliente_id: l.cliente_id, nome_loja: l.nome_loja, cliente: nomeDe({ id: l.cid, dados: l.dados }), valor_centavos: l.valor_centavos,
+        confirmado_em: l.confirmado_em, automatico: Boolean(l.mp_id),
+        confirmado_por: l.confirmado_por === "mercado_pago" ? "Mercado Pago" : l.confirmado_por === "admin" ? "Manual" : l.confirmado_por,
+      })),
+    };
+  }
+
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos,
+    visaoGeral, listarPagamentos, vendas,
   };
+}
+
+/* ---------- datas do relatório de vendas ---------- */
+const UM_DIA = 86_400_000;
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const GRUPOS = {
+  hora: { unidade: "hour", formato: "YYYY-MM-DD HH24" },
+  dia: { unidade: "day", formato: "YYYY-MM-DD" },
+  mes: { unidade: "month", formato: "YYYY-MM" },
+  ano: { unidade: "year", formato: "YYYY" },
+};
+const isoDoDia = (ms) => new Date(ms).toISOString().slice(0, 10);
+const dataValida = (d) => isoDoDia(Date.parse(`${d}T00:00:00Z`)) === d; // recusa 2026-02-31
+
+/** Todas as chaves do período (as mesmas que o banco gera), para o gráfico não pular os dias sem venda. */
+export function baldesDoPeriodo(g, de, ate) {
+  const inicio = Date.parse(`${de}T00:00:00Z`), fim = Date.parse(`${ate}T00:00:00Z`);
+  const chaves = [];
+  if (g === "hora" || g === "dia") {
+    for (let t = inicio; t <= fim && chaves.length <= 24 * 400; t += UM_DIA) {
+      const dia = isoDoDia(t);
+      if (g === "dia") chaves.push(dia);
+      else for (let h = 0; h < 24; h++) chaves.push(`${dia} ${String(h).padStart(2, "0")}`);
+    }
+    return chaves;
+  }
+  const [a0, m0] = de.split("-").map(Number), [a1, m1] = ate.split("-").map(Number);
+  if (g === "ano") { for (let a = a0; a <= a1; a++) chaves.push(String(a)); return chaves; }
+  for (let a = a0, m = m0; a < a1 || (a === a1 && m <= m1); m === 12 ? (a++, m = 1) : m++) chaves.push(`${a}-${String(m).padStart(2, "0")}`);
+  return chaves;
 }

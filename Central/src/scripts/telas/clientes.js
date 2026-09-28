@@ -9,7 +9,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, confirmar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { paraCentavos, emReais } from "/src/scripts/base/formatacao.js";
-import { api, aviso, dia, documentoBonito, linkWhats, pode, quando, reais, telefoneBonito } from "../nucleo.js";
+import { api, aviso, baixarPlanilha, dia, documentoBonito, linkWhats, pode, quando, reais, telefoneBonito, valorPlanilha } from "../nucleo.js";
 
 /* ---------- situação ---------- */
 const ETAPAS_LOJA = [
@@ -24,64 +24,84 @@ export function situacaoDe(c) {
   return ["Criando a loja", "info"];
 }
 const selo = (c) => { const [t, tom] = situacaoDe(c); return html`<span class="selo selo--${tom}">${t}</span>`; };
+const ponto = (c) => { const [t, tom] = situacaoDe(c); return html`<span class="ponto ponto--${tom}">${t}</span>`; };
+
+// filtros da lista: em que pé está cada cliente
+const FILTROS = [["", "Todas"], ["aguardando", "Aguardando"], ["criando", "Criando"], ["prontas", "Prontas"], ["canceladas", "Canceladas"]];
+const grupoDe = (c) => (c.situacao === "cancelado" ? "canceladas" : c.situacao === "aguardando_pagamento" ? "aguardando" : c.etapa === "pronta" ? "prontas" : "criando");
 
 /* ---------- lista ---------- */
 export async function telaClientes(conteiner, eu) {
   document.title = "Clientes — Forminha";
   let clientes = [];
+  let filtro = "";
   montar(conteiner, html`
     <div class="central__titulo">
-      <div><h1>Clientes</h1><p class="texto-suave" data-resumo>Carregando…</p></div>
+      <div><h1>Clientes</h1><p class="texto-suave" data-resumo></p></div>
       <div class="central__titulo-acoes">
         <label class="busca-central">${icone("busca", { tamanho: 16 })}<input type="search" data-busca placeholder="Buscar cliente ou loja" aria-label="Buscar cliente ou loja"></label>
+        <button type="button" class="btn btn--suave" data-acao="planilha" title="Baixar planilha" aria-label="Baixar planilha" disabled>${icone("baixar", { tamanho: 17 })}</button>
         ${pode(eu, "clientes.cadastrar") && html`<button type="button" class="btn btn--primario" data-acao="novo" ${!eu.recursos?.clientes && "disabled"}>${icone("mais", { tamanho: 17 })} Nova cliente</button>`}
       </div>
     </div>
     ${!eu.recursos?.clientes && aviso("aviso", pode(eu, "configuracoes") ? html`Para cadastrar clientes, falta ligar o banco da Central e a chave de criptografia. Veja em <a class="link" href="#/configuracoes">Configurações</a>.` : "A Central ainda não está pronta para clientes. Fale com o dono.")}
+    <div class="segmentos" role="group" aria-label="Situação" data-filtros hidden></div>
     <section data-lista><div class="carregando-pagina"><div class="spinner"></div></div></section>`);
 
   const lista = conteiner.querySelector("[data-lista]");
   const busca = conteiner.querySelector("[data-busca]");
+  const filtros = conteiner.querySelector("[data-filtros]");
+  let filtradas = [];
 
   function desenhar() {
     const termo = busca.value.trim().toLowerCase();
-    const filtradas = clientes.filter((c) => !termo || [c.nome, c.email, c.nome_loja].some((v) => String(v ?? "").toLowerCase().includes(termo)));
-    const prontas = clientes.filter((c) => c.etapa === "pronta").length;
-    const aguardando = clientes.filter((c) => c.situacao === "aguardando_pagamento").length;
-    conteiner.querySelector("[data-resumo]").textContent = clientes.length
-      ? `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"} · ${prontas} ${prontas === 1 ? "loja pronta" : "lojas prontas"} · ${aguardando} aguardando pagamento`
-      : "Nenhuma cliente ainda.";
+    filtradas = clientes.filter((c) => (!filtro || grupoDe(c) === filtro)
+      && (!termo || [c.nome, c.email, c.nome_loja].some((v) => String(v ?? "").toLowerCase().includes(termo))));
+    conteiner.querySelector("[data-resumo]").textContent = clientes.length ? `${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}` : "";
+    conteiner.querySelector('[data-acao="planilha"]').disabled = !filtradas.length;
+    filtros.hidden = !clientes.length;
+    montar(filtros, html`${FILTROS.map(([id, texto]) => {
+      const n = id ? clientes.filter((c) => grupoDe(c) === id).length : clientes.length;
+      return html`<button type="button" class="segmento ${id === filtro && "segmento--ativo"}" data-filtro="${id}" aria-pressed="${String(id === filtro)}">${texto} <span class="segmento__n">${n}</span></button>`;
+    })}`);
     if (!clientes.length) {
-      montar(lista, html`<div class="vazio"><span class="vazio__ico">${icone("usuarios", { tamanho: 36 })}</span><h3>Nenhuma cliente ainda</h3>
-        <p>Cadastre a primeira doceria: a Central gera o PIX, e quando ela pagar a loja é criada sozinha.</p></div>`);
+      montar(lista, html`<div class="vazio"><span class="vazio__ico">${icone("usuarios", { tamanho: 36 })}</span><h3>Nenhuma cliente ainda</h3></div>`);
       return;
     }
     montar(lista, filtradas.length ? html`
-      <div class="tabela-clientes" role="list">
-        <div class="tc__cab" aria-hidden="true"><span>Cliente</span><span>Loja</span><span>Situação</span><span>Valor</span><span>Desde</span></div>
+      <div class="tabela tabela--clientes" role="table" aria-label="Clientes">
+        <div class="tabela__linha tabela__cab" role="row"><span>Cliente</span><span>Loja</span><span>Situação</span><span>Valor</span><span>Desde</span></div>
         ${filtradas.map((c) => html`
-          <button type="button" class="tc__linha" role="listitem" data-acao="abrir" data-id="${c.id}">
-            <span class="tc__cliente"><strong>${c.nome}</strong><small>${c.email ?? ""}</small></span>
-            <span class="tc__loja">${c.nome_loja}</span>
-            <span>${selo(c)}</span>
-            <span class="tc__valor">${reais(c.valor_centavos)}</span>
-            <span class="tc__data">${dia(c.criado_em)}</span>
+          <button type="button" class="tabela__linha tabela__linha--clicavel" role="row" data-acao="abrir" data-id="${c.id}">
+            <span class="tabela__principal"><strong>${c.nome}</strong><small>${c.email ?? ""}</small></span>
+            <span>${c.nome_loja}</span>
+            <span>${ponto(c)}</span>
+            <span class="tabela__numero">${reais(c.valor_centavos)}</span>
+            <span class="tabela__suave">${dia(c.criado_em)}</span>
           </button>`)}
-      </div>` : html`<p class="texto-suave">Nada encontrado para “${busca.value}”.</p>`);
+      </div>` : html`<p class="texto-suave">Nada encontrado.</p>`);
   }
 
   async function carregar() {
-    if (!eu.recursos?.clientes) { montar(lista, ""); conteiner.querySelector("[data-resumo]").textContent = ""; return; }
+    if (!eu.recursos?.clientes) { montar(lista, ""); return; }
     try { clientes = (await api("GET", "clientes")).clientes; desenhar(); }
     catch (erro) { montar(lista, aviso("perigo", erro.message)); }
   }
 
   busca.addEventListener("input", desenhar);
   conteiner.addEventListener("click", (ev) => {
+    const botaoFiltro = ev.target.closest("[data-filtro]");
+    if (botaoFiltro) { filtro = botaoFiltro.dataset.filtro; return desenhar(); }
     const alvo = ev.target.closest("[data-acao]");
     if (!alvo || !conteiner.contains(alvo)) return;
     if (alvo.dataset.acao === "novo") novaCliente(carregar, eu);
     if (alvo.dataset.acao === "abrir") abrirFicha(alvo.dataset.id, carregar, eu);
+    if (alvo.dataset.acao === "planilha") {
+      baixarPlanilha(`clientes-${new Date().toISOString().slice(0, 10)}.csv`, [
+        ["Nome", "E-mail", "WhatsApp", "Loja", "Situação", "Valor (R$)", "Cadastro"],
+        ...filtradas.map((c) => [c.nome, c.email, telefoneBonito(c.telefone), c.nome_loja, situacaoDe(c)[0], valorPlanilha(c.valor_centavos), dia(c.criado_em)]),
+      ]);
+    }
   });
   await carregar();
 }

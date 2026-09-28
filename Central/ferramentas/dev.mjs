@@ -61,8 +61,35 @@ createServer(async (req, res) => {
   if (!dados) { res.writeHead(404).end("Não encontrado"); return; }
   res.writeHead(200, { ...cabecalhos, "Content-Type": TIPOS[extname(arquivo)] ?? "application/octet-stream", "Cache-Control": "no-store" });
   res.end(dados);
-}).listen(PORTA, "127.0.0.1", () => {
+}).listen(PORTA, "127.0.0.1", async () => {
   console.log(`\n✔ Central no ar → http://localhost:${PORTA}\n`);
   console.log(deVerdade ? "   ATENÇÃO: usando o Supabase e a Vercel DE VERDADE (cria lojas reais).\n"
     : "   Modo de teste: nada é criado de verdade.  Entrar com: teste@forminha.local / forminha\n");
+  if (!deVerdade && process.env.EXEMPLO === "1") await exemplo();
 });
+
+/** EXEMPLO=1 (só no modo de teste): clientes e vendas espalhadas pelos últimos 14 meses, para ver os gráficos cheios. */
+async function exemplo() {
+  const base = `http://127.0.0.1:${PORTA}/api/`;
+  const chamar = async (metodo, caminho, corpo, cookie) => {
+    const r = await fetch(base + caminho, { method: metodo, headers: { "content-type": "application/json", ...(cookie && { cookie }) }, body: corpo && JSON.stringify(corpo) });
+    return { dados: await r.json(), cookie: r.headers.get("set-cookie")?.split(";")[0] };
+  };
+  const { cookie } = await chamar("POST", "entrar", { usuario: "teste@forminha.local", senha: "forminha" });
+  await chamar("PUT", "configuracoes", { valor_padrao_centavos: 19900, pix: { chave: "pix@forminha.test", nome: "Forminha", cidade: "Sao Paulo" } }, cookie);
+  const nomes = ["Ana", "Bia", "Carla", "Dani", "Eva", "Fabi", "Gabi", "Helo", "Isa", "Ju", "Kika", "Lu", "Mari", "Nina", "Olga", "Pati", "Rita", "Sara", "Tati", "Vivi"];
+  let n = 0;
+  for (const [i, nome] of nomes.entries()) {
+    const valor = [19900, 24900, 29900][i % 3];
+    const { dados } = await chamar("POST", "clientes", { nome: `${nome} Doces`, email: `${nome.toLowerCase()}@exemplo.test`, nome_loja: `Doces da ${nome}`, valor_centavos: valor }, cookie);
+    if (!dados.cliente) continue;
+    if (i % 7 === 6) continue; // algumas ficam aguardando pagamento
+    // pago e com a loja pronta direto no banco de teste (sem esperar a criação simulada de cada loja)
+    const diasAtras = i < 6 ? i * 2 : Math.round(20 + (i - 6) * 28 + (i % 4) * 5); // várias neste mês, o resto espalhado
+    await opcoes.banco.consultar(`update pagamentos set situacao = 'aprovado', confirmado_por = 'Dono', confirmado_em = now() - make_interval(days => $2::int)
+      where cliente_id = $1 and situacao = 'pendente'`, [dados.cliente.id, diasAtras]);
+    await opcoes.banco.consultar("update clientes set situacao = 'pago', etapa = 'pronta', criado_em = now() - make_interval(days => $2::int) where id = $1", [dados.cliente.id, diasAtras]);
+    n += 1;
+  }
+  console.log(`   Exemplo: ${nomes.length} clientes e ${n} vendas nos últimos meses.\n`);
+}

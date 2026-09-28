@@ -9,7 +9,8 @@
    ========================================================== */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
-import { copiar, toast } from "/src/scripts/base/ui.js";
+import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
+import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { iniciais } from "/src/scripts/base/formatacao.js";
 import { api, aviso, marca, pode, quandoExpirar, raiz } from "./nucleo.js";
 import { botaoTema } from "./claro-escuro.js";
@@ -17,6 +18,7 @@ import { telaEntrar } from "./telas/entrar.js";
 import { telaVisaoGeral } from "./telas/visao-geral.js";
 import { telaClientes } from "./telas/clientes.js";
 import { telaPagamentos } from "./telas/pagamentos.js";
+import { telaVendas } from "./telas/vendas.js";
 import { telaLojas } from "./telas/lojas.js";
 import { telaEquipe } from "./telas/equipe.js";
 import { telaAtividade } from "./telas/atividade.js";
@@ -26,8 +28,11 @@ import { telaPrimeiraSenha, trocarMinhaSenha } from "./telas/minha-senha.js";
 
 // [endereço, nome, ícone, permissão (null = todos), tela]
 const MENU = [
-  { itens: [["visao-geral", "Visão geral", "grafico", null, telaVisaoGeral]] },
-  { grupo: "Vendas", itens: [["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos]] },
+  { itens: [["visao-geral", "Visão geral", "grade", null, telaVisaoGeral]] },
+  { grupo: "Vendas", itens: [
+    ["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["vendas", "Vendas", "grafico", "financeiro.ver", telaVendas],
+    ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos],
+  ] },
   { grupo: "Lojas", itens: [["lojas", "Lojas", "home", "lojas.ver", telaLojas]] },
   { grupo: "Administração", itens: [["equipe", "Equipe", "usuario", "equipe", telaEquipe], ["atividade", "Atividade", "relogio", "equipe", telaAtividade]] },
 ];
@@ -48,19 +53,23 @@ function lateral(eu, atual) {
     </aside>`;
 }
 
+/** Nome que aparece no topo: o nome da pessoa (completo, como ela escreveu). */
+const nomeDe = (q) => q.nome || String(q.usuario || "").split("@")[0] || "Perfil";
+
 function perfil(eu) {
   const q = eu.quem;
   const dono = q.tipo === "dono";
   const detalhe = dono ? q.usuario : `${q.usuario} · ${q.funcao_nome}`;
+  const nome = nomeDe(q);
   return html`
     <div class="perfil">
       <button type="button" class="perfil__botao" data-acao="perfil" aria-haspopup="menu" aria-expanded="false">
-        <span class="avatar">${iniciais(q.nome)}</span>
-        <span class="perfil__nome"><strong>${q.nome}</strong><small>${dono ? "Dono" : q.funcao_nome}</small></span>
+        <span class="avatar">${iniciais(nome)}</span>
+        <span class="perfil__nome"><strong>${nome}</strong><small>${dono ? "Dono" : q.funcao_nome}</small></span>
         ${icone("baixo", { tamanho: 16 })}
       </button>
       <div class="perfil__menu" role="menu" hidden>
-        <div class="perfil__cab"><strong>${q.nome}</strong>${detalhe && html`<small>${detalhe}</small>`}</div>
+        <div class="perfil__cab"><strong>${nome}</strong>${detalhe && html`<small>${detalhe}</small>`}</div>
         ${pode(eu, "configuracoes") && html`<a role="menuitem" href="#/configuracoes" class="perfil__item">${icone("ajustes", { tamanho: 17 })} Configurações</a>`}
         ${!dono && html`<button type="button" role="menuitem" class="perfil__item" data-acao="minha-senha">${icone("cadeado", { tamanho: 17 })} Trocar minha senha</button>`}
         <button type="button" role="menuitem" class="perfil__item" data-acao="sair">${icone("sair", { tamanho: 17 })} Sair</button>
@@ -97,6 +106,30 @@ async function rotear() {
       </div>
     </div>`);
   await TELAS[atual].tela(raiz.querySelector("[data-conteudo]"), eu);
+  if (eu.quem.tipo === "dono" && !eu.quem.nome && eu.recursos?.trocar_senha) pedirNome();
+}
+
+/** Sem nome ainda: pergunta uma vez (por visita) como a pessoa quer aparecer no topo. */
+function pedirNome() {
+  try { if (sessionStorage.getItem("forminha:pediu-nome")) return; sessionStorage.setItem("forminha:pediu-nome", "1"); } catch { /* modo privado */ }
+  const modal = abrirModal({
+    titulo: "Como você quer ser chamado?", largura: 420,
+    corpo: html`<form id="form-nome" class="form-empilhado" novalidate>
+      <div class="form-erro" data-erro-geral hidden></div>
+      ${campo({ nome: "nome", rotulo: "Seu nome", obrigatorio: true, placeholder: "Nome e sobrenome", atributos: 'autocomplete="name" maxlength="60" autofocus' })}
+      <p class="form-empilhado__dica">Aparece no topo, no seu perfil.</p>
+    </form>`,
+    rodape: html`<button type="button" class="btn btn--suave" data-fechar>Agora não</button><button type="submit" form="form-nome" class="btn btn--primario">Salvar</button>`,
+  });
+  const form = modal.el.querySelector("form");
+  ativarCampos(form);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    await ocupado(modal.el.querySelector('[form="form-nome"]'), async () => {
+      try { await api("PUT", "perfil", dadosDe(form)); modal.fechar(); rotear(); }
+      catch (erro) { mostrarErros(form, erro); }
+    });
+  });
 }
 
 /* ---------- menu do perfil e menu lateral no celular ---------- */
