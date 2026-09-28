@@ -34,6 +34,8 @@ describe("contar os dias", () => {
     assert.equal(textoDoPrazo({ nome: "Supabase", dias: -2 }), "A chave do Supabase venceu");
     assert.match(mensagemDeChaveRecusada("Supabase", 401), /venceu ou foi apagada.*opção 5/);
     assert.match(mensagemDeChaveRecusada("Vercel", 403), /não tem permissão.*opção 6/);
+    assert.match(mensagemDeChaveRecusada("Vercel", 403, "Vercel: Not authorized: Trying to access resource under scope"),
+      /All Projects.*opção 6\. \(Vercel: Not authorized: Trying to access resource under scope\)/, "diz o escopo certo e o motivo que a Vercel deu");
   });
 });
 

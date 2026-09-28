@@ -95,7 +95,9 @@ async function chaveSupabase() {
 }
 
 async function chaveVercel() {
-  console.log("\nCHAVE DA VERCEL — crie em https://vercel.com/account/tokens (validade: sem vencimento ou a mais longa)");
+  console.log("\nCHAVE DA VERCEL — crie em https://vercel.com/account/tokens");
+  console.log("   Scope: escolha a sua equipe e depois \"All Projects\" (NÃO escolha um projeto só: a Central cria um site novo para cada loja).");
+  console.log("   Expiration: sem vencimento ou a mais longa.");
   const chave = await perguntar("   Cole a chave: ", { secreto: true });
   if (chave.length < 20) { console.error("✖ Essa chave parece curta demais."); process.exit(1); }
   gravar("VERCEL_TOKEN", chave);

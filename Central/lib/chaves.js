@@ -27,9 +27,17 @@ export function textoDoPrazo({ nome, dias }) {
   return `${daChave(nome)} vence em ${dias} ${dias === 1 ? "dia" : "dias"}`;
 }
 
-/** Chave recusada (vencida, apagada ou sem permissão): diz o que fazer. */
-export function mensagemDeChaveRecusada(quem, status) {
+// o escopo que cada chave precisa (o erro mais comum é criar a chave para um projeto só)
+const ESCOPO = {
+  Vercel: "Na Vercel, a chave precisa ser da equipe inteira (Scope: sua equipe → All Projects), não de um projeto só.",
+  Supabase: "No Supabase, a chave precisa da organização Forminha com acesso total.",
+};
+
+/** Chave recusada (vencida, apagada ou sem permissão): diz o que fazer e o motivo que o serviço deu. */
+export function mensagemDeChaveRecusada(quem, status, detalhe = "") {
   const opcao = quem === "Vercel" ? "6" : "5";
   const motivo = status === 403 ? "não tem permissão para isso" : "foi recusada (venceu ou foi apagada)";
-  return `${daChave(quem)} ${motivo}. Crie uma nova e rode "npm run configurar", opção ${opcao}.`;
+  const dica = status === 403 && ESCOPO[quem] ? ` ${ESCOPO[quem]}` : "";
+  const disse = String(detalhe).replace(new RegExp(`^${quem}:\\s*`), "").trim();
+  return `${daChave(quem)} ${motivo}.${dica} Crie uma nova e rode "npm run configurar", opção ${opcao}.${disse ? ` (${quem}: ${disse.slice(0, 160)})` : ""}`;
 }

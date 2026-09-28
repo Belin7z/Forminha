@@ -300,7 +300,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       let resultado;
       try { resultado = await lojas.manterAtivas(); }
       catch (e) {
-        if (chaveRecusada(e)) await avisarDaChave([mensagemDeChaveRecusada(e.quem, e.status)]).catch(() => {});
+        if (chaveRecusada(e)) await avisarDaChave([mensagemDeChaveRecusada(e.quem, e.status, e.message)]).catch(() => {});
         throw e;
       }
       if (clientes) { await garantirEsquema(); resultado.criacoes_retomadas = await clientes.retomarParadas(); }
@@ -370,7 +370,8 @@ export function criarCentral(env = process.env, opcoes = {}) {
     } catch (erro) {
       if (erro instanceof ErroHttp) return responder(res, erro.status, { erro: erro.message, campos: erro.campos });
       // chave vencida ou sem permissão: para você, diz o que fazer; para visitantes, nada muda
-      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status) : erro.message });
+      if (erro instanceof ErroProvedor) console.error("[provedor]", erro.status, erro.message); // aparece nos registros da Vercel (sem chaves)
+      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status, erro.message) : erro.message });
       if (erro instanceof ErroCofre) { console.error("[cofre]", erro.message); return responder(res, 500, { erro: "Não foi possível abrir os dados protegidos (confira a CHAVE_CRIPTOGRAFIA)." }); }
       console.error(erro);
       responder(res, 500, { erro: "Erro inesperado na Central. Tente de novo." });
