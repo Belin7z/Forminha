@@ -4,7 +4,10 @@ import { criarApiPainel } from "/src/scripts/base/api/painel.js";
 
 const cfg = window.CONFIG_APP ?? {};
 
-export const supabase = criarClienteSupabase({ url: cfg.supabaseUrl, chave: cfg.supabaseAnonKey, storageKey: "sb-painel-auth" });
+// um site para várias lojas (banco único): a loja é a do endereço aberto
+const loja = cfg.multiloja ? location.hostname : "";
+
+export const supabase = criarClienteSupabase({ url: cfg.supabaseUrl, chave: cfg.supabaseAnonKey, storageKey: "sb-painel-auth", loja });
 
 // o e-mail de redefinição enviado a um cliente leva para a loja
-export const api = criarApiPainel(supabase, { urlLoja: cfg.urlLoja || undefined });
+export const api = criarApiPainel(supabase, { urlLoja: cfg.urlLoja || undefined, loja });

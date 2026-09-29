@@ -41,8 +41,9 @@ await cp(join(pasta, "src"), join(saida, "src"), { recursive: true });
 const RAIZ_EXTRAS = ["sw.js", "manifest.webmanifest", "robots.txt", "sitemap.xml"];
 for (const arquivo of RAIZ_EXTRAS) if (existsSync(join(pasta, arquivo))) await cp(join(pasta, arquivo), join(saida, arquivo));
 
-// nome, textos e cores DESTA loja (só na Vercel, ou pedindo com BUSCAR_LOJA=1): ver build/personalizar.mjs
-if (process.env.VERCEL || process.env.BUSCAR_LOJA === "1") {
+// nome, textos e cores DESTA loja (só na Vercel, ou pedindo com BUSCAR_LOJA=1): ver build/personalizar.mjs.
+// Um site para várias lojas (MULTILOJA=1) não é de uma loja só: ele se ajusta sozinho ao endereço aberto.
+if (!config.multiloja && (process.env.VERCEL || process.env.BUSCAR_LOJA === "1")) {
   try {
     const dados = await buscarLoja(config);
     config.tema = pacoteDoTema(dados.aparencia);
@@ -62,7 +63,7 @@ if (process.env.VERCEL || process.env.BUSCAR_LOJA === "1") {
 await writeFile(join(saida, "config.js"), textoDoConfig(config));
 // mapa do site para o Google (usa o endereço público, se a Vercel ou o .env informarem)
 const dominio = process.env.URL_SITE || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "");
-if (site === "loja" && dominio) {
+if (site === "loja" && dominio && !config.multiloja) {
   const base = dominio.replace(/\/+$/, "");
   const mapa = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${base}/</loc></url></urlset>\n`;
   await writeFile(join(saida, "sitemap.xml"), mapa);

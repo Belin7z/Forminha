@@ -107,6 +107,18 @@ ${texto}
 ; commit;`));
 }
 
+/** Uma consulta como a pessoa logada (papel authenticated), como o Storage faz ao conferir as políticas. */
+export function comoUsuario(db, claims, texto, params) {
+  return naFila(db, async () => {
+    await db.query("begin");
+    try {
+      await db.query("set local role authenticated");
+      await db.query("select set_config('request.jwt.claims', $1, true), set_config('request.jwt.claim.sub', $2, true)", [JSON.stringify(claims), claims.sub ?? ""]);
+      return (await db.query(texto, params)).rows;
+    } finally { await db.query("rollback"); }
+  });
+}
+
 /** Os dados iniciais de uma loja nova (supabase/seed.sql). */
 export const lerSeed = () => ler(path.join(PASTA_SQL, "seed.sql"));
 

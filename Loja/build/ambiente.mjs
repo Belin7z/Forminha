@@ -4,6 +4,10 @@
      SUPABASE_URL       endereço do projeto Supabase
      SUPABASE_ANON_KEY  chave pública (anon / publishable)
      URL_LOJA           (opcional, só no Dashboard) endereço público da Loja
+     URL_CENTRAL        (opcional, só no Dashboard) endereço da Central da Forminha
+                        (ligar pagamento online e domínio próprio pelo painel)
+     MULTILOJA          (opcional) "1" = um site só para TODAS as lojas do banco único:
+                        a loja vem do endereço aberto (anadoces.forminha.com.br)
    Localmente podem ficar num arquivo .env dentro da pasta do site.
    Na Vercel são cadastradas em Settings > Environment Variables.
    ========================================================== */
@@ -34,10 +38,11 @@ export function configDoApp(app, env = process.env) {
   const url = String(env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "");
   const chave = String(env.SUPABASE_ANON_KEY ?? "").trim();
   const urlLoja = String(env.URL_LOJA ?? "").trim().replace(/\/+$/, "");
+  const urlCentral = String(env.URL_CENTRAL ?? "").trim().replace(/\/+$/, "");
 
   const faltando = [!url && "SUPABASE_URL", !chave && "SUPABASE_ANON_KEY"].filter(Boolean);
   if (faltando.length) {
-    throw new Error(`Falta configurar: ${faltando.join(" e ")}.\n  Cadastre em Vercel > Settings > Environment Variables (veja docs/PUBLICAR.md no repositório do Dashboard).`);
+    throw new Error(`Falta configurar: ${faltando.join(" e ")}.\n  Cadastre em Vercel > Settings > Environment Variables (veja docs/PUBLICAR.md).`);
   }
   if (!/^https:\/\/[a-z0-9.-]+$/i.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(url)) {
     throw new Error(`SUPABASE_URL inválida: "${url}". Use algo como https://abcdefgh.supabase.co`);
@@ -47,9 +52,23 @@ export function configDoApp(app, env = process.env) {
     throw new Error("SUPABASE_ANON_KEY está com a chave SECRETA (service_role). Use a chave pública \"anon\" — a secreta daria acesso total ao banco a qualquer visitante.");
   }
   if (urlLoja && !/^https?:\/\/[^\s]+$/.test(urlLoja)) throw new Error(`URL_LOJA inválida: "${urlLoja}".`);
+  if (urlCentral && !/^https:\/\/[a-z0-9.-]+$/i.test(urlCentral) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(urlCentral)) {
+    throw new Error(`URL_CENTRAL inválida: "${urlCentral}". Use algo como https://forminha.vercel.app`);
+  }
 
-  return { supabaseUrl: url, supabaseAnonKey: chave, urlLoja: app === "dashboard" ? urlLoja : "" };
+  const painel = app === "dashboard";
+  const multiloja = String(env.MULTILOJA ?? "").trim() === "1";
+  return { supabaseUrl: url, supabaseAnonKey: chave, urlLoja: painel ? urlLoja : "", ...(painel && urlCentral && { urlCentral }), ...(multiloja && { multiloja: true }) };
 }
 
-/** Conteúdo do config.js que o navegador carrega antes do site. */
-export const textoDoConfig = (cfg) => `window.CONFIG_APP = Object.freeze(${JSON.stringify(cfg)});\n`;
+/**
+ * Conteúdo do config.js que o navegador carrega antes do site. Com várias lojas no mesmo site, o endereço da
+ * loja sai do endereço do painel: "anadoces-painel.forminha.com.br" é de "anadoces.forminha.com.br" e
+ * "painel.suadoceria.com.br" é de "suadoceria.com.br" (é assim que a Central cria os endereços).
+ */
+export function textoDoConfig(cfg) {
+  if (!cfg.multiloja || cfg.urlLoja) return `window.CONFIG_APP = Object.freeze(${JSON.stringify(cfg)});\n`;
+  return `window.CONFIG_APP = Object.freeze(Object.assign(${JSON.stringify(cfg)}, {
+  urlLoja: location.origin.replace(/^(https?:\\/\\/)painel\\./, "$1").replace(/-painel\\./, "."),
+}));\n`;
+}

@@ -11,7 +11,7 @@
    ========================================================== */
 import crypto from "node:crypto";
 import http from "node:http";
-import { criarBanco, executarNaLoja, executarRpc, lerSeed, sql } from "./banco.js";
+import { comoUsuario, criarBanco, executarNaLoja, executarRpc, lerSeed, sql } from "./banco.js";
 import { criarExternos } from "./externos.js";
 import { cabecalhosCors, criarRpc } from "../../../supabase/functions/_shared/comum.js";
 import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
@@ -328,10 +328,11 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   }
 
   /* ---------- Storage ---------- */
-  async function ehAdmin(req) {
+  /** A mesma regra das políticas do Storage (migração 24): administradora da loja dona da pasta do arquivo. */
+  async function podeMexer(req, nome) {
     const claims = claimsDe(req);
     if (claims?.role !== "authenticated") return false;
-    try { return (await executarRpc(db, { papel: "authenticated", claims }, "e_admin")) === true; } catch { return false; }
+    try { return (await comoUsuario(db, claims, "select public.e_admin_do_arquivo($1) as ok", [nome]))[0]?.ok === true; } catch { return false; }
   }
 
   async function rotaStorage(req, res, caminho) {
@@ -347,13 +348,15 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
     const bucket = idBucket ? (await sql(db, "select * from storage.buckets where id = $1", [idBucket])).rows[0] : null;
     if (!bucket) return responder(res, 404, { statusCode: "404", error: "Bucket not found", message: "Bucket not found" });
     if (req.method === "DELETE" && caminho === `/object/${idBucket}`) {
-      if (!(await ehAdmin(req))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
       const { prefixes = [] } = await lerJson(req);
+      for (const p of prefixes) {
+        if (!(await podeMexer(req, p))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
+      }
       prefixes.forEach((p) => arquivos.delete(`${idBucket}/${p}`));
       return responder(res, 200, prefixes.map((name) => ({ name })));
     }
     if ((req.method === "POST" || req.method === "PUT") && m) {
-      if (!(await ehAdmin(req))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
+      if (!(await podeMexer(req, decodeURIComponent(m[2])))) return responder(res, 403, { statusCode: "403", error: "Unauthorized", message: "new row violates row-level security policy" });
       const bruto = await lerCorpo(req);
       let arquivo;
       if (/multipart\/form-data/.test(req.headers["content-type"] ?? "")) {

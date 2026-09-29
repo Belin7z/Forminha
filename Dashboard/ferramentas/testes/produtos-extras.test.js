@@ -51,7 +51,7 @@ describe("alérgenos e fotos extras", () => {
     assert.deepEqual(produto.alergenos, ["leite", "ovos"]);
     assert.equal(produto.galeria.length, 2);
     for (const url of produto.galeria) {
-      assert.match(url, /\/storage\/v1\/object\/public\/produtos\/[\w-]+\.png$/);
+      assert.match(url, /\/storage\/v1\/object\/public\/produtos\/[0-9a-f-]{36}\/[\w-]+\.png$/);
       assert.equal((await fetch(url)).status, 200);
     }
     const publico = (await visitante.get("/catalogo")).produtos.find((p) => p.id === produto.id);

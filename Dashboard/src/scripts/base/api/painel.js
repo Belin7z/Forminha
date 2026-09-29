@@ -11,7 +11,13 @@ const EQUIPE = ["admin", "atendente"]; // quem pode entrar no painel
 const BUCKET = "produtos";
 
 /* ---------- Fotos ---------- */
-async function enviarFoto(supabase, dataUrl, bucket = BUCKET) {
+/** A pasta da loja no Storage ("<id da loja>/"): no banco com várias lojas, cada loja só mexe na sua. */
+async function pastaDaLoja(rpc) {
+  const eu = await rpc("perfil_atual").catch(() => null);
+  return eu?.loja_id ? `${eu.loja_id}/` : "";
+}
+
+async function enviarFoto({ supabase, rpc }, dataUrl, bucket = BUCKET) {
   const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl));
   if (!m) throw new ErroApi(422, "Envie uma imagem PNG, JPG ou WEBP.");
   const texto = atob(m[2]);
@@ -21,7 +27,7 @@ async function enviarFoto(supabase, dataUrl, bucket = BUCKET) {
 
   const ext = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" }[m[1]];
   const sufixo = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join("");
-  const caminho = `${Date.now().toString(36)}-${sufixo}.${ext}`;
+  const caminho = `${await pastaDaLoja(rpc)}${Date.now().toString(36)}-${sufixo}.${ext}`;
   const { error } = await supabase.storage.from(bucket).upload(caminho, new Blob([bytes], { type: m[1] }), { contentType: m[1], cacheControl: "31536000" });
   if (error) throw new ErroApi(422, "Não foi possível enviar a foto. Tente uma imagem menor.");
   return supabase.storage.from(bucket).getPublicUrl(caminho).data.publicUrl;
@@ -37,13 +43,13 @@ async function apagarFoto(supabase, url, bucket = BUCKET) {
 async function salvarProduto({ rpc, supabase, corpo, params }) {
   const dados = { ...corpo };
   const enviadas = []; // fotos que subiram agora (apagadas se o banco recusar o produto)
-  if (dados.imagem_nova) { dados.imagem = await enviarFoto(supabase, dados.imagem_nova); enviadas.push(dados.imagem); }
+  if (dados.imagem_nova) { dados.imagem = await enviarFoto({ supabase, rpc }, dados.imagem_nova); enviadas.push(dados.imagem); }
   delete dados.imagem_nova;
   // fotos extras: o que é "data:" é foto nova (sobe agora); o resto já são endereços do Storage
   if (Array.isArray(dados.galeria)) {
     dados.galeria = await Promise.all(dados.galeria.map(async (g) => {
       if (!String(g).startsWith("data:")) return g;
-      const url = await enviarFoto(supabase, g);
+      const url = await enviarFoto({ supabase, rpc }, g);
       enviadas.push(url);
       return url;
     }));
@@ -74,7 +80,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /** Convite de primeiro acesso: cria a conta (ou entra numa que já existe) e vira administradora da loja.
     Se o convite for recusado (vencido, já usado, de outro e-mail), sai da conta: nada fica pela metade. */
-async function usarConvite({ supabase, rpc, corpo }) {
+async function usarConvite({ supabase, rpc, corpo, contexto }) {
   const email = String(corpo.email ?? "").trim().toLowerCase();
   const campos = {};
   if (!EMAIL.test(email)) campos.email = "Informe um e-mail válido.";
@@ -87,7 +93,7 @@ async function usarConvite({ supabase, rpc, corpo }) {
   if (Object.keys(campos).length) throw new ErroApi(422, Object.values(campos)[0], campos);
 
   if (corpo.criar) {
-    const { data, error } = await supabase.auth.signUp({ email, password: String(corpo.senha), options: { data: { nome } } });
+    const { data, error } = await supabase.auth.signUp({ email, password: String(corpo.senha), options: { data: { nome, ...(contexto.loja && { loja: contexto.loja }) } } });
     if (error) throw erroDeAuth(error);
     // com "Confirmar e-mail" ligado no Supabase: ela confirma e depois volta ao mesmo link para entrar
     if (!data.session) return { confirmar_email: true };
@@ -115,7 +121,7 @@ export const rotasPainel = [
   ["PUT", "/conta/senha", trocarSenha],
 
   // imagens do site (logo, foto de destaque, galeria)
-  ["POST", "/site/imagem", async ({ supabase, corpo }) => ({ url: await enviarFoto(supabase, corpo.imagem, "site") })],
+  ["POST", "/site/imagem", async ({ supabase, rpc, corpo }) => ({ url: await enviarFoto({ supabase, rpc }, corpo.imagem, "site") })],
   ["POST", "/site/imagem/apagar", async ({ supabase, corpo }) => { await apagarFoto(supabase, corpo.url, "site"); return { ok: true }; }],
 
   // visão geral e pedidos (rotas fixas antes de "/pedidos/:id")
@@ -240,5 +246,8 @@ export const rotasPainel = [
   ["DELETE", "/zonas/:id", ({ rpc, params }) => rpc("admin_excluir_zona", { id: Number(params.id) })],
 ];
 
-/** contexto: { urlLoja } — para onde vai o link do e-mail de redefinição de senha do cliente. */
+/**
+ * contexto: { urlLoja } — para onde vai o link do e-mail de redefinição de senha do cliente;
+ * { loja } — no banco com várias lojas, o endereço deste painel (a conta nova nasce nesta loja).
+ */
 export const criarApiPainel = (supabase, contexto = {}) => criarApi({ supabase, rotas: rotasPainel, contexto });

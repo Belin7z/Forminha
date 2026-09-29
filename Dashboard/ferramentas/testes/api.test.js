@@ -373,7 +373,7 @@ describe("cardápio no painel", () => {
     });
     novoId = r.produto.id;
     urlFoto = r.produto.imagem;
-    assert.match(urlFoto, /\/storage\/v1\/object\/public\/produtos\/[\w-]+\.png$/);
+    assert.match(urlFoto, /\/storage\/v1\/object\/public\/produtos\/[0-9a-f-]{36}\/[\w-]+\.png$/);
     assert.equal(r.produto.opcoes[0].itens[1].id, "g1i2");
     assert.equal((await fetch(urlFoto)).status, 200);
     assert.ok((await visitante.get("/catalogo")).produtos.some((p) => p.id === novoId));

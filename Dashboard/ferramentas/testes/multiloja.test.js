@@ -19,15 +19,17 @@ import { iniciarEmulador } from "./emulador/servidor.js";
 import { criarApiLoja } from "../../../Loja/src/scripts/base/api/loja.js";
 import { criarApiPainel } from "../../src/scripts/base/api/painel.js";
 import { gerarHorarios, dataISO } from "../../../Loja/src/scripts/base/agendamento.js";
+import { criarClienteSupabase } from "../../src/scripts/base/api/nucleo.js";
+import { textoDoConfig } from "../../build/ambiente.mjs";
 
 const BIA = { codigo: "x6u-BC4-4Bz", nome: "Doce da Bia", prefixo: "DB", enderecos: ["bia.forminha.test", "bia-painel.forminha.test"] };
 let emu, idA, idB;
-/** Um navegador de uma loja: o site manda a loja (código ou endereço) em todas as chamadas. */
-const navegador = (loja) => createClient(emu.url, emu.chaveAnon, {
-  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }, global: { headers: { "x-loja": loja } },
-});
-const lojaDe = (loja) => criarApiLoja(navegador(loja));
-const painelDe = (loja) => criarApiPainel(navegador(loja));
+/** Um navegador de uma loja: a MESMA conexão dos sites, que manda a loja (código ou endereço) nas chamadas ao banco. */
+const navegador = (loja) => criarClienteSupabase({ url: emu.url, chave: emu.chaveAnon, storageKey: "teste", fabrica: createClient, loja,
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+const lojaDe = (loja) => criarApiLoja(navegador(loja), { loja });
+const painelDe = (loja) => criarApiPainel(navegador(loja), { loja });
+const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 async function falha(promessa) { try { await promessa; } catch (e) { return e; } assert.fail("era esperado um erro"); }
 const q = async (texto, params) => (await emu.db.query(texto, params)).rows;
 
@@ -188,6 +190,38 @@ describe("imagens e estrutura", () => {
     assert.equal(await comoUsuario("dona.a@teste.local", () => pode(`${idA}/bolo.png`)), true);
     assert.equal(await comoUsuario("dona.a@teste.local", () => pode("bolo.png")), false, "arquivo sem pasta só vale em banco de uma loja");
     assert.equal(await comoUsuario("carla@teste.com", () => pode(`${idB}/bolo.png`)), false, "cliente não envia");
+  });
+
+  it("a foto do produto vai para a pasta da loja, e a outra dona não apaga", async () => {
+    const cat = (await painelB.get("/categorias")).categorias[0];
+    const r = await painelB.post("/produtos", { categoria_id: cat.id, nome: "Bolo com Foto", descricao: "", preco: 3000, unidade: "bolo", min_qtd: 1, emoji: "📷", ativo: true, destaque: false, imagem_nova: PNG });
+    const caminho = r.produto.imagem.split("/object/public/produtos/")[1];
+    assert.ok(caminho.startsWith(`${idB}/`), caminho);
+    assert.equal((await fetch(r.produto.imagem)).status, 200);
+    const invasora = navegador("principal");
+    await invasora.auth.signInWithPassword({ email: "dona.a@teste.local", password: "Admin12345" });
+    const { error } = await invasora.storage.from("produtos").remove([caminho]);
+    assert.ok(error, "a dona A não apaga a foto da B");
+    assert.equal((await fetch(r.produto.imagem)).status, 200);
+    const { error: e2 } = await invasora.storage.from("produtos").upload(`${idB}/invasao.png`, new Blob([Buffer.from("x")], { type: "image/png" }), { contentType: "image/png" });
+    assert.ok(e2, "nem envia na pasta da B");
+  });
+
+  it("cadastro feito na loja B nasce direto na B", async () => {
+    await lojaDe("bia.forminha.test").post("/auth/cadastro", { nome: "Eva", email: "eva@teste.com", telefone: "11966665555", senha: "Senha1234", aceite: true });
+    const perfis = await q("select loja_id, aceite_termos_em is not null as aceite from public.perfis where email = 'eva@teste.com'");
+    assert.deepEqual(perfis, [{ loja_id: idB, aceite: true }]);
+    const e = await falha(lojaDe("principal").post("/auth/cadastro", { nome: "Eva", email: "eva@teste.com", telefone: "11966665555", senha: "Senha1234", aceite: true }));
+    assert.equal(e.status, 409);
+    assert.match(e.message, /Entrar.*mesma senha/, "explica que o login é o mesmo");
+  });
+
+  it("o painel acha o endereço da loja pelo próprio endereço", () => {
+    const texto = textoDoConfig({ supabaseUrl: "https://x.supabase.co", supabaseAnonKey: "k", urlLoja: "", multiloja: true });
+    const endereco = (origin) => { const window = {}; new Function("window", "location", texto)(window, { origin }); return window.CONFIG_APP.urlLoja; };
+    assert.equal(endereco("https://anadoces-painel.forminha.com.br"), "https://anadoces.forminha.com.br");
+    assert.equal(endereco("https://painel.suadoceria.com.br"), "https://suadoceria.com.br");
+    assert.equal(textoDoConfig({ supabaseUrl: "u", urlLoja: "https://fixa.test" }), 'window.CONFIG_APP = Object.freeze({"supabaseUrl":"u","urlLoja":"https://fixa.test"});\n', "loja única: nada muda");
   });
 
   it("toda tabela tem loja e a trava de loja", async () => {

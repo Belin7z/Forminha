@@ -23,10 +23,20 @@ function validarCadastro({ nome, email, telefone, senha }) {
   return { nome: n, email: e, telefone: t, senha: String(senha) };
 }
 
-async function cadastrar({ supabase, rpc, corpo }) {
+async function cadastrar({ supabase, rpc, corpo, contexto }) {
   const d = validarCadastro(corpo);
-  const { data, error } = await supabase.auth.signUp({ email: d.email, password: d.senha, options: { data: { nome: d.nome, telefone: d.telefone, aceite: corpo.aceite === true } } });
-  if (error) throw erroDeAuth(error);
+  // banco com várias lojas: o cadastro diz em qual loja a pessoa se cadastrou (o perfil nasce nela)
+  const dados = { nome: d.nome, telefone: d.telefone, aceite: corpo.aceite === true, ...(contexto.loja && { loja: contexto.loja }) };
+  const { data, error } = await supabase.auth.signUp({ email: d.email, password: d.senha, options: { data: dados } });
+  if (error) {
+    const erro = erroDeAuth(error);
+    // o mesmo login serve em todas as docerias do sistema: quem já comprou em outra entra com a mesma senha
+    if (contexto.loja && erro.status === 409) {
+      const msg = "Este e-mail já tem cadastro. Toque em Entrar e use a sua senha (se você já comprou em outra doceria que usa este sistema, é a mesma senha).";
+      throw new ErroApi(409, msg, { email: msg });
+    }
+    throw erro;
+  }
   // com "Confirmar e-mail" ligado no Supabase, não há sessão até o cliente clicar no link
   if (!data.session) return { usuario: null, confirmar_email: true };
   return { usuario: await rpc("perfil_atual") };

@@ -6,6 +6,8 @@
      URL_LOJA           (opcional, só no Dashboard) endereço público da Loja
      URL_CENTRAL        (opcional, só no Dashboard) endereço da Central da Forminha
                         (ligar pagamento online e domínio próprio pelo painel)
+     MULTILOJA          (opcional) "1" = um site só para TODAS as lojas do banco único:
+                        a loja vem do endereço aberto (anadoces.forminha.com.br)
    Localmente podem ficar num arquivo .env dentro da pasta do site.
    Na Vercel são cadastradas em Settings > Environment Variables.
    ========================================================== */
@@ -55,8 +57,18 @@ export function configDoApp(app, env = process.env) {
   }
 
   const painel = app === "dashboard";
-  return { supabaseUrl: url, supabaseAnonKey: chave, urlLoja: painel ? urlLoja : "", ...(painel && urlCentral && { urlCentral }) };
+  const multiloja = String(env.MULTILOJA ?? "").trim() === "1";
+  return { supabaseUrl: url, supabaseAnonKey: chave, urlLoja: painel ? urlLoja : "", ...(painel && urlCentral && { urlCentral }), ...(multiloja && { multiloja: true }) };
 }
 
-/** Conteúdo do config.js que o navegador carrega antes do site. */
-export const textoDoConfig = (cfg) => `window.CONFIG_APP = Object.freeze(${JSON.stringify(cfg)});\n`;
+/**
+ * Conteúdo do config.js que o navegador carrega antes do site. Com várias lojas no mesmo site, o endereço da
+ * loja sai do endereço do painel: "anadoces-painel.forminha.com.br" é de "anadoces.forminha.com.br" e
+ * "painel.suadoceria.com.br" é de "suadoceria.com.br" (é assim que a Central cria os endereços).
+ */
+export function textoDoConfig(cfg) {
+  if (!cfg.multiloja || cfg.urlLoja) return `window.CONFIG_APP = Object.freeze(${JSON.stringify(cfg)});\n`;
+  return `window.CONFIG_APP = Object.freeze(Object.assign(${JSON.stringify(cfg)}, {
+  urlLoja: location.origin.replace(/^(https?:\\/\\/)painel\\./, "$1").replace(/-painel\\./, "."),
+}));\n`;
+}

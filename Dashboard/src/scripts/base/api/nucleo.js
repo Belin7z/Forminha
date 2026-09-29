@@ -13,12 +13,27 @@ import { ErroApi } from "../http.js";
  * inclusive quando o cliente pede no computador e abre o e-mail no celular — e quando é a loja
  * (painel) quem dispara o e-mail para o cliente. O fluxo PKCE exigiria o mesmo navegador.
  */
-export function criarClienteSupabase({ url, chave, storageKey, fabrica = globalThis.supabase?.createClient, auth = {} }) {
+export function criarClienteSupabase({ url, chave, storageKey, fabrica = globalThis.supabase?.createClient, auth = {}, loja = "" }) {
   if (!fabrica) throw new Error("A biblioteca do Supabase não foi carregada.");
   if (!url || !chave) throw new Error("Configure SUPABASE_URL e SUPABASE_ANON_KEY (veja docs/PUBLICAR.md).");
   return fabrica(url, chave, {
     auth: { storageKey, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "implicit", ...auth },
+    ...(loja && { global: { fetch: fetchDaLoja(loja) } }),
   });
+}
+
+/**
+ * Banco com várias lojas: as chamadas às funções do banco (e às do servidor) dizem de qual loja são, pelo
+ * cabeçalho x-loja (o código ou o endereço do site). O login e as fotos não precisam — e não recebem.
+ */
+export function fetchDaLoja(loja, base = (...a) => globalThis.fetch(...a)) {
+  return (entrada, init = {}) => {
+    const endereco = typeof entrada === "string" ? entrada : entrada?.url ?? String(entrada);
+    if (!/\/(rest|functions)\/v1\//.test(endereco)) return base(entrada, init);
+    const cabecalhos = new Headers(init.headers ?? (typeof entrada === "object" && entrada?.headers) ?? undefined);
+    cabecalhos.set("x-loja", loja);
+    return base(entrada, { ...init, headers: cabecalhos });
+  };
 }
 
 /* ---------- Erros ---------- */
