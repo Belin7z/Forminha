@@ -105,6 +105,23 @@ export const ESQUEMA = [
   end $$`,
   `alter table clientes add column if not exists cadastrado_por text`, // "Dono" ou "FMV-0427 · Ana"
   `alter table clientes add column if not exists pronta_em timestamptz`,
+  // cupons de desconto e indicação (o código de indicação é um cupom ligado à cliente que indica)
+  `create table if not exists cupons (
+    id uuid primary key default gen_random_uuid(),
+    codigo text not null unique,                -- sempre em maiúsculas
+    tipo text not null check (tipo in ('percentual', 'valor')),
+    valor integer not null check (valor > 0),   -- % ou centavos
+    validade date,                              -- último dia que vale (vazio = sem prazo)
+    max_usos integer check (max_usos > 0),      -- vazio = sem limite
+    usos integer not null default 0,
+    ativo boolean not null default true,
+    indicacao_de uuid references clientes (id) on delete cascade,
+    criado_em timestamptz not null default now()
+  )`,
+  `alter table clientes add column if not exists cupom text`,
+  `alter table clientes add column if not exists desconto_centavos integer not null default 0`,
+  `alter table clientes add column if not exists indicada_por uuid references clientes (id) on delete set null`,
+  `alter table clientes add column if not exists credito_centavos integer not null default 0`, // ganho indicando (abate nas mensalidades)
 ];
 
 /** Cria as tabelas uma vez por instância (a primeira requisição paga o custo, as outras não). */

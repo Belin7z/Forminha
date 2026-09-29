@@ -78,6 +78,7 @@ export async function telaPagar(token) {
       <p class="pagar__sobre">Pagamento da loja</p>
       <h1 class="pagar__loja-titulo">${d.nome_loja}</h1>
       <p class="pagar__valor">${reais(d.valor_centavos)}</p>
+      ${d.desconto_centavos > 0 && html`<p class="pagar__desconto">Cupom ${d.cupom}: você economizou ${reais(d.desconto_centavos)}</p>`}
       <div class="pagar__qr" data-qr></div>
       <ol class="pagar__passos"><li>Abra o app do seu banco e escolha <strong>PIX</strong>.</li><li>Leia o QR Code ou use o código abaixo.</li><li>Pronto: o acesso chega no seu e-mail.</li></ol>
       <div class="pagar__codigo"><code>${d.pix}</code></div>

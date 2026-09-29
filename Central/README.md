@@ -15,7 +15,9 @@ dono define —, vendas do mês dia a dia ou dos 12 meses, o que precisa de aten
 **Funil** (das clientes que entraram no período: quantas receberam a cobrança, pagaram e estão com a loja no ar, a conversão de cada passo, o tempo até pagar e o resultado de cada pessoa da equipe), **Vendas** (Hoje, 7 dias, 30 dias, Este mês, 12 meses,
 Por ano ou de um dia até outro: faturamento, vendas e ticket médio comparados com o período anterior,
 gráfico por hora/dia/mês/ano e cada venda, com planilha), **Pagamentos** (tudo o que foi cobrado, com
-total recebido e pendente), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
+total recebido e pendente), **Cupons** (só o dono: cupons em % ou R$, com validade e limite de usos; e as regras da
+**indicação** — cada cliente que pagou tem um código na ficha: quem usa ganha desconto e, quando paga, quem indicou ganha
+crédito para abater nas mensalidades; quem vende aplica o cupom no cadastro e já vê o valor final), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
 financeiro). No topo, a **busca rápida** (Ctrl+K ou "/": clientes, lojas, telas e ações, sem acento e pelo teclado), o **sino** (avisos na hora: pagamento recebido, loja pronta, criação parada e, para o
 dono, cliente cadastrada pela equipe; também no computador, se você deixar) e o **perfil**: ao clicar,
 Configurações (dono) ou Trocar minha senha (equipe) e Sair. No celular, o menu abre pelo botão ☰.

@@ -71,7 +71,7 @@ export function validarCliente(corpo, { parcial = false } = {}) {
 
 /* ---------- módulo ---------- */
 export function criarClientes({ banco, cofre, lojas, email = null, mp = null, urlBase, segredoInterno = "", fetchFn = fetch, orcamentoMs = 40_000, agendar = null, esperaBancoMs = 4000,
-  avisar = async () => {} }) {
+  avisar = async () => {}, cupons = null }) {
   const sql = (t, p) => banco.consultar(t, p);
   const ctx = (id) => `cliente:${id}`;
   const brl = (centavos) => (Number(centavos) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -171,16 +171,30 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const d = validarCliente({ ...corpo, valor_centavos: corpo.valor_centavos ?? cfg.valor_padrao_centavos });
     const soInteresse = corpo.so_interesse === true;
     if (!soInteresse && !cfg.pix.chave) throw new ErroHttp(409, "Antes de cadastrar, informe a sua chave PIX em Configurações.");
+    // cupom (de desconto ou de indicação): confere, reserva um uso e já cobra o valor com desconto
+    let cupom = null;
+    if (String(corpo.cupom ?? "").trim()) {
+      if (!cupons) throw new ErroHttp(503, "Cupons indisponíveis agora.");
+      cupom = await cupons.conferir(corpo.cupom, d.valor_centavos);
+      await cupons.reservar(cupom.codigo);
+    }
     const id = randomUUID();
     const pessoa = { nome: d.nome, email: d.email, telefone: d.telefone ?? "", documento: d.documento ?? "", observacoes: d.observacoes ?? "" };
     try {
-      await sql(`insert into clientes (id, dados, email_indice, nome_loja, valor_centavos, situacao, cadastrado_por) values ($1, $2, $3, $4, $5, $6, $7)`,
-        [id, cofre.cifrar(pessoa, ctx(id)), cofre.indice(d.email), d.nome_loja, d.valor_centavos, soInteresse ? "interessada" : "aguardando_pagamento", autorAtual() ?? null]);
+      await sql(`insert into clientes (id, dados, email_indice, nome_loja, valor_centavos, situacao, cadastrado_por, cupom, desconto_centavos, indicada_por)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [id, cofre.cifrar(pessoa, ctx(id)), cofre.indice(d.email), d.nome_loja, cupom ? cupom.valor_final : d.valor_centavos,
+          soInteresse ? "interessada" : "aguardando_pagamento", autorAtual() ?? null, cupom?.codigo ?? null, cupom?.desconto_centavos ?? 0, cupom?.indicacao_de ?? null]);
     } catch (e) {
+      if (cupom) await cupons.liberar(cupom.codigo).catch(() => {});
       if (String(e.code) === "23505" || /duplicate|unique/i.test(e.message)) throw new ErroHttp(409, "Já existe uma cliente com esse e-mail.", { email: "Já existe uma cliente com esse e-mail." });
       throw e;
     }
     await anotarHistorico(id, "cadastro", soInteresse ? "Interesse registrado (ainda sem cobrança)." : "Cliente cadastrada.");
+    if (cupom) {
+      const [quem] = cupom.indicacao_de ? await sql("select nome_loja from clientes where id = $1", [cupom.indicacao_de]) : [];
+      await anotarHistorico(id, "cadastro", `Cupom ${cupom.codigo} aplicado: ${cupom.descricao} (−${brl(cupom.desconto_centavos)}).${quem ? ` Veio por indicação de ${quem.nome_loja}.` : ""}`);
+    }
     const autor = autorAtual();
     if (autor && autor !== "Dono") aviso({ tipo: "cadastro", titulo: `Cliente nova: ${d.nome_loja}`, texto: `Cadastrada por ${autor} · ${brl(d.valor_centavos)}`, cliente_id: id, permissao: "dono" });
     if (soInteresse) return { ...(await detalhe(id)), link_pagamento: null, email_enviado: false, so_interesse: true };
@@ -201,6 +215,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       loja_ref: c.loja_ref, loja_codigo: c.loja_codigo, loja_url: c.loja_url, painel_url: c.painel_url,
       convite: c.convite ? cofre.decifrar(c.convite, ctx(c.id)) : null, convite_em: c.convite_em, email_boas_vindas_em: c.email_boas_vindas_em,
       cadastrado_por: c.cadastrado_por ?? null, pronta_em: c.pronta_em ?? null,
+      cupom: c.cupom ?? null, desconto_centavos: c.desconto_centavos ?? 0, indicada_por: c.indicada_por ?? null, credito_centavos: c.credito_centavos ?? 0,
     };
   }
 
@@ -264,10 +279,21 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now()
       where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id]);
     await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "manualmente"}.`);
-    const [dona] = await sql("select nome_loja from clientes where id = $1", [p.cliente_id]);
+    const [dona] = await sql("select nome_loja, indicada_por from clientes where id = $1", [p.cliente_id]);
+    if (dona?.indicada_por && cupons) await premiarIndicacao(dona.indicada_por, dona.nome_loja);
     aviso({ tipo: "pagamento", titulo: `Pagamento recebido: ${dona?.nome_loja ?? "loja"}`, texto: `${brl(p.valor_centavos)} · ${por === "mercado_pago" ? "PIX automático" : "confirmado à mão"}. A loja já está sendo criada.`,
       cliente_id: p.cliente_id, permissao: "clientes.ver" });
     return { cliente_id: p.cliente_id, ja_estava: false };
+  }
+
+  /** A indicada pagou: quem indicou ganha o crédito da indicação (para abater nas mensalidades). */
+  async function premiarIndicacao(indicouId, nomeDaIndicada) {
+    const { recompensa_centavos: valor } = await cupons.lerIndicacao();
+    if (!(valor > 0)) return;
+    const [quem] = await sql("update clientes set credito_centavos = credito_centavos + $2, atualizado_em = now() where id = $1 returning nome_loja, credito_centavos", [indicouId, valor]);
+    if (!quem) return;
+    await anotarHistorico(indicouId, "pagamento", `Indicou ${nomeDaIndicada}: ganhou ${brl(valor)} de crédito (total: ${brl(quem.credito_centavos)}).`);
+    aviso({ tipo: "indicacao", titulo: `Indicação: ${quem.nome_loja} trouxe ${nomeDaIndicada}`, texto: `${brl(valor)} de crédito para ${quem.nome_loja}.`, cliente_id: indicouId, permissao: "clientes.ver" });
   }
 
   async function confirmarManual(id, corpo) {
@@ -418,7 +444,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     if (c.situacao === "pago" && c.etapa !== "pronta") { await avancar(c.id, { orcamento: 8000 }); c = await linha(c.id); }
     const passoAtual = ORDEM.indexOf(c.etapa);
     return {
-      nome_loja: c.nome_loja, valor_centavos: p.valor_centavos,
+      nome_loja: c.nome_loja, valor_centavos: p.valor_centavos, cupom: c.cupom ?? null, desconto_centavos: c.desconto_centavos ?? 0,
       situacao: p.situacao === "cancelado" ? "cancelado" : c.situacao === "pago" ? "pago" : "pendente",
       pix: p.mp_copia_cola ?? p.pix_copia_cola, qr_base64: p.mp_qr_base64 ?? null, automatico: Boolean(p.mp_id),
       loja_pronta: c.etapa === "pronta", progresso: c.situacao === "pago" ? Math.max(0, passoAtual) / (ORDEM.length - 1) : 0,
@@ -479,6 +505,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const c = await linha(id);
     if (!["interessada", "aguardando_pagamento"].includes(c.situacao)) throw new ErroHttp(409, "Só dá para cancelar antes do pagamento. Depois, exclua a loja na aba Lojas.");
     await sql("update clientes set situacao = 'cancelado', atualizado_em = now() where id = $1", [id]);
+    if (c.cupom && cupons) await cupons.liberar(c.cupom).catch(() => {});
     await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and situacao = 'pendente'", [id]);
     await anotarHistorico(id, "cadastro", "Cadastro cancelado.");
     return detalhe(id);
@@ -667,6 +694,20 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     };
   }
 
+  /** O código de indicação da cliente (depois que ela paga), quem ela já trouxe e o crédito que tem. */
+  async function indicacao(id) {
+    if (!cupons) throw new ErroHttp(503, "Cupons indisponíveis agora.");
+    const c = await linha(id);
+    if (c.situacao !== "pago") throw new ErroHttp(409, "O código de indicação aparece depois que a cliente paga.");
+    const cupom = await cupons.codigoDeIndicacao(c);
+    const cfg = await cupons.lerIndicacao();
+    const indicadas = await sql("select id, nome_loja, situacao, etapa, criado_em from clientes where indicada_por = $1 order by criado_em desc", [id]);
+    return {
+      codigo: cupom.codigo, ativo: cupom.ativo, desconto_pct: cfg.desconto_pct, recompensa_centavos: cfg.recompensa_centavos, credito_centavos: c.credito_centavos ?? 0,
+      indicadas: indicadas.map((i) => ({ id: i.id, nome_loja: i.nome_loja, situacao: i.situacao, etapa: i.etapa, criado_em: i.criado_em })),
+    };
+  }
+
   /** A loja passou a usar outro endereço (domínio próprio ligado ou tirado): a ficha da cliente acompanha. */
   async function atualizarEnderecos(lojaRef, { loja, painel }) {
     const mudadas = await sql(`update clientes set loja_url = $2, painel_url = $3, atualizado_em = now()
@@ -677,7 +718,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil,
+    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil, indicacao,
   };
 }
 

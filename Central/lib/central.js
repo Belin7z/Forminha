@@ -24,6 +24,7 @@ import { criarAcesso } from "./acesso.js";
 import { FUNCOES, PERMISSOES, TODAS, criarEquipe, lerUsuario } from "./equipe.js";
 import { comAutor } from "./autoria.js";
 import { criarAvisos } from "./avisos.js";
+import { criarCupons } from "./cupons.js";
 
 export { ErroHttp };
 const OBRIGATORIAS = ["CENTRAL_SENHA_HASH", "SEGREDO_SESSAO", "SUPABASE_ACCESS_TOKEN", "VERCEL_TOKEN", "FORMINHA_ORG", "DATABASE_URL", "CHAVE_CRIPTOGRAFIA"];
@@ -52,10 +53,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const email = opcoes.email !== undefined ? opcoes.email : criarEmail({ usuario: env.SMTP_USUARIO, senha: env.SMTP_SENHA, nome: env.EMAIL_NOME || "Forminha" });
   const mp = opcoes.mercadoPago !== undefined ? opcoes.mercadoPago : env.MP_ACCESS_TOKEN ? criarMercadoPago({ token: env.MP_ACCESS_TOKEN, fetchFn }) : null;
   const avisos = banco ? criarAvisos({ banco, preparar: garantirEsquema }) : null; // o sino da Central
+  const cupons = banco ? criarCupons({ banco, preparar: garantirEsquema }) : null; // cupons de desconto e indicação
   const clientes = banco && cofre && lojas ? criarClientes({
     banco, cofre, lojas, email, mp, urlBase, segredoInterno: env.CRON_SECRET, fetchFn,
     agendar: opcoes.agendar ?? null, orcamentoMs: opcoes.orcamentoMs ?? 40_000, esperaBancoMs: opcoes.esperaBancoMs ?? 4000,
-    avisar: avisos ? (dados) => avisos.registrar(dados) : undefined,
+    avisar: avisos ? (dados) => avisos.registrar(dados) : undefined, cupons,
   }) : null;
   const equipe = banco && cofre ? criarEquipe({ banco, cofre, preparar: garantirEsquema }) : null;
 
@@ -101,6 +103,10 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const exigirEquipe = () => {
     if (!equipe) throw new ErroHttp(503, "Para ter equipe, ligue o banco da Central e a criptografia (veja Configurações).");
     return equipe;
+  };
+  const exigirCupons = () => {
+    if (!cupons) throw new ErroHttp(503, "Para ter cupons, ligue o banco da Central (veja Configurações).");
+    return cupons;
   };
   const autorizadoInterno = (cabecalhos) => env.CRON_SECRET && cabecalhos.authorization === `Bearer ${env.CRON_SECRET}`;
   /** Para rotas públicas: se faltar configuração, não conta ao visitante o que falta. */
@@ -258,6 +264,17 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["GET", /^avisos$/, true, async ({ quem }) => ({ corpo: avisos ? await avisos.listar(quem) : { avisos: [], nao_vistos: 0, ultimo: 0 } })],
     ["POST", /^avisos\/vistos$/, true, async ({ quem, corpo }) => ({ corpo: avisos ? await avisos.marcarVistos(quem, corpo.ate) : { ok: true } })],
     ["GET", /^metas$/, "financeiro.ver", async () => ({ corpo: await (await exigirClientes()).lerMetas() })],
+    /* ---------- cupons e indicação ---------- */
+    ["GET", /^cupons$/, "configuracoes", async () => ({ corpo: await exigirCupons().listar() })],
+    ["POST", /^cupons$/, "configuracoes", async ({ corpo }) => { const c = await exigirCupons().criar(corpo); return { corpo: c, alvo: c.codigo }; }, "Criou cupom"],
+    ["PUT", new RegExp(`^cupons/${ID}$`), "configuracoes", async ({ m, corpo }) => { const c = await exigirCupons().editar(m[1], corpo); return { corpo: c, alvo: c.codigo }; }, "Alterou cupom"],
+    ["DELETE", new RegExp(`^cupons/${ID}$`), "configuracoes", async ({ m }) => ({ corpo: await exigirCupons().excluir(m[1]) }), "Apagou cupom"],
+    ["PUT", /^indicacao$/, "configuracoes", async ({ corpo }) => ({ corpo: await exigirCupons().salvarIndicacao(corpo) }), "Alterou a indicação"],
+    ["GET", /^cupons\/conferir$/, "clientes.cadastrar", async ({ url }) => ({
+      corpo: await exigirCupons().conferir(url.searchParams.get("codigo"), Math.round(Number(url.searchParams.get("valor")) || 0)),
+    })],
+    ["POST", new RegExp(`^clientes/${ID}/indicacao$`), "clientes.ver", async ({ m }) => ({ corpo: await (await exigirClientes()).indicacao(m[1]) })],
+
     ["GET", /^funil$/, "clientes.ver", async ({ url, quem }) => ({
       corpo: await (await exigirClientes()).funil({ de: url.searchParams.get("de"), ate: url.searchParams.get("ate"), financeiro: quem.permissoes.includes("financeiro.ver") }),
     })],

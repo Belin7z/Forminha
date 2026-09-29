@@ -124,6 +124,8 @@ export async function novaCliente(depois, eu) {
           ${campo({ nome: "documento", rotulo: "CPF ou CNPJ", atributos: 'inputmode="numeric" maxlength="18"', ajuda: "Opcional." })}
           ${campo({ nome: "nome_loja", rotulo: "Nome da loja", obrigatorio: true, placeholder: "Ex.: Doce da Ana", atributos: 'maxlength="60"' })}
           ${campo({ nome: "valor", rotulo: "Valor (R$)", mascara: "moeda", valor: padrao ? emReais(padrao) : "", obrigatorio: true })}
+          ${campo({ nome: "cupom", rotulo: "Cupom ou código de indicação", placeholder: "Opcional", atributos: 'maxlength="20" autocomplete="off" autocapitalize="characters" spellcheck="false"' })}
+          <p class="cupom-conferido" data-cupom-info aria-live="polite"></p>
         </div>
         ${campo({ nome: "observacoes", rotulo: "Observações", tipo: "textarea", linhas: 2, atributos: 'maxlength="1000"', ajuda: "Só a equipe da Forminha vê. Fica guardado criptografado." })}
         ${interruptor({ nome: "so_interesse", rotulo: "Só registrar o interesse", ajuda: "Ela ainda está pensando: a cobrança vai depois, pela ficha (Enviar proposta). Entra no funil de vendas." })}
@@ -134,12 +136,32 @@ export async function novaCliente(depois, eu) {
   const form = modal.el.querySelector("form");
   ativarCampos(form);
   const botaoEnviar = modal.el.querySelector('[form="form-cliente"]');
+  // o cupom é conferido enquanto a pessoa digita: já mostra o desconto e o valor final
+  const infoCupom = form.querySelector("[data-cupom-info]");
+  let esperaCupom = null;
+  const conferirCupom = () => {
+    clearTimeout(esperaCupom);
+    const codigo = form.cupom.value.trim();
+    form.cupom.closest(".campo")?.classList.remove("campo--erro");
+    form.cupom.closest(".campo")?.querySelector(".campo__erro")?.remove();
+    if (!codigo) { infoCupom.textContent = ""; return; }
+    esperaCupom = setTimeout(async () => {
+      try {
+        const r = await api("GET", `cupons/conferir?codigo=${encodeURIComponent(codigo)}&valor=${paraCentavos(form.valor.value)}`);
+        if (form.cupom.value.trim() !== codigo) return;
+        montar(infoCupom, html`${icone("check", { tamanho: 14 })} ${r.descricao}: <strong>−${reais(r.desconto_centavos)}</strong> · a loja sai por <strong>${reais(r.valor_final)}</strong>`);
+      } catch (erro) { if (form.cupom.value.trim() === codigo) { infoCupom.textContent = ""; mostrarErros(form, erro); } }
+    }, 400);
+  };
+  form.cupom.addEventListener("input", conferirCupom);
+  form.valor.addEventListener("change", conferirCupom);
   form.so_interesse.addEventListener("change", () => { botaoEnviar.textContent = form.so_interesse.checked ? "Registrar interesse" : "Cadastrar e gerar PIX"; });
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const dados = dadosDe(form);
     const corpo = { ...dados, valor_centavos: paraCentavos(dados.valor) };
     delete corpo.valor;
+    if (!corpo.cupom?.trim()) delete corpo.cupom;
     await ocupado(modal.el.querySelector('[form="form-cliente"]'), async () => {
       try {
         const r = await api("POST", "clientes", corpo);
@@ -188,6 +210,7 @@ export function abrirFicha(id, depois, eu) {
     return html`
       <section class="ficha__cartao">
         <h3>${icone("dinheiro", { tamanho: 17 })} Pagamento <span class="ficha__valor">${reais(c.valor_centavos)}</span></h3>
+        ${c.cupom && html`<p class="ficha__cupom">${icone("percentual", { tamanho: 14 })} Cupom <strong>${c.cupom}</strong>: −${reais(c.desconto_centavos)}${c.indicada_por ? " (indicação)" : ""}</p>`}
         ${aprovado && html`<p class="ficha__ok">${icone("checkCirculo", { tamanho: 16 })} Pago em ${quando(aprovado.confirmado_em)} · ${aprovado.confirmado_por === "mercado_pago" ? "confirmado pelo Mercado Pago" : !aprovado.confirmado_por || aprovado.confirmado_por === "admin" ? "confirmado manualmente" : `confirmado por ${aprovado.confirmado_por}`}</p>`}
         ${c.situacao === "cancelado" && html`<p class="texto-suave">Cadastro cancelado.</p>`}
         ${c.situacao === "interessada" && html`
@@ -226,8 +249,8 @@ export function abrirFicha(id, depois, eu) {
     return html`<section class="ficha__cartao" data-secao-loja>
       <h3>${icone("home", { tamanho: 17 })} Loja <span class="selo selo--sucesso">Pronta</span></h3>
       <div class="loja__links">
-        <a href="${c.loja_url}" target="_blank" rel="noopener" class="link">${icone("home", { tamanho: 15 })} ${String(c.loja_url).replace("https://", "")}</a>
-        <a href="${c.painel_url}" target="_blank" rel="noopener" class="link">${icone("grade", { tamanho: 15 })} ${String(c.painel_url).replace("https://", "")}</a>
+        ${c.loja_url && html`<a href="${c.loja_url}" target="_blank" rel="noopener" class="link">${icone("home", { tamanho: 15 })} ${String(c.loja_url).replace("https://", "")}</a>`}
+        ${c.painel_url && html`<a href="${c.painel_url}" target="_blank" rel="noopener" class="link">${icone("grade", { tamanho: 15 })} ${String(c.painel_url).replace("https://", "")}</a>`}
       </div>
       ${c.loja_codigo && html`<p class="texto-suave ficha__codigo">Código: <span class="codigo codigo--texto">${c.loja_codigo}</span></p>`}
       ${c.convite && html`
@@ -243,6 +266,14 @@ export function abrirFicha(id, depois, eu) {
         </div>`}
     </section>`;
   };
+
+  const secaoIndicacao = () => (d.cliente.situacao !== "pago" ? "" : html`
+    <section class="ficha__cartao" data-secao-indicacao>
+      <h3>${icone("usuarios", { tamanho: 17 })} Indicação ${d.cliente.credito_centavos > 0 && html`<span class="selo selo--sucesso">${reais(d.cliente.credito_centavos)} de crédito</span>`}</h3>
+      <p class="texto-suave">Quem ela indicar ganha desconto; quando a indicada paga, ela ganha crédito para abater nas mensalidades.</p>
+      <div class="ficha__acoes"><button type="button" class="btn btn--suave btn--pequeno" data-acao="indicacao">${icone("usuarios", { tamanho: 15 })} Ver o código dela</button></div>
+      <div data-indicacao></div>
+    </section>`);
 
   const secaoSuporte = () => html`
     <section class="ficha__cartao">
@@ -277,7 +308,7 @@ export function abrirFicha(id, depois, eu) {
         ${selo(c)}
       </div>
       <div class="ficha__grade">
-        <div>${secaoPagamento()}${secaoLoja()}</div>
+        <div>${secaoPagamento()}${secaoLoja()}${secaoIndicacao()}</div>
         <div>${secaoSuporte()}</div>
       </div>`);
   }
@@ -328,6 +359,23 @@ export function abrirFicha(id, depois, eu) {
       const ok = await confirmar({ titulo: "Cancelar cadastro?", mensagem: "A cobrança deixa de valer. Os dados continuam guardados para consulta.", rotulo: "Cancelar cadastro", perigo: true });
       if (ok) return agir(alvo, async () => { d = await api("POST", `clientes/${id}/cancelar`, {}); desenhar(); });
       return;
+    }
+    if (acao === "indicacao") {
+      return agir(alvo, async () => {
+        const r = await api("POST", `clientes/${id}/indicacao`, {});
+        montar(modal.el.querySelector("[data-indicacao]"), html`
+          <div class="bloco-link">
+            <p class="bloco-link__rotulo">Código de indicação ${!r.ativo && html`<small>· desligado nas regras de indicação</small>`}</p>
+            <p class="indicacao__codigo">${r.codigo}</p>
+            <p class="texto-suave">${r.desconto_pct}% de desconto para quem usar · ${reais(r.recompensa_centavos)} de crédito para ela a cada indicada que pagar</p>
+            <div class="convite-pronto__botoes">
+              <button type="button" class="btn btn--primario btn--pequeno" data-copiar="${r.codigo}">${icone("copiar", { tamanho: 15 })} Copiar código</button>
+              <a class="btn btn--whats btn--pequeno" href="${linkWhats(`Olá, ${d.cliente.nome.split(" ")[0]}! Indique a Forminha para outras docerias: com o seu código ${r.codigo}, quem você indicar ganha ${r.desconto_pct}% de desconto e você ganha ${reais(r.recompensa_centavos)} de crédito quando ela fechar.`, d.cliente.telefone)}" target="_blank" rel="noopener">${icone("mensagem", { tamanho: 15 })} Mandar para ela</a>
+            </div>
+            ${r.indicadas.length ? html`<ul class="indicacao__lista">${r.indicadas.map((i) => { const [t, tom] = situacaoDe(i); return html`<li><strong>${i.nome_loja}</strong> <span class="ponto ponto--${tom}">${t}</span></li>`; })}</ul>`
+            : html`<p class="texto-suave">Ninguém usou o código ainda.</p>`}
+          </div>`);
+      });
     }
     if (acao === "tentar") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/tentar-de-novo`, {}); desenhar(); acompanhar(); });
     if (acao === "convite") return agir(alvo, async () => { const r = await api("POST", `clientes/${id}/convite`, {}); d = r; desenhar(); toast(r.email_enviado ? "Link novo gerado e enviado por e-mail." : "Link novo gerado."); });

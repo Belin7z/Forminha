@@ -11,7 +11,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { toast } from "/src/scripts/base/ui.js";
 import { api, quandoCurto } from "./nucleo.js";
 
-const ICONES = { pagamento: "dinheiro", loja_pronta: "checkCirculo", parada: "alerta", cadastro: "usuario" };
+const ICONES = { pagamento: "dinheiro", loja_pronta: "checkCirculo", parada: "alerta", cadastro: "usuario", indicacao: "usuarios" };
 const estado = { avisos: [], naoVistos: 0, ultimo: 0, conhecido: null, relogio: null, conteiner: null, aberto: false, aoAbrirCliente: null };
 
 const podeNotificar = () => typeof Notification !== "undefined" && Notification.permission === "granted";

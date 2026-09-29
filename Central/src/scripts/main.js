@@ -20,6 +20,7 @@ import { telaClientes } from "./telas/clientes.js";
 import { telaPagamentos } from "./telas/pagamentos.js";
 import { telaVendas } from "./telas/vendas.js";
 import { telaFunil } from "./telas/funil.js";
+import { telaCupons } from "./telas/cupons.js";
 import { telaLojas } from "./telas/lojas.js";
 import { telaEquipe } from "./telas/equipe.js";
 import { telaAtividade } from "./telas/atividade.js";
@@ -37,7 +38,7 @@ const MENU = [
   { grupo: "Vendas", itens: [
     ["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["funil", "Funil", "funil", "clientes.ver", telaFunil],
     ["vendas", "Vendas", "grafico", "financeiro.ver", telaVendas],
-    ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos],
+    ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos], ["cupons", "Cupons", "percentual", "configuracoes", telaCupons],
   ] },
   { grupo: "Lojas", itens: [["lojas", "Lojas", "home", "lojas.ver", telaLojas]] },
   { grupo: "Administração", itens: [["equipe", "Equipe", "usuario", "equipe", telaEquipe], ["atividade", "Atividade", "relogio", "equipe", telaAtividade]] },

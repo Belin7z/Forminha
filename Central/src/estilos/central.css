@@ -591,3 +591,22 @@ kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--bord
   .tabela--funil .tabela__linha > :nth-child(n+4), .tabela--funil-valor .tabela__linha > :nth-child(n+4) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .funil__barra::before { transition: none; } }
+
+/* ---------- cupons e indicação ---------- */
+.cupom-conferido { grid-column: 1 / -1; display: flex; align-items: center; gap: .35rem; min-height: 1.2rem; margin: -.4rem 0 .4rem; font-size: .84rem; color: var(--sucesso); }
+.cupom-conferido:empty { display: none; }
+.cupons__explica { margin: 0 0 1rem; font-size: .88rem; }
+.cupons__grade { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+@media (max-width: 1100px) { .cupons__grade { grid-template-columns: minmax(0, 1fr); } }
+.tabela--cupons { --colunas: minmax(0, 1.3fr) 6rem minmax(0, 1fr) 6rem 6.5rem; }
+.ficha__cupom { display: flex; align-items: center; gap: .35rem; margin: -.2rem 0 .6rem; font-size: .84rem; color: var(--texto-suave); }
+[data-secao-indicacao] .texto-suave { margin: 0 0 .8rem; font-size: .86rem; }
+[data-secao-indicacao] .convite-pronto__botoes { margin-bottom: .6rem; }
+.indicacao__codigo { margin: .2rem 0 .3rem; font: 600 1.5rem/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .08em; color: var(--escura); }
+.indicacao__lista { list-style: none; margin: .8rem 0 0; padding: 0; display: grid; gap: .35rem; font-size: .88rem; }
+.indicacao__lista li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.pagar__desconto { margin: -.2rem 0 .6rem; font-size: .88rem; color: var(--sucesso); font-weight: 500; }
+@media (max-width: 720px) {
+  .tabela--cupons .tabela__linha { grid-template-columns: minmax(0, 1fr) 4.5rem 6.5rem; }
+  .tabela--cupons .tabela__linha > :is(:nth-child(3), :nth-child(4)) { display: none; }
+}
