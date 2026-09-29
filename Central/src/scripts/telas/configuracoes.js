@@ -6,6 +6,7 @@ import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/fo
 import { emReais, paraCentavos } from "/src/scripts/base/formatacao.js";
 import { api, aviso, quando } from "../nucleo.js";
 import { abrirSeguranca } from "./seguranca.js";
+import { cartaoDominioForminha } from "./dominio-forminha.js";
 
 /** Baixa um JSON como arquivo. */
 function baixarJson(nome, dados) {
@@ -81,6 +82,12 @@ export async function telaConfiguracoes(conteiner, eu) {
           <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>
         </form>`}
 
+      ${r.dominio && html`
+        <section class="cartao cartao--largo">
+          <div class="cartao__cab"><div><h2>Domínio da Forminha</h2><small class="texto-suave">A Central no seu domínio e um endereço para cada loja embaixo dele.</small></div></div>
+          <div data-dominio-forminha><div class="carregando-pagina"><div class="spinner"></div></div></div>
+        </section>`}
+
       <section class="cartao">
         <div class="cartao__cab"><h2>Conexões</h2></div>
         <ul class="conexoes">
@@ -139,6 +146,9 @@ export async function telaConfiguracoes(conteiner, eu) {
         </div>
       </section>`}
     </div>`);
+
+  const lugarDominio = conteiner.querySelector("[data-dominio-forminha]");
+  if (lugarDominio) cartaoDominioForminha(lugarDominio);
 
   const formEmpresa = conteiner.querySelector("#f-empresa");
   if (formEmpresa) {

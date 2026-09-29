@@ -27,6 +27,7 @@ import { criarAvisos } from "./avisos.js";
 import { criarCupons } from "./cupons.js";
 import { criarProtecao } from "./protecao.js";
 import { criarDuasEtapas } from "./duasetapas.js";
+import { criarDominioCentral } from "./dominio-central.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export { ErroHttp };
@@ -39,14 +40,11 @@ const TABELAS_DA_CENTRAL = ["clientes", "pagamentos", "historico", "configuracoe
 export function criarCentral(env = process.env, opcoes = {}) {
   const org = String(env.FORMINHA_ORG ?? "").trim();
   const fetchFn = opcoes.fetchFn ?? fetch;
-  const urlBase = String(env.URL_CENTRAL || (env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://forminha.vercel.app")).replace(/\/+$/, "");
+  const urlInicial = String(env.URL_CENTRAL || (env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : "https://forminha.vercel.app")).replace(/\/+$/, "");
+  // o endereço dos links (pagamento, e-mails): passa a ser o domínio da Forminha quando ele funcionar (sem URL_CENTRAL fixa)
+  let urlBase = urlInicial;
   const sb = opcoes.supabase ?? (env.SUPABASE_ACCESS_TOKEN ? criarSupabase({ token: env.SUPABASE_ACCESS_TOKEN, fetchFn }) : null);
   const vc = opcoes.vercel ?? (env.VERCEL_TOKEN ? criarVercel({ token: env.VERCEL_TOKEN, time: env.VERCEL_TIME, fetchFn }) : null);
-  const lojas = sb && vc && org ? criarLojas({
-    sb, vc, org, fetchFn,
-    repoLoja: env.REPO_LOJA || "Belin7z/Forminha", repoPainel: env.REPO_PAINEL || "Belin7z/Forminha",
-    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard", urlCentral: urlBase,
-  }) : null;
 
   // banco e cofre da Central (clientes e equipe): sem eles, as lojas continuam funcionando
   const urlBanco = env.DATABASE_URL || env.POSTGRES_URL;
@@ -54,6 +52,27 @@ export function criarCentral(env = process.env, opcoes = {}) {
   let cofre = null, erroCofre = null;
   try { cofre = env.CHAVE_CRIPTOGRAFIA ? criarCofre(env.CHAVE_CRIPTOGRAFIA) : null; } catch (e) { erroCofre = e.message; }
   const garantirEsquema = banco ? preparadorDeEsquema(banco) : null;
+
+  // domínio da Forminha (ex.: forminha.com.br): a Central na raiz e as lojas embaixo dele
+  const dominioCentral = banco && vc ? criarDominioCentral({
+    banco, preparar: garantirEsquema, vc, projeto: env.VERCEL_PROJECT_ID || env.PROJETO_VERCEL || "forminha", fetchFn,
+  }) : null;
+  let dominioLidoEm = 0;
+  async function atualizarEndereco() {
+    if (!dominioCentral || env.URL_CENTRAL || Date.now() - dominioLidoEm < 60_000) return;
+    dominioLidoEm = Date.now();
+    const cfg = await dominioCentral.ler().catch(() => undefined);
+    if (cfg !== undefined) urlBase = cfg?.ativo_em ? `https://${cfg.raiz}` : urlInicial;
+  }
+  const lojas = sb && vc && org ? criarLojas({
+    sb, vc, org, fetchFn,
+    repoLoja: env.REPO_LOJA || "Belin7z/Forminha", repoPainel: env.REPO_PAINEL || "Belin7z/Forminha",
+    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard", urlCentral: () => urlBase,
+    baseDasLojas: dominioCentral ? async () => {
+      const cfg = await dominioCentral.ler();
+      return cfg ? { raiz: cfg.raiz, pronta: Boolean(cfg.coringa_em) } : null;
+    } : null,
+  }) : null;
   // e-mail profissional (Resend, do seu domínio) e/ou Gmail; as respostas das clientes vão para EMAIL_RESPONDER (ou o Gmail)
   const email = opcoes.email !== undefined ? opcoes.email : criarEmail({
     usuario: env.SMTP_USUARIO, senha: env.SMTP_SENHA, nome: env.EMAIL_NOME || "Forminha",
@@ -63,7 +82,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const avisos = banco ? criarAvisos({ banco, preparar: garantirEsquema }) : null; // o sino da Central
   const cupons = banco ? criarCupons({ banco, preparar: garantirEsquema }) : null; // cupons de desconto e indicação
   const clientes = banco && cofre && lojas ? criarClientes({
-    banco, cofre, lojas, email, mp, urlBase, segredoInterno: env.CRON_SECRET, fetchFn,
+    banco, cofre, lojas, email, mp, urlBase: () => urlBase, segredoInterno: env.CRON_SECRET, fetchFn,
     agendar: opcoes.agendar ?? null, orcamentoMs: opcoes.orcamentoMs ?? 40_000, esperaBancoMs: opcoes.esperaBancoMs ?? 4000,
     avisar: avisos ? (dados) => avisos.registrar(dados) : undefined, cupons,
   }) : null;
@@ -209,6 +228,19 @@ export function criarCentral(env = process.env, opcoes = {}) {
     conferir: async (loja) => { const r = await lojas.conferirDominio(loja); await acompanharEnderecos(loja, r); return r; },
     tirar: async (loja) => { const r = await lojas.removerDominio(loja); await acompanharEnderecos(loja, r); return r; },
   };
+  /** Endereço na Forminha (anadoces.forminha.com.br): mesmo jeito, só pela Central. */
+  const acoesDeSub = {
+    ver: async (loja) => { const r = await lojas.subdominio(loja); await acompanharEnderecos(loja, r); return r; },
+    ligar: async (loja, corpo) => { const r = await lojas.definirSubdominio(loja, corpo); await acompanharEnderecos(loja, r); return r; },
+    conferir: async (loja) => { const r = await lojas.conferirSubdominio(loja); await acompanharEnderecos(loja, r); return r; },
+    tirar: async (loja) => { const r = await lojas.removerSubdominio(loja); await acompanharEnderecos(loja, r); return r; },
+  };
+  const exigirDominioCentral = () => {
+    if (!dominioCentral) throw new ErroHttp(503, "Para ter domínio próprio, ligue o banco da Central e a chave da Vercel (veja Configurações).");
+    return dominioCentral;
+  };
+  /** Mexeu no domínio da Forminha: os links passam a usar o endereço certo já na próxima requisição. */
+  const reler = (r) => { if (r.mudou) dominioLidoEm = 0; return r; };
 
   /* ----------------------------------------------------------
      rotas: [método, caminho, quem pode, função, atividade]
@@ -310,7 +342,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
           recursos: quem ? {
             clientes: Boolean(clientes), email: Boolean(email), email_provedor: email?.provedor ?? null, email_reserva: email?.reserva ?? null,
             mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET),
-            trocar_senha: Boolean(banco), equipe: Boolean(equipe),
+            trocar_senha: Boolean(banco), equipe: Boolean(equipe), dominio: Boolean(dominioCentral),
           } : null,
         },
       };
@@ -533,6 +565,29 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const loja = await lojas.porRef(m[1]);
       return { corpo: await acoesDeDominio.tirar(loja), alvo: loja.nome };
     }, "Tirou o domínio próprio"],
+    // endereço na Forminha (anadoces.forminha.com.br)
+    ["GET", /^lojas\/([a-z]+)\/subdominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.ver(await lojas.porRef(m[1])) }; }],
+    ["POST", /^lojas\/([a-z]+)\/subdominio$/, "lojas.suporte", async ({ m, corpo }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      const r = await acoesDeSub.ligar(loja, corpo);
+      return { corpo: r, alvo: `${loja.nome} (${r.host})` };
+    }, "Ligou o endereço na Forminha"],
+    ["POST", /^lojas\/([a-z]+)\/subdominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.conferir(await lojas.porRef(m[1])) }; }],
+    ["DELETE", /^lojas\/([a-z]+)\/subdominio$/, "lojas.suporte", async ({ m }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await acoesDeSub.tirar(loja), alvo: loja.nome };
+    }, "Tirou o endereço na Forminha"],
+
+    /* ---------- domínio da Forminha (a Central e a base das lojas) ---------- */
+    ["GET", /^dominio$/, "dono", async () => ({ corpo: reler(await exigirDominioCentral().situacao()) })],
+    ["POST", /^dominio$/, "dono", async ({ corpo }) => {
+      const r = reler(await exigirDominioCentral().definir(corpo));
+      return { corpo: r, alvo: r.dominio };
+    }, "Ligou o domínio da Forminha"],
+    ["POST", /^dominio\/conferir$/, "dono", async () => ({ corpo: reler(await exigirDominioCentral().situacao({ conferir: true })) })],
+    ["DELETE", /^dominio$/, "dono", async () => ({ corpo: reler(await exigirDominioCentral().remover()) }), "Tirou o domínio da Forminha"],
 
     /* ---------- chamadas do painel da loja (a dona, com o login dela; sem cookie da Central) ---------- */
     ["POST", /^loja\/pagamento$/, false, async ({ cabecalhos, corpo }) => {
@@ -641,6 +696,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const daLoja = rota.startsWith("loja/");
       if (daLoja) extras = CORS_DAS_LOJAS;
       if (daLoja && metodo === "OPTIONS") return responder(res, 204, null, null, extras);
+      await atualizarEndereco(); // no máximo uma leitura por minuto
       quem = await identificar(lerSessao(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO));
 
       const achada = rotas.map(([met, re, pode, fn, atividade]) => met === metodo && re.exec(rota) && { m: re.exec(rota), pode, fn, atividade }).find(Boolean);

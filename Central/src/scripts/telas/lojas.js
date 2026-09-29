@@ -4,6 +4,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { montarDominio } from "/src/scripts/base/dns.js";
+import { montarEnderecoNaForminha } from "./dominio-forminha.js";
 import { baixarJson } from "./configuracoes.js";
 import { api, aviso, dorme, pode } from "../nucleo.js";
 
@@ -269,16 +270,34 @@ function pagamentoOnline(loja) {
   });
 }
 
-/** Domínio próprio da loja (ex.: suadoceria.com.br): a mesma tela que a dona vê no painel dela. */
+/**
+ * Endereços da loja: o da Forminha (anadoces.forminha.com.br, se o domínio da Forminha estiver ligado) e o
+ * domínio próprio (ex.: suadoceria.com.br) — este com a mesma tela que a dona vê no painel dela.
+ */
 async function dominioDaLoja(loja, depois) {
   let mudou = false;
+  const aoMudar = () => { mudou = true; };
   const modal = abrirModal({
     titulo: `Domínio — ${loja.nome}`, largura: 640, corpo: html`<div class="carregando-pagina"><div class="spinner"></div></div>`,
     aoFechar: () => { if (mudou) depois(); },
   });
-  const chamar = (metodo, acao, corpo) => api(metodo, `lojas/${loja.ref}/dominio${acao ? `/${acao}` : ""}`, corpo);
-  try { montarDominio(modal.corpo, await chamar("GET"), { chamar, aoMudar: () => { mudou = true; } }); }
-  catch (erro) { montar(modal.corpo, aviso("perigo", erro.message)); }
+  const rota = (base) => (metodo, acao, corpo) => api(metodo, `lojas/${loja.ref}/${base}${acao ? `/${acao}` : ""}`, corpo);
+  try {
+    const [sub, proprio] = await Promise.all([rota("subdominio")("GET").catch(() => ({ raiz: null })), rota("dominio")("GET")]);
+    montar(modal.corpo, html`
+      <section class="dominio-secao" data-sub hidden></section>
+      <section class="dominio-secao">${sub.raiz && html`<h3 class="dominio-secao__titulo">Domínio próprio</h3>`}<div data-proprio></div></section>`);
+    // o endereço na Forminha mudou: a parte do domínio próprio é desenhada de novo (ela diz onde a loja abre hoje)
+    const redesenharProprio = async () => {
+      const lugar = modal.corpo.querySelector("[data-proprio]");
+      const novo = document.createElement("div");
+      novo.setAttribute("data-proprio", "");
+      try { const info = await rota("dominio")("GET"); lugar.replaceWith(novo); montarDominio(novo, info, { chamar: rota("dominio"), aoMudar }); }
+      catch { /* fica como estava */ }
+    };
+    montarEnderecoNaForminha(modal.corpo.querySelector("[data-sub]"), sub, { chamar: rota("subdominio"), aoMudar: () => { aoMudar(); redesenharProprio(); } });
+    montarDominio(modal.corpo.querySelector("[data-proprio]"), proprio, { chamar: rota("dominio"), aoMudar });
+  } catch (erro) { montar(modal.corpo, aviso("perigo", erro.message)); }
 }
 
 async function atualizarBanco(loja, depois) {

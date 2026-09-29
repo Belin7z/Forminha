@@ -41,7 +41,19 @@ const json = (status, corpo) => new Response(corpo === undefined ? null : JSON.s
 export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = null } = {}) {
   // dns: endereços cujo DNS já aponta para a Vercel · dominiosDeOutraConta: raízes que a Vercel pede para provar (TXT)
   const estado = { projetos: new Map(), sites: new Map(), publicacoes: [], cutucadas: [], chamadas: [], mp: new Map(), segredosLidos: [],
-    dns: new Set(), dominiosDeOutraConta: new Set() };
+    dns: new Set(), dominiosDeOutraConta: new Set(),
+    // o projeto da própria Central na Vercel ("forminha"), que recebe o domínio da Forminha
+    central: { id: "prj_central", nome: "forminha", variaveis: {}, dominios: new Map() } };
+  /** Um site da Vercel pelo id ou pelo nome (como a API aceita); a Central também conta. */
+  const siteDe = (x) => estado.sites.get(x) ?? [...estado.sites.values(), estado.central].find((s) => s.id === x || s.nome === x) ?? null;
+  const todosOsSites = () => [...estado.sites.values(), estado.central];
+  /** O DNS aponta para a Vercel: o próprio endereço, ou o coringa "*.<pai>" criado pela dona. */
+  const apontado = (host) => estado.dns.has(host) || estado.dns.has(`*.${String(host).split(".").slice(1).join(".")}`) || coringaSozinho(host);
+  /** No modo de teste (dnsEmMs), o coringa do domínio da Central "fica pronto" sozinho depois do tempo. */
+  function coringaSozinho(host) {
+    const raiz = [...estado.central.dominios.values()].find((d) => d.name === d.apexName);
+    return dnsEmMs !== null && Boolean(raiz) && String(host).endsWith(`.${raiz.name}`) && Date.now() - raiz.criado >= dnsEmMs;
+  }
   const fila = new WeakMap(); // PGlite tem uma conexão só: uma consulta por vez
   const naFila = (db, tarefa) => { const p = (fila.get(db) ?? Promise.resolve()).then(tarefa, tarefa); fila.set(db, p.catch(() => {})); return p; };
 
@@ -117,10 +129,10 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     let m;
     /* domínios próprios: cada site guarda os seus endereços */
     if (metodo === "POST" && (m = /^\/v10\/projects\/([^/]+)\/domains$/.exec(caminho))) {
-      const s = estado.sites.get(m[1]);
+      const s = siteDe(decodeURIComponent(m[1]));
       if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
       if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(String(corpo?.name ?? ""))) return json(400, { error: { code: "invalid_domain", message: "Invalid domain name" } });
-      for (const outro of estado.sites.values()) {
+      for (const outro of todosOsSites()) {
         if (outro !== s && outro.dominios?.has(corpo.name)) return json(409, { error: { code: "domain_already_in_use", message: `Cannot add ${corpo.name} since it's already in use by another project.` } });
       }
       s.dominios ??= new Map();
@@ -134,7 +146,7 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       return json(200, d);
     }
     if ((m = /^\/v9\/projects\/([^/]+)\/domains\/([^/]+?)(\/verify)?$/.exec(caminho))) {
-      const s = estado.sites.get(m[1]);
+      const s = siteDe(decodeURIComponent(m[1]));
       if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
       const d = s.dominios?.get(decodeURIComponent(m[2]));
       if (!d) return json(404, { error: { code: "not_found", message: "The project domain was not found" } });
@@ -152,8 +164,8 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     }
     if (metodo === "GET" && (m = /^\/v6\/domains\/([^/]+)\/config$/.exec(caminho))) {
       const host = decodeURIComponent(m[1]);
-      const ligado = [...estado.sites.values()].map((x) => x.dominios?.get(host)).find(Boolean);
-      const ok = estado.dns.has(host) || (dnsEmMs !== null && Boolean(ligado) && Date.now() - ligado.criado >= dnsEmMs);
+      const ligado = todosOsSites().map((x) => x.dominios?.get(host)).find(Boolean);
+      const ok = apontado(host) || (dnsEmMs !== null && Boolean(ligado) && Date.now() - ligado.criado >= dnsEmMs);
       return json(200, {
         configuredBy: ok ? (raizDoDominio(host) === host ? "A" : "CNAME") : null, acceptedChallenges: ["http-01"], misconfigured: !ok,
         recommendedIPv4: [{ rank: 1, value: ["216.198.79.1"] }, { rank: 2, value: ["76.76.21.21"] }],
@@ -237,10 +249,16 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       if (!existe) return json(404, { code: 404, msg: "User not found" });
       return json(200, { action_link: `https://${p.ref}.supabase.co/auth/v1/verify?token=simulado&type=${corpo.type}&redirect_to=${encodeURIComponent(corpo.redirect_to)}` });
     }
+    // DNS público (DNS sobre HTTPS, formato JSON): responde o que a dona "criou" com configurarDns
+    if (u.host === "cloudflare-dns.com" && u.pathname === "/dns-query") {
+      const nome = u.searchParams.get("name");
+      if (!apontado(nome)) return json(200, { Status: 3, Answer: [] });
+      return json(200, { Status: 0, Answer: [{ name: `${nome}.`, type: 5, TTL: 300, data: "cname.vercel-dns.com." }, { name: "cname.vercel-dns.com.", type: 1, TTL: 60, data: "76.76.21.21" }] });
+    }
     throw new Error(`o simulado não conhece ${u.href}`);
   }
 
-  /** A dona criou o registro no site onde comprou o domínio (ex.: "doce.com.br", "www.doce.com.br", "_vercel.doce.com.br"). */
+  /** A dona criou o registro no site onde comprou o domínio (ex.: "doce.com.br", "www.doce.com.br", "_vercel.doce.com.br", "*.forminha.com.br"). */
   const configurarDns = (...hosts) => { for (const h of hosts) estado.dns.add(h); };
 
   /** Pausa um projeto (como o Supabase grátis faz depois de dias sem uso). */

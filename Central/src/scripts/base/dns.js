@@ -34,7 +34,7 @@ const formDominio = (info) => html`
     <div><button type="submit" class="btn btn--primario">${info.dominio ? "Salvar" : "Ligar domínio"}</button></div>
   </form>`;
 
-const tabelaDns = (registros) => html`
+export const tabelaDns = (registros) => html`
   <div class="dns__registros" role="table" aria-label="Registros de DNS">
     <div class="dns__linha dns__linha--cab" role="row"><span role="columnheader">Tipo</span><span role="columnheader">Nome</span><span role="columnheader">Valor</span><span role="columnheader">Situação</span></div>
     ${registros.map((r) => html`

@@ -49,6 +49,24 @@ cortesia), atualizar o banco, reativar e excluir. Em cada loja pronta:
   não fica pronto, a loja continua no endereço da Vercel; quando fica, tudo passa a usar o domínio
   sozinho (links de login e do WhatsApp, o painel e a ficha da cliente). A dona também pode ligar pelo
   painel dela, em **Configurações → Domínio**. O domínio é comprado e pago pela doceria.
+  Com o domínio da Forminha ligado (abaixo), a mesma janela mostra também o **endereço na Forminha**
+  da loja (trocar o nome ou tirar).
+
+## Domínio da Forminha (Configurações — só o dono)
+
+Com um domínio seu (ex.: `forminha.com.br`, comprado no Registro.br):
+
+1. Em **Configurações → Domínio da Forminha**, digite o domínio e clique em **Ligar domínio**.
+2. Onde o domínio foi comprado, crie os 3 registros que a Central mostra: `A @` (a Central),
+   `CNAME www` (atalho) e `CNAME *` (o coringa, que manda qualquer `nome.forminha.com.br` para a Vercel).
+3. Clique em **Conferir agora** (o DNS pode levar algumas horas).
+
+Quando a raiz funciona, a Central abre em `forminha.com.br` e os links novos (pagamento, e-mails)
+passam a usar esse endereço — os antigos, em `forminha.vercel.app`, continuam valendo. Quando o coringa
+fica pronto, cada loja nova já nasce com `nomedaloja.forminha.com.br` (e o painel em
+`nomedaloja-painel.forminha.com.br`); para as lojas que já existiam, use **Dar endereço às lojas antigas**.
+O domínio próprio da doceria, quando ligado, vale mais que o endereço na Forminha. Com `URL_CENTRAL`
+definida na Vercel, a Central continua usando ela nos links.
 
 ## Mensalidade (assinatura)
 

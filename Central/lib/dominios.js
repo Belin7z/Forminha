@@ -67,6 +67,29 @@ export const nomeNoDns = (host, raiz) => (host === raiz ? "@" : String(host).sli
 
 const primeiro = (lista) => [...(Array.isArray(lista) ? lista : [])].sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99))[0]?.value;
 
+/* ---------- endereços das lojas embaixo do domínio da Forminha (anadoces.forminha.com.br) ---------- */
+// nomes que ficam para a própria Forminha (e os que confundem as clientes)
+const ROTULOS_RESERVADOS = new Set(["www", "api", "app", "central", "painel", "admin", "adm", "mail", "email", "smtp", "imap", "pop", "ftp", "webmail",
+  "suporte", "ajuda", "status", "blog", "loja", "lojas", "forminha", "pagar", "pagamento", "pagamentos", "conta", "login", "entrar", "cdn", "static", "teste"]);
+
+/** Confere o nome escolhido para a loja (o "anadoces" de anadoces.forminha.com.br). */
+export function normalizarSubdominio(texto) {
+  const erro = (msg) => new ErroHttp(422, msg, { subdominio: msg });
+  // espaço, símbolo e traços repetidos viram um traço só; acento sai
+  const t = String(texto ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!t) throw erro("Digite o nome do endereço. Exemplo: anadoces");
+  if (t.length > 50) throw erro("Use até 50 letras e números. Exemplo: anadoces");
+  if (ROTULOS_RESERVADOS.has(t) || t.endsWith("-painel")) throw erro("Esse nome é reservado. Escolha outro.");
+  return t;
+}
+
+/** Os dois endereços de uma loja embaixo do domínio da Forminha: a loja e o painel. */
+export const enderecosNaForminha = (rotulo, raiz) => [
+  { host: `${rotulo}.${raiz}`, site: "loja" },
+  { host: `${rotulo}-painel.${raiz}`, site: "painel" },
+];
+
 /** O registro que aponta o endereço para a Vercel: "A" na raiz, "CNAME" nos demais (com o valor que a Vercel recomenda). */
 export function registroDoEndereco(host, raiz, config) {
   if (host === raiz) {

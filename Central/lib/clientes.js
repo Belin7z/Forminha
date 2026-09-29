@@ -74,6 +74,8 @@ export function validarCliente(corpo, { parcial = false } = {}) {
 /* ---------- módulo ---------- */
 export function criarClientes({ banco, cofre, lojas, email = null, mp = null, urlBase, segredoInterno = "", fetchFn = fetch, orcamentoMs = 40_000, agendar = null, esperaBancoMs = 4000,
   avisar = async () => {}, cupons = null }) {
+  // o endereço da Central pode mudar (domínio próprio): `urlBase` é texto ou função
+  const central = typeof urlBase === "function" ? urlBase : () => urlBase;
   const sql = (t, p) => banco.consultar(t, p);
   const ctx = (id) => `cliente:${id}`;
   const brl = (centavos) => (Number(centavos) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -156,13 +158,13 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and situacao = 'pendente' and tipo = $2", [c.id, tipo]);
     const id = randomUUID();
     const token = randomBytes(24).toString("base64url");
-    const link = `${urlBase}/#/pagar/${token}`;
+    const link = `${central()}/#/pagar/${token}`;
     const pix = gerarPix({ ...cfg.pix, valor, identificador: `FM${id.replace(/-/g, "").slice(0, 20)}` });
     let automatico = null;
     if (mp) {
       try {
         const descricao = tipo === "mensalidade" ? `Mensalidade ${c.nome_loja} - Forminha` : `Loja ${c.nome_loja} - Forminha`;
-        automatico = await mp.criarCobranca({ valorCentavos: valor, descricao, email: pessoa.email, referencia: id, notificacao: `${urlBase}/api/webhook/mercadopago`, chaveUnica: id });
+        automatico = await mp.criarCobranca({ valorCentavos: valor, descricao, email: pessoa.email, referencia: id, notificacao: `${central()}/api/webhook/mercadopago`, chaveUnica: id });
       } catch (e) { await anotarHistorico(c.id, "pagamento", `Mercado Pago indisponível; ficou só o PIX com a sua chave (${e.message}).`); }
     }
     await sql(`insert into pagamentos (id, cliente_id, token_hash, link, valor_centavos, pix_copia_cola, mp_id, mp_copia_cola, mp_qr_base64, tipo, vencimento, credito_usado_centavos)
@@ -347,8 +349,8 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   /** Pede para outra execução continuar a criação (a função da Vercel tem tempo limitado). */
   function continuar(id) {
     if (agendar) return agendar(id);
-    if (!segredoInterno || !urlBase) return;
-    fetchFn(`${urlBase}/api/interno/avancar`, {
+    if (!segredoInterno || !central()) return;
+    fetchFn(`${central()}/api/interno/avancar`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${segredoInterno}` }, body: JSON.stringify({ id }),
       signal: AbortSignal.timeout(2500),
     }).catch(() => {}); // quem chama não espera: a outra execução segue sozinha

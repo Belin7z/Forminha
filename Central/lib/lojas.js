@@ -12,7 +12,7 @@
 import { randomBytes } from "node:crypto";
 import { ErroProvedor } from "./provedores.js";
 import { FUNCOES, montarFuncao, versaoDasFuncoes } from "./funcoes.js";
-import { enderecosDoDominio, nomeNoDns, normalizarDominio, raizDoDominio, registroDoEndereco } from "./dominios.js";
+import { enderecosDoDominio, enderecosNaForminha, nomeNoDns, normalizarDominio, normalizarSubdominio, raizDoDominio, registroDoEndereco } from "./dominios.js";
 import { gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleatoria, slug } from "./codigo.js";
 import { aplicarProxima, gerarConvite, gravarFicha, semear, situacao } from "./banco.js";
 import { EMAIL, ErroHttp } from "./erros.js";
@@ -36,30 +36,54 @@ function resumoDoBanco(s) {
     etapa, feitas: s.feitas, total: s.total, atualizar: s.semeada && s.pendentes.length > 0,
     email: s.ficha?.email ?? null, loja: enderecoLoja(s.ficha), painel: enderecoPainel(s.ficha),
     dominio: s.ficha?.dominio?.nome ?? null, dominio_ativo: Boolean(s.ficha?.dominio?.ativo_em),
+    subdominio: s.ficha?.sub ? `${s.ficha.sub.rotulo}.${s.ficha.sub.raiz}` : null,
     suspensa: Boolean(s.ficha?.assinatura?.suspensa),
   };
 }
 
-/** Endereço da loja para as clientes: o domínio próprio quando já funciona; antes disso, o da Vercel. */
-export const enderecoLoja = (ficha) => (ficha?.dominio?.ativo_em ? `https://${ficha.dominio.nome}` : ficha?.loja?.url ?? null);
-/** Endereço do painel: "painel.<domínio>" quando a dona escolheu e já funciona. */
-export const enderecoPainel = (ficha) => (ficha?.dominio?.painel && ficha.dominio.painel_ativo_em ? `https://painel.${ficha.dominio.nome}` : ficha?.painel?.url ?? null);
+// ficha.sub = o endereço embaixo do domínio da Forminha: { rotulo, raiz, adicionado_em, ativo_em, painel_ativo_em }
+const hostDoSub = (sub, site) => enderecosNaForminha(sub.rotulo, sub.raiz).find((e) => e.site === site).host;
 
-/** Os endereços de uma loja (sites e domínio próprio): só eles podem chamar as funções dela pelo navegador. */
+/** Endereço da loja para as clientes: o domínio próprio quando já funciona; depois, o da Forminha; senão, o da Vercel. */
+export function enderecoLoja(ficha) {
+  if (ficha?.dominio?.ativo_em) return `https://${ficha.dominio.nome}`;
+  if (ficha?.sub?.ativo_em) return `https://${hostDoSub(ficha.sub, "loja")}`;
+  return ficha?.loja?.url ?? null;
+}
+/** Endereço do painel: "painel.<domínio>" quando a dona escolheu e já funciona; depois, o da Forminha. */
+export function enderecoPainel(ficha) {
+  if (ficha?.dominio?.painel && ficha.dominio.painel_ativo_em) return `https://painel.${ficha.dominio.nome}`;
+  if (ficha?.sub?.painel_ativo_em) return `https://${hostDoSub(ficha.sub, "painel")}`;
+  return ficha?.painel?.url ?? null;
+}
+
+/** Os endereços de uma loja (sites, domínio próprio e o da Forminha): só eles podem chamar as funções dela pelo navegador. */
 export function origensDaLoja(ficha) {
   const doDominio = ficha?.dominio?.nome ? enderecosDoDominio(ficha.dominio.nome, ficha.dominio).map((e) => `https://${e.host}`) : [];
-  const lista = [ficha?.loja?.url, ficha?.painel?.url, ...doDominio];
+  const daForminha = ficha?.sub ? enderecosNaForminha(ficha.sub.rotulo, ficha.sub.raiz).map((e) => `https://${e.host}`) : [];
+  const lista = [ficha?.loja?.url, ficha?.painel?.url, ...doDominio, ...daForminha];
   return [...new Set(lista.filter(Boolean).map((u) => String(u).replace(/\/+$/, "")))];
 }
 
 /** Para onde os links dos e-mails de login podem voltar. */
 const listaDeRetorno = (ficha) => origensDaLoja(ficha).map((o) => `${o}/**`).join(",");
 
-export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", fetchFn = fetch }) {
+/**
+ * `urlCentral`: o endereço da Central (texto ou função, porque muda quando ela ganha domínio próprio).
+ * `baseDasLojas`: função que devolve o domínio da Forminha ({ raiz, pronta }) ou null — com ele pronto, cada loja
+ * ganha anadoces.<raiz> e anadoces-painel.<raiz>.
+ */
+export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, fetchFn = fetch }) {
+  const centralAgora = typeof urlCentral === "function" ? urlCentral : () => urlCentral;
+  const base = async () => (baseDasLojas ? baseDasLojas().catch(() => null) : null);
   // o domínio da própria Central (e o que vier embaixo dele) não pode virar domínio de loja
-  let hostCentral = "";
-  try { hostCentral = urlCentral ? new URL(urlCentral).hostname : ""; } catch { /* sem Central configurada */ }
-  const reservados = hostCentral && !/^(localhost|127\.0\.0\.1)$/.test(hostCentral) ? [raizDoDominio(hostCentral)] : [];
+  async function reservados() {
+    let host = "";
+    try { host = centralAgora() ? new URL(centralAgora()).hostname : ""; } catch { /* sem Central configurada */ }
+    const lista = host && !/^(localhost|127\.0\.0\.1)$/.test(host) ? [raizDoDominio(host)] : [];
+    const b = await base();
+    return b?.raiz ? [...lista, b.raiz] : lista;
+  }
 
   /** Busca o projeto e confere que é MESMO uma loja da Forminha. */
   async function porRef(ref) {
@@ -147,7 +171,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     }
     if (!ficha.painel?.id) {
       const site = await criarSite({ nomeBase: `${nomeBase}-painel`, alternativo: `${nomeBase}-${sufixo}-painel`, repo: repoPainel, pasta: pastaPainel,
-        variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave, URL_LOJA: ficha.loja.url, ...(urlCentral && { URL_CENTRAL: urlCentral }) } });
+        variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave, URL_LOJA: ficha.loja.url, ...(centralAgora() && { URL_CENTRAL: centralAgora() }) } });
       await vc.publicar({ projetoId: site.id, nome: site.nome, repo: repoPainel });
       ficha.painel = { ...site, url: await enderecoDoSite(site) };
       await gravarFicha(sb, loja.ref, { painel: ficha.painel });
@@ -157,7 +181,14 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       site_url: enderecoLoja(ficha), uri_allow_list: listaDeRetorno(ficha),
       external_email_enabled: true, mailer_autoconfirm: true, password_min_length: 8, password_required_characters: SENHA_LETRAS_E_NUMEROS,
     });
-    return { etapa: "pronta", loja: ficha.loja.url, painel: ficha.painel.url };
+    // com o domínio da Forminha pronto, a loja já ganha anadoces.<domínio> (se der errado, fica no da Vercel e dá para ligar depois)
+    let final = ficha;
+    const b = await base();
+    if (b?.pronta && !ficha.sub) {
+      try { final = (await ligarSub(loja, ficha, { raiz: b.raiz, rotulo: rotuloSugerido(ficha) })).ficha; }
+      catch (e) { console.error("[endereço na Forminha]", e.message); }
+    }
+    return { etapa: "pronta", loja: enderecoLoja(final), painel: enderecoPainel(final) };
   }
 
   async function convite(loja, emailDona) {
@@ -397,7 +428,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
    * de DNS que faltam criar. O endereço da loja só muda quando o DNS estiver certo (em conferirDominio).
    */
   async function definirDominio(loja, dados) {
-    const nome = normalizarDominio(dados?.dominio, { reservados });
+    const nome = normalizarDominio(dados?.dominio, { reservados: await reservados() });
     const usarPainel = dados?.painel !== false;
     let ficha = await fichaPublicada(loja);
     const antigo = ficha.dominio?.nome ? ficha.dominio : null;
@@ -448,6 +479,133 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return { ...resumoDoDominio(ficha), mudou: true };
   }
 
+  /* ---------- endereço na Forminha (anadoces.forminha.com.br) ---------- */
+
+  /** O nome sugerido: o do site da loja na Vercel (já é único); se não servir, nome + código. */
+  function rotuloSugerido(ficha) {
+    for (const t of [ficha.loja?.nome, `${slug(ficha.nome ?? "loja")}-${String(ficha.codigo ?? "").toLowerCase()}`]) {
+      try { return normalizarSubdominio(t); } catch { /* tenta o próximo */ }
+    }
+    return `loja-${randomBytes(3).toString("hex")}`;
+  }
+
+  async function lerEnderecosSub(ficha) {
+    const { rotulo, raiz } = ficha.sub;
+    return Promise.all(enderecosNaForminha(rotulo, raiz).map(async (e) => {
+      const site = siteDoEndereco(ficha, e);
+      const [pd, cfg] = await Promise.all([
+        vc.dominioDoProjeto(site.id, e.host).catch(semDominioNoSite),
+        vc.configDoDominio(e.host, site.id).catch(() => null),
+      ]);
+      const verificado = Boolean(pd?.verified);
+      const dnsOk = cfg?.misconfigured === false;
+      // o DNS das lojas é o coringa "*" do domínio da Forminha (criado uma vez, em Configurações)
+      const registros = dnsOk ? [] : [{ tipo: "CNAME", nome: "*", valor: registroDoEndereco(e.host, raiz, null).valor, ok: false }];
+      if (pd && !verificado) {
+        for (const v of pd.verification ?? []) registros.push({ tipo: String(v.type ?? "TXT").toUpperCase(), nome: nomeNoDns(v.domain, raiz), valor: v.value, ok: false });
+      }
+      return { host: e.host, site: e.site, atalho: false, ligado: Boolean(pd), ok: Boolean(pd) && verificado && dnsOk, registros };
+    }));
+  }
+
+  function resumoDoSub(ficha, b, enderecos = null) {
+    const s = ficha.sub;
+    const base = { raiz: b?.raiz ?? s?.raiz ?? null, pronta: Boolean(b?.pronta), endereco_loja: enderecoLoja(ficha), endereco_painel: enderecoPainel(ficha) };
+    if (!s) return { ...base, subdominio: null, sugestao: rotuloSugerido(ficha), enderecos: [] };
+    const todos = enderecos ? enderecos.every((e) => e.ok) : Boolean(s.ativo_em && s.painel_ativo_em);
+    const principal = enderecos?.[0]?.ok ?? Boolean(s.ativo_em);
+    return { ...base, raiz: s.raiz, subdominio: s.rotulo, host: hostDoSub(s, "loja"), ativo: Boolean(s.ativo_em),
+      situacao: todos ? "ok" : principal ? "parcial" : "aguardando", enderecos: enderecos ?? [] };
+  }
+
+  /** Endereço pronto e ainda sem uso? Passa a usar (login, funções e painel), como no domínio próprio. */
+  async function ativarSubSePronto(loja, ficha, enderecos) {
+    const s = ficha.sub;
+    const agora = new Date().toISOString();
+    const novo = { ...s };
+    if (enderecos.find((e) => e.site === "loja")?.ok && !s.ativo_em) novo.ativo_em = agora;
+    if (enderecos.find((e) => e.site === "painel")?.ok && !s.painel_ativo_em) novo.painel_ativo_em = agora;
+    const mudou = novo.ativo_em !== s.ativo_em || novo.painel_ativo_em !== s.painel_ativo_em;
+    if (!mudou) return { ficha, mudou };
+    const antes = enderecoLoja(ficha);
+    const atualizada = { ...ficha, sub: novo };
+    await gravarFicha(sb, loja.ref, { sub: novo });
+    await aplicarEnderecos(loja, atualizada, { publicarPainel: antes !== enderecoLoja(atualizada) });
+    return { ficha: atualizada, mudou };
+  }
+
+  /** Liga (ou troca) anadoces.<raiz> e anadoces-painel.<raiz> nos sites da loja e confere. */
+  async function ligarSub(loja, ficha, { raiz, rotulo }) {
+    const antigo = ficha.sub ?? null;
+    const mesmo = antigo?.rotulo === rotulo && antigo?.raiz === raiz;
+    const lista = enderecosNaForminha(rotulo, raiz);
+    const ligados = [];
+    try {
+      for (const e of lista) {
+        await ligarEndereco(siteDoEndereco(ficha, e), e);
+        ligados.push(e);
+      }
+    } catch (erro) {
+      if (!mesmo) await soltarEnderecos(ficha, ligados).catch(() => {}); // não deixa metade ligada
+      if (erro instanceof ErroHttp && erro.status === 409) {
+        throw new ErroHttp(409, `O endereço ${rotulo}.${raiz} já é de outro site. Escolha outro nome.`, { subdominio: "Esse endereço já é de outra loja." });
+      }
+      throw erro;
+    }
+    if (antigo && !mesmo) await soltarEnderecos(ficha, enderecosNaForminha(antigo.rotulo, antigo.raiz));
+    const antes = { loja: enderecoLoja(ficha), painel: enderecoPainel(ficha) };
+    const novo = mesmo ? antigo : { rotulo, raiz, adicionado_em: new Date().toISOString(), ativo_em: null, painel_ativo_em: null };
+    const atual = { ...ficha, sub: novo };
+    await gravarFicha(sb, loja.ref, { sub: novo });
+    // os endereços novos entram na lista de quem pode chamar a loja (e o antigo sai)
+    await aplicarEnderecos(loja, atual, { publicarPainel: antes.loja !== enderecoLoja(atual) });
+    const r = await ativarSubSePronto(loja, atual, await lerEnderecosSub(atual));
+    return { ...r, mudou: r.mudou || enderecoLoja(r.ficha) !== antes.loja || enderecoPainel(r.ficha) !== antes.painel };
+  }
+
+  async function subdominio(loja) {
+    const ficha = await fichaPublicada(loja);
+    const b = await base();
+    if (!ficha.sub) return { ...resumoDoSub(ficha, b), mudou: false };
+    const enderecos = await lerEnderecosSub(ficha);
+    const r = await ativarSubSePronto(loja, ficha, enderecos);
+    return { ...resumoDoSub(r.ficha, b, enderecos), mudou: r.mudou };
+  }
+
+  async function definirSubdominio(loja, dados) {
+    const ficha = await fichaPublicada(loja);
+    const b = await base();
+    if (!b?.raiz) throw new ErroHttp(409, "Primeiro ligue o domínio da Forminha em Configurações.");
+    if (!b.pronta) throw new ErroHttp(409, "O registro coringa (*) do domínio da Forminha ainda não está pronto. Veja em Configurações.");
+    const rotulo = dados?.subdominio ? normalizarSubdominio(dados.subdominio) : ficha.sub?.raiz === b.raiz ? ficha.sub.rotulo : rotuloSugerido(ficha);
+    const r = await ligarSub(loja, ficha, { raiz: b.raiz, rotulo });
+    return { ...resumoDoSub(r.ficha, b, await lerEnderecosSub(r.ficha)), mudou: r.mudou };
+  }
+
+  async function conferirSubdominio(loja) {
+    const ficha = await fichaPublicada(loja);
+    if (!ficha.sub) throw new ErroHttp(409, "Esta loja ainda não tem endereço na Forminha.");
+    for (const e of enderecosNaForminha(ficha.sub.rotulo, ficha.sub.raiz)) {
+      const site = siteDoEndereco(ficha, e);
+      const pd = await vc.dominioDoProjeto(site.id, e.host).catch(semDominioNoSite);
+      if (!pd) await ligarEndereco(site, e);
+      else if (!pd.verified) await vc.verificarDominio(site.id, e.host).catch(() => null);
+    }
+    return subdominio(loja);
+  }
+
+  async function removerSubdominio(loja) {
+    let ficha = await fichaPublicada(loja);
+    const s = ficha.sub;
+    if (!s) return { ...resumoDoSub(ficha, await base()), mudou: false };
+    const antes = enderecoLoja(ficha);
+    await soltarEnderecos(ficha, enderecosNaForminha(s.rotulo, s.raiz));
+    ficha = { ...ficha, sub: null };
+    await gravarFicha(sb, loja.ref, { sub: null });
+    await aplicarEnderecos(loja, ficha, { publicarPainel: antes !== enderecoLoja(ficha) });
+    return { ...resumoDoSub(ficha, await base()), mudou: true };
+  }
+
   /**
    * Cópia de segurança dos dados da loja (todas as tabelas do banco dela, em JSON). As fotos ficam no
    * armazenamento do Supabase e não entram. Lojas muito grandes: use o painel do Supabase (Database → Backups).
@@ -472,5 +630,6 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
   const escreverFicha = (ref, dados) => gravarFicha(sb, ref, dados);
 
   return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
-    conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio };
+    conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio,
+    subdominio, definirSubdominio, conferirSubdominio, removerSubdominio };
 }
