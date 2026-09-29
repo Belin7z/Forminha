@@ -1,4 +1,4 @@
-/* PÁGINA — configurações: loja e textos, horários, regras de pedido e pagamento (PIX) */
+/* PÁGINA — configurações: loja e textos, horários, regras de pedido, pagamento (PIX) e domínio próprio */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { ocupado, toast } from "/src/scripts/base/ui.js";
@@ -11,9 +11,14 @@ import { cabecalhoPagina, carregandoPagina, erroPagina } from "../componentes/pa
 import { ligarImagens, ligarPerguntas, paginaImagens, paginaLegal, paginaPerguntas } from "../componentes/config-extras.js";
 import { ligarIntegracoes, paginaIntegracoes } from "../componentes/config-integracoes.js";
 import { ligarAparencia, paginaAparencia } from "../componentes/config-aparencia.js";
+import { montarDominio } from "/src/scripts/base/dns.js";
+import { chamarCentral, temCentral } from "../nucleo/central.js";
 
+// "Domínio" só aparece quando a loja foi criada pela Central (é ela que liga o domínio na Vercel)
 const ABAS = [["loja", "Loja e textos", "home"], ["aparencia", "Aparência", "paleta"], ["horarios", "Horários", "relogio"], ["pedidos", "Pedidos", "pacote"], ["pagamento", "Pagamento", "dinheiro"],
-  ["integracoes", "Integrações", "mensagem"], ["imagens", "Imagens", "imagem"], ["perguntas", "Perguntas", "ajuda"], ["legal", "Privacidade e termos", "documento"]];
+  ["integracoes", "Integrações", "mensagem"], ["dominio", "Domínio", "globo"], ["imagens", "Imagens", "imagem"], ["perguntas", "Perguntas", "ajuda"], ["legal", "Privacidade e termos", "documento"]]
+  .filter(([id]) => id !== "dominio" || temCentral());
+const chamarDominio = (metodo, acao, corpo) => chamarCentral(metodo, acao ? `dominio/${acao}` : "dominio", corpo);
 
 /** Liga um formulário à API: `preparar` ajusta os dados antes de enviar. */
 function ligar(form, secao, { preparar = (d) => d, aoSalvar }) {
@@ -47,9 +52,14 @@ export async function configuracoes(ctx) {
 
   const aba = ABAS.some(([id]) => id === ctx.params.secao) ? ctx.params.secao : "loja";
   const atualizar = (nova) => { cfg = nova; };
-  let integ = null;
+  let integ = null, dominio = null;
   if (aba === "integracoes") {
     try { integ = { gateway: await api.get("/gateway"), avisos: await api.get("/avisos") }; }
+    catch (erro) { montar(ctx.raiz, erroPagina(erro.message)); return; }
+    if (!ctx.ativo()) return;
+  }
+  if (aba === "dominio") {
+    try { dominio = await chamarDominio("GET"); }
     catch (erro) { montar(ctx.raiz, erroPagina(erro.message)); return; }
     if (!ctx.ativo()) return;
   }
@@ -119,6 +129,11 @@ export async function configuracoes(ctx) {
 
     aparencia: () => paginaAparencia(cfg),
     integracoes: () => paginaIntegracoes(integ),
+    dominio: () => html`
+      <section class="cartao">
+        <div class="cartao__cab"><div><h2>Domínio próprio</h2><small class="texto-suave">O endereço da sua loja na internet.</small></div></div>
+        <div id="dominio"></div>
+      </section>`,
     imagens: () => paginaImagens(cfg),
     perguntas: () => paginaPerguntas(),
     legal: () => paginaLegal(cfg),
@@ -161,6 +176,8 @@ export async function configuracoes(ctx) {
     ligarAparencia(ctx, cfg, atualizar);
   } else if (aba === "integracoes") {
     ligarIntegracoes(ctx, integ);
+  } else if (aba === "dominio") {
+    montarDominio($("#dominio"), dominio, { chamar: chamarDominio });
   } else if (aba === "imagens") {
     ligarImagens(ctx, cfg);
   } else if (aba === "perguntas") {

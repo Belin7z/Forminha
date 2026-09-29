@@ -31,7 +31,8 @@ let opcoes = {};
 const deVerdade = Boolean(env.SUPABASE_ACCESS_TOKEN && env.VERCEL_TOKEN);
 if (!deVerdade) {
   const { bancoDeTeste, criarSimulado } = await import("./simulado.js");
-  const sim = criarSimulado({ prontoEmMs: 6000 });
+  // no modo de teste, o DNS de um domínio próprio "fica certo" 20 s depois de ligado
+  const sim = criarSimulado({ prontoEmMs: 6000, dnsEmMs: 20_000 });
   env = {
     ...env, ...sim.env, CENTRAL_EMAIL: "teste@forminha.local", CENTRAL_SENHA_HASH: await resumirSenha("forminha"), CRON_SECRET: "cron-local",
     CHAVE_CRIPTOGRAFIA: novaChave(), URL_CENTRAL: `http://localhost:${PORTA}`,

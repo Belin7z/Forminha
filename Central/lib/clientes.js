@@ -569,10 +569,17 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     };
   }
 
+  /** A loja passou a usar outro endereço (domínio próprio ligado ou tirado): a ficha da cliente acompanha. */
+  async function atualizarEnderecos(lojaRef, { loja, painel }) {
+    const mudadas = await sql(`update clientes set loja_url = $2, painel_url = $3, atualizado_em = now()
+      where loja_ref = $1 and (loja_url is distinct from $2 or painel_url is distinct from $3) returning id`, [lojaRef, loja, painel]);
+    for (const { id } of mudadas) await anotarHistorico(id, "loja", `Endereço da loja: ${loja}`);
+  }
+
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos, vendas,
+    visaoGeral, listarPagamentos, vendas, atualizarEnderecos,
   };
 }
 

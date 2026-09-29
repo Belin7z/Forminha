@@ -95,8 +95,11 @@ Na **Visão geral** aparece a lista **“Primeiros passos”**: ela mostra o que
 - **Exportar** pedidos (por período) e clientes em planilha (CSV, abre no Excel e no Google Planilhas).
 - **Envio de fotos com assistente:** ao escolher uma foto (logo, destaque, galeria, produtos) abre uma janela para **enquadrar** (arrastar e dar zoom) na proporção certa
   de cada lugar do site, com avisos ao vivo de foto pequena, escura, com muita luz ou desfocada. Há dicas de fotografia em *Configurações → Imagens*.
-- **Integrações** (*Configurações → Integrações*): **PIX automático** pelo Mercado Pago (o pedido muda para “pago” sozinho) e **avisos automáticos por WhatsApp** oficial
+- **Integrações** (*Configurações → Integrações*): **pagamento online** pelo Mercado Pago — PIX automático e cartão de crédito/débito, o pedido muda para “pago”
+  sozinho (em loja criada pela Central, basta colar o Access Token) — e **avisos automáticos por WhatsApp** oficial
   (Meta) a cada mudança de situação, com histórico e botão “Reenviar aviso” em cada pedido. Ficam desligados até você criar as contas: siga [INTEGRACOES.md](INTEGRACOES.md).
+- **Domínio** (*Configurações → Domínio*, em loja criada pela Central): um endereço só seu, como `suadoceria.com.br` (e, se quiser, `painel.suadoceria.com.br`).
+  Digite o domínio, crie os registros de DNS que aparecem na tela no site onde ele foi comprado e pronto: quando o DNS fica certo, a loja passa a usar o domínio sozinha.
 
 ### Estoque, receitas, custos e lucro — passo a passo
 

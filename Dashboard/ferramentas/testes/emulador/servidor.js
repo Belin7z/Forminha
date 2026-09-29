@@ -18,6 +18,7 @@ import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
 import { receberWebhook } from "../../../supabase/functions/pix-webhook/logica.js";
 import { avisarWhatsapp } from "../../../supabase/functions/whatsapp-avisar/logica.js";
 import { criarCheckoutCartao } from "../../../supabase/functions/cartao-criar/logica.js";
+import { enderecosDoDominio, normalizarDominio, raizDoDominio, registroDoEndereco } from "../../../../Central/lib/dominios.js";
 
 const b64 = (dados) => Buffer.from(dados).toString("base64url");
 
@@ -215,12 +216,50 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
     return responder(res, 404, { message: "Controle inexistente" });
   }
 
-  /* ---------- Central da Forminha (de mentira): ligar o pagamento online pelo painel ---------- */
+  /* ---------- Central da Forminha (de mentira): pagamento online e domínio próprio pelo painel ---------- */
+  // domínio: o "DNS" fica certo 15 s depois de ligar (dá para ver a tela passar de "aguardando" para "funcionando")
+  let dominioFalso = null;
+  const DNS_EM_MS = 15_000;
+  function situacaoDoDominio(mudou = false) {
+    const base = { endereco_loja: "http://localhost:3000", endereco_painel: "http://localhost:3001" };
+    if (!dominioFalso) return { dominio: null, ...base, mudou };
+    const raiz = raizDoDominio(dominioFalso.nome);
+    const pronto = Date.now() - dominioFalso.criado >= DNS_EM_MS;
+    const cfg = { recommendedIPv4: [{ rank: 1, value: ["216.198.79.1"] }], recommendedCNAME: [{ rank: 1, value: "d1d4fc829fe7bc7c.vercel-dns-017.com." }] };
+    const enderecos = enderecosDoDominio(dominioFalso.nome, dominioFalso).map((e) => ({
+      host: e.host, site: e.site, atalho: Boolean(e.redirecionar), ligado: true, ok: pronto, registros: [{ ...registroDoEndereco(e.host, raiz, cfg), ok: pronto }],
+    }));
+    return {
+      dominio: dominioFalso.nome, painel: dominioFalso.painel, raiz, adicionado_em: new Date(dominioFalso.criado).toISOString(), ativo: pronto,
+      situacao: pronto ? "ok" : "aguardando", enderecos, mudou,
+      endereco_loja: pronto ? `https://${dominioFalso.nome}` : base.endereco_loja,
+      endereco_painel: pronto && dominioFalso.painel ? `https://painel.${dominioFalso.nome}` : base.endereco_painel,
+    };
+  }
+
   async function rotaCentral(req, res, caminho) {
-    const corsCentral = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type", "access-control-allow-methods": "POST, OPTIONS" };
+    const corsCentral = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type", "access-control-allow-methods": "GET, POST, DELETE, OPTIONS" };
     const enviar = (status, corpo) => { res.writeHead(status, { ...corsCentral, "content-type": "application/json" }); res.end(JSON.stringify(corpo)); };
-    if (caminho !== "/api/loja/pagamento" || req.method !== "POST") return enviar(404, { erro: "Caminho não encontrado." });
+    const rotas = ["POST /api/loja/pagamento", "GET /api/loja/dominio", "POST /api/loja/dominio", "POST /api/loja/dominio/conferir", "DELETE /api/loja/dominio"];
+    if (!rotas.includes(`${req.method} ${caminho}`)) return enviar(404, { erro: "Caminho não encontrado." });
     if (!(await ehAdmin(req))) return enviar(403, { erro: "Só a administradora da loja pode fazer isso. Entre de novo no painel." });
+    if (caminho.startsWith("/api/loja/dominio")) {
+      if (req.method === "GET") return enviar(200, situacaoDoDominio());
+      if (req.method === "DELETE") { dominioFalso = null; return enviar(200, situacaoDoDominio(true)); }
+      if (caminho.endsWith("/conferir")) {
+        if (!dominioFalso) return enviar(409, { erro: "Esta loja não tem domínio próprio." });
+        const r = situacaoDoDominio();
+        const mudou = r.ativo && !dominioFalso.avisado;
+        if (mudou) dominioFalso.avisado = true;
+        return enviar(200, { ...r, mudou });
+      }
+      const corpo = await lerJson(req);
+      let nome;
+      try { nome = normalizarDominio(corpo.dominio); } catch (e) { return enviar(e.status ?? 422, { erro: e.message, campos: e.campos }); }
+      const mesmo = dominioFalso?.nome === nome;
+      dominioFalso = { nome, painel: corpo.painel !== false, criado: mesmo ? dominioFalso.criado : Date.now(), avisado: mesmo && dominioFalso.avisado };
+      return enviar(200, situacaoDoDominio(true));
+    }
     const { token } = await lerJson(req);
     if (!/^(APP_USR|TEST)-[\w-]{20,}$/.test(String(token ?? ""))) return enviar(422, { erro: "Cole o Access Token do Mercado Pago (começa com APP_USR-).", campos: { token: "Cole o Access Token (começa com APP_USR-)." } });
     const segredo = crypto.randomBytes(24).toString("hex");

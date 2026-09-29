@@ -33,7 +33,17 @@ link novo), **Redefinir senha da dona** (link por e-mail, que vale pouco tempo),
 **notas** e o histórico de tudo o que aconteceu.
 
 A aba **Lojas** mostra todas as lojas e serve para criar uma loja **sem cobrança** (teste ou
-cortesia), atualizar o banco, reativar e excluir.
+cortesia), atualizar o banco, reativar e excluir. Em cada loja pronta:
+
+- **Pagamento online**: cole o Access Token de produção do Mercado Pago da doceria e a Central liga
+  o PIX automático e o cartão na loja (a dona também pode fazer isso no painel dela, em
+  Configurações → Integrações).
+- **Domínio**: liga um endereço próprio, como `suadoceria.com.br`. A Central coloca o domínio, o
+  `www` (atalho para o domínio) e, se quiser, `painel.suadoceria.com.br` nos sites da loja, e mostra
+  os registros de DNS para criar onde o domínio foi comprado (Registro.br, Hostinger…). Enquanto o DNS
+  não fica pronto, a loja continua no endereço da Vercel; quando fica, tudo passa a usar o domínio
+  sozinho (links de login e do WhatsApp, o painel e a ficha da cliente). A dona também pode ligar pelo
+  painel dela, em **Configurações → Domínio**. O domínio é comprado e pago pela doceria.
 
 ## Equipe (aba Equipe — só o dono)
 

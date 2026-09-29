@@ -461,3 +461,39 @@
   .grafico__area { height: 180px; }
   .grafico { gap: .45rem; }
 }
+
+/* ---------- domínio próprio: endereços e registros de DNS (igual no painel e na Central) ---------- */
+.dns { display: grid; gap: 1.1rem; }
+.dns:focus { outline: none; } /* recebe o foco só por programa (tabindex -1) */
+.dns__cab { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.dns__dominio { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
+.dns__enderecos { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.dns__enderecos li { display: grid; grid-template-columns: 1.2rem minmax(0, 1fr) auto; align-items: center; gap: .65rem; font-size: .92rem; }
+.dns__marca { display: inline-flex; color: var(--texto-suave); }
+.dns__marca--ok { color: var(--sucesso); }
+.dns__host { overflow-wrap: anywhere; }
+.dns__papel { color: var(--texto-suave); font-size: .8rem; }
+.dns__passo { margin: 0; font-size: .92rem; }
+.dns__passo--ok { display: flex; align-items: center; gap: .45rem; color: var(--sucesso); }
+.dns__passo--ok .link { color: inherit; }
+.dns__registros { border: 1px solid var(--borda); border-radius: var(--raio-sm, 10px); overflow: hidden; }
+.dns__linha { display: grid; grid-template-columns: 4.2rem 5.8rem minmax(0, 1fr) 6.4rem; gap: .9rem; align-items: center; padding: .7rem .95rem; border-bottom: 1px solid var(--borda); font-size: .88rem; }
+.dns__linha:last-child { border-bottom: 0; }
+.dns__linha--cab { padding-block: .5rem; font-size: .68rem; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--texto-suave); background: var(--marca-50); }
+.dns__linha code, .dns__valor code { font: 500 .84rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; overflow-wrap: anywhere; }
+.dns__valor { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+.dns__copiar { flex: none; display: inline-flex; padding: .3rem; border: 0; border-radius: 6px; background: none; color: var(--texto-suave); cursor: pointer; }
+.dns__copiar:hover, .dns__copiar:focus-visible { background: var(--marca-100); color: var(--texto); }
+.dns__status { display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; color: var(--aviso, #b26a00); }
+.dns__status--ok { color: var(--sucesso); }
+.dns__dica { margin: 0; font-size: .84rem; color: var(--texto-suave); }
+.dns__botoes { display: flex; flex-wrap: wrap; gap: .6rem; }
+.dns__form { display: grid; gap: .2rem; max-width: 520px; }
+.dns__trocar summary { cursor: pointer; font-size: .9rem; color: var(--texto-suave); }
+.dns__trocar[open] summary { margin-bottom: .9rem; }
+@media (max-width: 640px) {
+  .dns__linha { grid-template-columns: auto minmax(0, 1fr); row-gap: .4rem; }
+  .dns__linha--cab { display: none; }
+  .dns__linha [data-rotulo]::before { content: attr(data-rotulo); margin-right: .45rem; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-suave); }
+  .dns__valor, .dns__status { grid-column: 1 / -1; }
+}

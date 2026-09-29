@@ -1,6 +1,6 @@
 /* ==========================================================
    PROVEDORES — conversa com o Supabase (bancos das lojas) e com a
-   Vercel (sites das lojas) usando as chaves guardadas na Vercel.
+   Vercel (sites e domínios das lojas) usando as chaves guardadas na Vercel.
    É o ÚNICO lugar que usa as chaves; elas nunca vão para o navegador.
    Nos testes e no modo simulado, `fetchFn` é trocado por imitações.
    ========================================================== */
@@ -110,5 +110,18 @@ export function criarVercel({ token, time = "", base = "https://api.vercel.com",
       return (r?.domains ?? []).map((d) => d.name);
     },
     excluirProjeto: (projetoId) => api("DELETE", `/v9/projects/${encodeURIComponent(projetoId)}${q()}`),
+
+    /* domínio próprio: cada endereço (suadoceria.com.br, www., painel.) é ligado a um dos sites */
+    /** Liga um endereço ao site. Com `redirect`, o endereço vira um atalho para outro (www -> principal). */
+    adicionarDominio: (projetoId, dados) => api("POST", `/v10/projects/${encodeURIComponent(projetoId)}/domains${q()}`, dados),
+    /** Como o endereço está no site: `verified` false = a Vercel pede um registro TXT (`verification`). */
+    dominioDoProjeto: (projetoId, host) => api("GET", `/v9/projects/${encodeURIComponent(projetoId)}/domains/${encodeURIComponent(host)}${q()}`),
+    verificarDominio: (projetoId, host) => api("POST", `/v9/projects/${encodeURIComponent(projetoId)}/domains/${encodeURIComponent(host)}/verify${q()}`),
+    removerDominio: (projetoId, host) => api("DELETE", `/v9/projects/${encodeURIComponent(projetoId)}/domains/${encodeURIComponent(host)}${q()}`),
+    /** O DNS do endereço já aponta para a Vercel (`misconfigured` false)? Traz também os registros recomendados. */
+    configDoDominio: (host, projetoId) => api("GET", `/v6/domains/${encodeURIComponent(host)}/config${q({ projectIdOrName: projetoId })}`),
+    /** Cria ou troca uma variável do site (vale na próxima publicação). */
+    definirVariavel: (projetoId, chave, valor) => api("POST", `/v10/projects/${encodeURIComponent(projetoId)}/env${q({ upsert: "true" })}`,
+      { key: chave, value: String(valor), type: "encrypted", target: ["production", "preview"] }),
   };
 }

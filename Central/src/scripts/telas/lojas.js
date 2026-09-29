@@ -1,8 +1,9 @@
-/* TELA — Lojas: todas as lojas no Supabase/Vercel (criar à mão, convite, atualizar banco, reativar, excluir) */
+/* TELA — Lojas: todas as lojas no Supabase/Vercel (criar à mão, convite, pagamento online, domínio, atualizar banco, reativar, excluir) */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
+import { montarDominio } from "/src/scripts/base/dns.js";
 import { api, aviso, dorme, pode } from "../nucleo.js";
 
 const ETAPAS = {
@@ -24,6 +25,7 @@ function cartaoLoja(l, eu) {
         <span class="selo selo--${tom}">${rotulo}${l.etapa === "tabelas" && l.total ? ` · ${l.feitas} de ${l.total}` : ""}</span>
       </header>
       ${l.atualizar && html`<p class="loja__nota">${icone("atualizar", { tamanho: 14 })} Tem atualização do banco para esta loja.</p>`}
+      ${l.dominio && !l.dominio_ativo && html`<p class="loja__nota">${icone("globo", { tamanho: 14 })} ${l.dominio}: aguardando o DNS.</p>`}
       ${(l.loja || l.painel) && html`<div class="loja__links">
         ${l.loja && html`<a href="${l.loja}" target="_blank" rel="noopener" class="link">${icone("home", { tamanho: 15 })} ${l.loja.replace("https://", "")}</a>`}
         ${l.painel && html`<a href="${l.painel}" target="_blank" rel="noopener" class="link">${icone("grade", { tamanho: 15 })} ${l.painel.replace("https://", "")}</a>`}
@@ -32,6 +34,7 @@ function cartaoLoja(l, eu) {
         ${suporte && incompleta(l) && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="continuar">Continuar criação</button>`}
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("email", { tamanho: 15 })} Convite da dona</button>`}
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="pagamento">${icone("cartao", { tamanho: 15 })} Pagamento online</button>`}
+        ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="dominio">${icone("globo", { tamanho: 15 })} Domínio</button>`}
         ${suporte && l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
         ${suporte && l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
         ${pode(eu, "lojas.excluir") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
@@ -97,6 +100,7 @@ export async function telaLojas(conteiner, eu) {
     if (acao === "continuar") return acompanharCriacao(loja, "", carregar);
     if (acao === "convite") return novoConvite(loja);
     if (acao === "pagamento") return pagamentoOnline(loja);
+    if (acao === "dominio") return dominioDaLoja(loja, carregar);
     if (acao === "atualizar") return atualizarBanco(loja, carregar);
     if (acao === "reativar") {
       await ocupado(alvo, async () => {
@@ -239,6 +243,18 @@ function pagamentoOnline(loja) {
       } catch (erro) { mostrarErros(form, erro); }
     });
   });
+}
+
+/** Domínio próprio da loja (ex.: suadoceria.com.br): a mesma tela que a dona vê no painel dela. */
+async function dominioDaLoja(loja, depois) {
+  let mudou = false;
+  const modal = abrirModal({
+    titulo: `Domínio — ${loja.nome}`, largura: 640, corpo: html`<div class="carregando-pagina"><div class="spinner"></div></div>`,
+    aoFechar: () => { if (mudou) depois(); },
+  });
+  const chamar = (metodo, acao, corpo) => api(metodo, `lojas/${loja.ref}/dominio${acao ? `/${acao}` : ""}`, corpo);
+  try { montarDominio(modal.corpo, await chamar("GET"), { chamar, aoMudar: () => { mudou = true; } }); }
+  catch (erro) { montar(modal.corpo, aviso("perigo", erro.message)); }
 }
 
 async function atualizarBanco(loja, depois) {

@@ -1,5 +1,5 @@
 /* ==========================================================
-   SIMULADO — imita o Supabase (Management API) e a Vercel, para testar
+   SIMULADO — imita o Supabase (Management API) e a Vercel (sites e domínios), para testar
    a Central sem criar nada de verdade (npm test e npm run dev sem chaves).
    Cada "projeto" criado ganha um Postgres de verdade em memória (PGlite)
    com o mínimo do Supabase: as migrações da loja rodam de verdade nele,
@@ -7,6 +7,7 @@
    ========================================================== */
 import { randomBytes } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
+import { raizDoDominio } from "../lib/dominios.js";
 
 /** O que o Supabase já traz pronto num projeto novo (igual ao emulador do Dashboard). */
 const BASE_SUPABASE = `
@@ -37,8 +38,10 @@ const json = (status, corpo) => new Response(corpo === undefined ? null : JSON.s
  * prontoEmMs: quanto tempo o banco novo leva para ficar "ACTIVE_HEALTHY" (0 nos testes, alguns segundos no npm run dev).
  * Devolve { fetchFn, estado } — estado guarda projetos, sites e chamadas, para os testes conferirem.
  */
-export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
-  const estado = { projetos: new Map(), sites: new Map(), publicacoes: [], cutucadas: [], chamadas: [], mp: new Map(), segredosLidos: [] };
+export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = null } = {}) {
+  // dns: endereços cujo DNS já aponta para a Vercel · dominiosDeOutraConta: raízes que a Vercel pede para provar (TXT)
+  const estado = { projetos: new Map(), sites: new Map(), publicacoes: [], cutucadas: [], chamadas: [], mp: new Map(), segredosLidos: [],
+    dns: new Set(), dominiosDeOutraConta: new Set() };
   const fila = new WeakMap(); // PGlite tem uma conexão só: uma consulta por vez
   const naFila = (db, tarefa) => { const p = (fila.get(db) ?? Promise.resolve()).then(tarefa, tarefa); fila.set(db, p.catch(() => {})); return p; };
 
@@ -110,8 +113,60 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
     return json(404, { message: "rota desconhecida" });
   }
 
-  async function vercel(metodo, caminho, corpo) {
+  async function vercel(metodo, caminho, corpo, busca) {
     let m;
+    /* domínios próprios: cada site guarda os seus endereços */
+    if (metodo === "POST" && (m = /^\/v10\/projects\/([^/]+)\/domains$/.exec(caminho))) {
+      const s = estado.sites.get(m[1]);
+      if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
+      if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(String(corpo?.name ?? ""))) return json(400, { error: { code: "invalid_domain", message: "Invalid domain name" } });
+      for (const outro of estado.sites.values()) {
+        if (outro !== s && outro.dominios?.has(corpo.name)) return json(409, { error: { code: "domain_already_in_use", message: `Cannot add ${corpo.name} since it's already in use by another project.` } });
+      }
+      s.dominios ??= new Map();
+      if (s.dominios.has(corpo.name)) return json(400, { error: { code: "domain_already_exists", message: "The domain already exists on this project." } });
+      const apex = raizDoDominio(corpo.name);
+      const deOutra = estado.dominiosDeOutraConta.has(apex);
+      const d = { name: corpo.name, apexName: apex, projectId: s.id, redirect: corpo.redirect ?? null, redirectStatusCode: corpo.redirectStatusCode ?? null,
+        verified: !deOutra, criado: Date.now(),
+        ...(deOutra && { verification: [{ type: "TXT", domain: `_vercel.${apex}`, value: `vc-domain-verify=${corpo.name},simulado`, reason: "pending_domain_verification" }] }) };
+      s.dominios.set(corpo.name, d);
+      return json(200, d);
+    }
+    if ((m = /^\/v9\/projects\/([^/]+)\/domains\/([^/]+?)(\/verify)?$/.exec(caminho))) {
+      const s = estado.sites.get(m[1]);
+      if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
+      const d = s.dominios?.get(decodeURIComponent(m[2]));
+      if (!d) return json(404, { error: { code: "not_found", message: "The project domain was not found" } });
+      if (metodo === "GET" && !m[3]) return json(200, d);
+      if (metodo === "POST" && m[3]) {
+        if (!estado.dns.has(`_vercel.${d.apexName}`)) return json(400, { error: { code: "missing_txt_record", message: "Domain _vercel TXT record not found" } });
+        d.verified = true; delete d.verification;
+        return json(200, d);
+      }
+      if (metodo === "DELETE" && !m[3]) {
+        if ([...s.dominios.values()].some((x) => x.redirect === d.name)) return json(409, { error: { code: "domain_is_redirect", message: "Domain is the target of a redirect" } });
+        s.dominios.delete(d.name);
+        return json(200, {});
+      }
+    }
+    if (metodo === "GET" && (m = /^\/v6\/domains\/([^/]+)\/config$/.exec(caminho))) {
+      const host = decodeURIComponent(m[1]);
+      const ligado = [...estado.sites.values()].map((x) => x.dominios?.get(host)).find(Boolean);
+      const ok = estado.dns.has(host) || (dnsEmMs !== null && Boolean(ligado) && Date.now() - ligado.criado >= dnsEmMs);
+      return json(200, {
+        configuredBy: ok ? (raizDoDominio(host) === host ? "A" : "CNAME") : null, acceptedChallenges: ["http-01"], misconfigured: !ok,
+        recommendedIPv4: [{ rank: 1, value: ["216.198.79.1"] }, { rank: 2, value: ["76.76.21.21"] }],
+        recommendedCNAME: [{ rank: 1, value: "d1d4fc829fe7bc7c.vercel-dns-017.com." }, { rank: 2, value: "cname.vercel-dns.com." }],
+      });
+    }
+    if (metodo === "POST" && (m = /^\/v10\/projects\/([^/]+)\/env$/.exec(caminho))) {
+      const s = estado.sites.get(m[1]);
+      if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
+      if (busca?.get("upsert") !== "true" && corpo.key in s.variaveis) return json(400, { error: { code: "ENV_ALREADY_EXISTS", message: "A variable with the same key already exists" } });
+      s.variaveis[corpo.key] = corpo.value;
+      return json(201, { created: { key: corpo.key, target: corpo.target } });
+    }
     if (metodo === "POST" && caminho === "/v11/projects") {
       if ([...estado.sites.values()].some((s) => s.nome === corpo.name)) return json(409, { error: { code: "conflict", message: `Project "${corpo.name}" already exists` } });
       if (!/^[a-z0-9-]{1,100}$/.test(corpo.name)) return json(400, { error: { message: "nome inválido" } });
@@ -161,7 +216,7 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
     const cab = new Headers(init.headers);
     const token = cab.get("authorization");
     if (u.host === "api.supabase.com") return token === "Bearer token-supabase-simulado" ? supabase(metodo, u.pathname, corpo, u.searchParams) : json(401, { message: "Unauthorized" });
-    if (u.host === "api.vercel.com") return token === "Bearer token-vercel-simulado" ? vercel(metodo, u.pathname, corpo) : json(401, { error: { message: "Unauthorized" } });
+    if (u.host === "api.vercel.com") return token === "Bearer token-vercel-simulado" ? vercel(metodo, u.pathname, corpo, u.searchParams) : json(401, { error: { message: "Unauthorized" } });
     // a conta Mercado Pago de uma doceria (quando ela liga o pagamento online da loja dela)
     if (u.host === "api.mercadopago.com" && u.pathname === "/users/me") {
       return /^Bearer (APP_USR|TEST)-(?!recusada)/.test(token ?? "") ? json(200, { id: 123456, nickname: "DOCERIA_SIMULADA", site_id: "MLB" }) : json(401, { message: "invalid access token" });
@@ -185,6 +240,9 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
     throw new Error(`o simulado não conhece ${u.href}`);
   }
 
+  /** A dona criou o registro no site onde comprou o domínio (ex.: "doce.com.br", "www.doce.com.br", "_vercel.doce.com.br"). */
+  const configurarDns = (...hosts) => { for (const h of hosts) estado.dns.add(h); };
+
   /** Pausa um projeto (como o Supabase grátis faz depois de dias sem uso). */
   const pausar = (ref) => { const p = estado.projetos.get(ref); if (p) p.pausado = true; };
   const fechar = async () => { for (const p of estado.projetos.values()) await p.db.close().catch(() => {}); };
@@ -192,7 +250,7 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
   /** Token de login de uma pessoa da loja (como o Supabase emite): diz de qual loja é e o papel. */
   const tokenDaLoja = (ref, papel = "admin") => ["e30", Buffer.from(JSON.stringify({ iss: `https://${ref}.supabase.co/auth/v1`, sub: "u1", papel })).toString("base64url"), "assinatura"].join(".");
 
-  return { fetchFn, estado, pausar, aprovarMp, fechar, org, tokenDaLoja, env: { SUPABASE_ACCESS_TOKEN: "token-supabase-simulado", VERCEL_TOKEN: "token-vercel-simulado", FORMINHA_ORG: org } };
+  return { fetchFn, estado, pausar, aprovarMp, fechar, org, tokenDaLoja, configurarDns, env: { SUPABASE_ACCESS_TOKEN: "token-supabase-simulado", VERCEL_TOKEN: "token-vercel-simulado", FORMINHA_ORG: org } };
 }
 
 /** Banco da Central para testes e para o modo de teste (o mesmo SQL que roda no Neon). */

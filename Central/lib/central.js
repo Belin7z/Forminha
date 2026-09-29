@@ -131,6 +131,19 @@ export function criarCentral(env = process.env, opcoes = {}) {
     return loja;
   }
   const registrarDaDona = (loja, acao) => equipe?.registrar({ quem: `loja:${loja.ref}`, usuario: "Dona da loja", acao, alvo: loja.nome }).catch(() => {});
+  /** O endereço da loja mudou (domínio próprio): o cadastro da cliente acompanha. */
+  async function acompanharEnderecos(loja, r) {
+    if (!r.mudou || !clientes) return;
+    try { await (await exigirClientes()).atualizarEnderecos(loja.ref, { loja: r.endereco_loja, painel: r.endereco_painel }); }
+    catch (e) { console.error("[enderecos]", e.message); }
+  }
+  /** Domínio próprio: as mesmas ações servem para você (pela Central) e para a dona (pelo painel dela). */
+  const acoesDeDominio = {
+    ver: async (loja) => { const r = await lojas.dominio(loja); await acompanharEnderecos(loja, r); return r; },
+    ligar: async (loja, corpo) => { const r = await lojas.definirDominio(loja, corpo); await acompanharEnderecos(loja, r); return r; },
+    conferir: async (loja) => { const r = await lojas.conferirDominio(loja); await acompanharEnderecos(loja, r); return r; },
+    tirar: async (loja) => { const r = await lojas.removerDominio(loja); await acompanharEnderecos(loja, r); return r; },
+  };
 
   /* ----------------------------------------------------------
      rotas: [método, caminho, quem pode, função, atividade]
@@ -312,12 +325,40 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.conectarPagamento(loja, corpo.token), alvo: loja.nome };
     }, "Ligou o pagamento online"],
+    // domínio próprio (ex.: suadoceria.com.br)
+    ["GET", /^lojas\/([a-z]+)\/dominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.ver(await lojas.porRef(m[1])) }; }],
+    ["POST", /^lojas\/([a-z]+)\/dominio$/, "lojas.suporte", async ({ m, corpo }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      const r = await acoesDeDominio.ligar(loja, corpo);
+      return { corpo: r, alvo: `${loja.nome} (${r.dominio})` };
+    }, "Ligou domínio próprio"],
+    ["POST", /^lojas\/([a-z]+)\/dominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.conferir(await lojas.porRef(m[1])) }; }],
+    ["DELETE", /^lojas\/([a-z]+)\/dominio$/, "lojas.suporte", async ({ m }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await acoesDeDominio.tirar(loja), alvo: loja.nome };
+    }, "Tirou o domínio próprio"],
 
     /* ---------- chamadas do painel da loja (a dona, com o login dela; sem cookie da Central) ---------- */
     ["POST", /^loja\/pagamento$/, false, async ({ cabecalhos, corpo }) => {
       const loja = await lojaDaDona(cabecalhos);
       const r = await lojas.conectarPagamento(loja, corpo.token);
       registrarDaDona(loja, "Ligou o pagamento online");
+      return { corpo: r };
+    }],
+    ["GET", /^loja\/dominio$/, false, async ({ cabecalhos }) => ({ corpo: await acoesDeDominio.ver(await lojaDaDona(cabecalhos)) })],
+    ["POST", /^loja\/dominio$/, false, async ({ cabecalhos, corpo }) => {
+      const loja = await lojaDaDona(cabecalhos);
+      const r = await acoesDeDominio.ligar(loja, corpo);
+      registrarDaDona(loja, `Ligou o domínio ${r.dominio}`);
+      return { corpo: r };
+    }],
+    ["POST", /^loja\/dominio\/conferir$/, false, async ({ cabecalhos }) => ({ corpo: await acoesDeDominio.conferir(await lojaDaDona(cabecalhos)) })],
+    ["DELETE", /^loja\/dominio$/, false, async ({ cabecalhos }) => {
+      const loja = await lojaDaDona(cabecalhos);
+      const r = await acoesDeDominio.tirar(loja);
+      registrarDaDona(loja, "Tirou o domínio próprio");
       return { corpo: r };
     }],
     ["DELETE", /^lojas\/([a-z]+)$/, "lojas.excluir", async ({ m, corpo }) => {
@@ -374,7 +415,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   // o painel de cada loja mora em outro endereço: estas rotas aceitam chamadas de fora (a proteção é o login da dona, não cookie)
   const CORS_DAS_LOJAS = {
     "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Max-Age": "600",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Max-Age": "600",
   };
 
   async function tratar(req, res) {
