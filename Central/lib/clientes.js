@@ -24,6 +24,8 @@ const resumo = (t) => createHash("sha256").update(String(t)).digest("hex");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ORDEM = ["criar_projeto", "aguardar_banco", "preparar", "publicar", "convite", "email", "pronta"];
 const MAX_TENTATIVAS = 6;
+/** Versão dos termos de uso e da política de privacidade da Forminha (mude quando o texto mudar). */
+export const VERSAO_DOS_TERMOS = "2026-09-29";
 const ESPERA_MAXIMA_BANCO_MS = 20 * 60 * 1000;
 const dorme = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -225,6 +227,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       convite: c.convite ? cofre.decifrar(c.convite, ctx(c.id)) : null, convite_em: c.convite_em, email_boas_vindas_em: c.email_boas_vindas_em,
       cadastrado_por: c.cadastrado_por ?? null, pronta_em: c.pronta_em ?? null,
       cupom: c.cupom ?? null, desconto_centavos: c.desconto_centavos ?? 0, indicada_por: c.indicada_por ?? null, credito_centavos: c.credito_centavos ?? 0,
+      termos_versao: c.termos_versao ?? null, termos_aceitos_em: c.termos_aceitos_em ?? null,
     };
   }
 
@@ -287,8 +290,9 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       throw new ErroHttp(409, "Esta cobrança foi cancelada (há uma mais nova).");
     }
     if (p.tipo === "mensalidade") { await mensalidadePaga(p, por); return { cliente_id: p.cliente_id, ja_estava: false, tipo: "mensalidade" }; }
-    await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now()
-      where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id]);
+    await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now(),
+        termos_versao = $2, termos_aceitos_em = now()
+      where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id, VERSAO_DOS_TERMOS]);
     await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "manualmente"}.`);
     const [dona] = await sql("select nome_loja, indicada_por from clientes where id = $1", [p.cliente_id]);
     if (dona?.indicada_por && cupons) await premiarIndicacao(dona.indicada_por, dona.nome_loja);
@@ -589,6 +593,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return {
       ...r,
       financeiro: { mes: Number(f.mes), mes_anterior: Number(f.mes_anterior), total: Number(f.total), pendente: Number(f.pendente), vendas: f.vendas, meses },
+      sem_nota: Number((await sql("select count(*)::int as n from pagamentos where situacao = 'aprovado' and nota_fiscal is null"))[0].n),
       // mensalidades: quanto entra todo mês (as lojas no ar que pagam) e quantas estão atrasadas
       recorrente: await recorrencia(),
       // meta do mês e onde ele fecha se o ritmo continuar
@@ -602,15 +607,17 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
 
   /** Todas as cobranças (as mais novas primeiro), com o total recebido e o pendente. */
   async function listarPagamentos({ situacao = "" } = {}) {
+    if (situacao === "sem_nota") return listarPagamentosSemNota();
     const filtro = ["pendente", "aprovado", "cancelado"].includes(situacao) ? situacao : null;
     const linhas = await sql(`select p.id, p.cliente_id, p.valor_centavos, p.situacao, p.criado_em, p.confirmado_em, p.confirmado_por, p.mp_id,
         p.tipo, p.nota_fiscal, to_char(p.vencimento, 'YYYY-MM-DD') as vencimento, c.nome_loja, c.dados, c.id as cid
       from pagamentos p join clientes c on c.id = p.cliente_id ${filtro ? "where p.situacao = $1" : ""}
       order by coalesce(p.confirmado_em, p.criado_em) desc limit 300`, filtro ? [filtro] : []);
     const [t] = await sql(`select coalesce(sum(valor_centavos) filter (where situacao = 'aprovado'), 0)::bigint as recebido,
-      coalesce(sum(valor_centavos) filter (where situacao = 'pendente'), 0)::bigint as pendente from pagamentos`);
+      coalesce(sum(valor_centavos) filter (where situacao = 'pendente'), 0)::bigint as pendente,
+      count(*) filter (where situacao = 'aprovado' and nota_fiscal is null)::int as sem_nota from pagamentos`);
     return {
-      totais: { recebido: Number(t.recebido), pendente: Number(t.pendente) },
+      totais: { recebido: Number(t.recebido), pendente: Number(t.pendente), sem_nota: t.sem_nota },
       pagamentos: linhas.map((p) => ({
         id: p.id, cliente_id: p.cliente_id, cliente: nomeDe({ id: p.cid, dados: p.dados }), nome_loja: p.nome_loja, valor_centavos: p.valor_centavos,
         situacao: p.situacao, criado_em: p.criado_em, confirmado_em: p.confirmado_em, automatico: Boolean(p.mp_id),
@@ -618,6 +625,44 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
         tipo: p.tipo ?? "loja", vencimento: p.vencimento ?? null, nota_fiscal: p.nota_fiscal ?? null,
       })),
     };
+  }
+
+  async function listarPagamentosSemNota() {
+    const r = await listarPagamentos({ situacao: "aprovado" });
+    return { ...r, pagamentos: r.pagamentos.filter((p) => !p.nota_fiscal) };
+  }
+
+  /** Nota fiscal de um pagamento recebido (emitida fora da Central): número e, se houver, o link. Número vazio apaga. */
+  async function registrarNota(pagamentoId, corpo) {
+    if (!UUID.test(String(pagamentoId))) throw new ErroHttp(404, "Pagamento não encontrado.");
+    const numero = String(corpo.numero ?? "").trim();
+    const link = String(corpo.link ?? "").trim();
+    const campos = {};
+    if (numero.length > 40) campos.numero = "Número: até 40 caracteres.";
+    if (link && !/^https:\/\/\S{4,500}$/.test(link)) campos.link = "O link precisa começar com https://";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    const nota = numero ? { numero, link: link || null, emitida_em: new Date().toISOString() } : null;
+    const [p] = await sql("update pagamentos set nota_fiscal = $2::jsonb where id = $1 and situacao = 'aprovado' returning id, cliente_id",
+      [pagamentoId, nota ? JSON.stringify(nota) : null]);
+    if (!p) throw new ErroHttp(409, "Só dá para registrar nota de um pagamento recebido.");
+    await anotarHistorico(p.cliente_id, "pagamento", nota ? `Nota fiscal ${numero} registrada.` : "Nota fiscal apagada.");
+    return { id: p.id, nota_fiscal: nota };
+  }
+
+  /* dados da empresa (aparecem nos termos de uso e na política de privacidade) */
+  async function lerEmpresa() {
+    const [l] = await sql("select valor from configuracoes where chave = 'empresa'");
+    return { nome: "", documento: "", email: "", cidade: "", ...(l?.valor ?? {}), termos_versao: VERSAO_DOS_TERMOS };
+  }
+  async function salvarEmpresa(corpo) {
+    const d = { nome: texto(corpo.nome, 120), documento: soDigitos(corpo.documento), email: String(corpo.email ?? "").trim().toLowerCase(), cidade: texto(corpo.cidade, 80) };
+    const campos = {};
+    if (d.nome.length > 120) campos.nome = "Até 120 letras.";
+    if (d.documento && !(cpfValido(d.documento) || cnpjValido(d.documento))) campos.documento = "CPF ou CNPJ inválido.";
+    if (d.email && !EMAIL.test(d.email)) campos.email = "E-mail inválido.";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    await sql("insert into configuracoes (chave, valor) values ('empresa', $1::jsonb) on conflict (chave) do update set valor = excluded.valor", [JSON.stringify(d)]);
+    return lerEmpresa();
   }
 
   /**
@@ -951,6 +996,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
     visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil, indicacao,
     lerAssinatura, salvarAssinatura, cobrarMensalidades, ajustarAssinatura, cobrarMensalidadeAgora, suspenderAgora,
+    registrarNota, lerEmpresa, salvarEmpresa,
   };
 }
 

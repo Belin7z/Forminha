@@ -28,8 +28,9 @@ export async function telaConfiguracoes(conteiner, eu) {
   const r = eu.recursos ?? {};
   const webhook = `${location.origin}/api/webhook/mercadopago`;
   let cfg = null;
-  let assinatura = null;
+  let assinatura = null, empresa = null;
   if (r.clientes) {
+    try { empresa = await api("GET", "empresa"); } catch { /* sem banco */ }
     try { cfg = await api("GET", "configuracoes"); } catch { /* mostra só as conexões */ }
     try { assinatura = await api("GET", "assinatura"); } catch { /* sem mensalidade por enquanto */ }
   }
@@ -63,6 +64,20 @@ export async function telaConfiguracoes(conteiner, eu) {
             ${campo({ nome: "aviso_antes_dias", rotulo: "Cobrar antes (dias)", tipo: "number", valor: assinatura.aviso_antes_dias, atributos: 'min="0" max="30"', ajuda: "A cobrança sai por e-mail." })}
             ${campo({ nome: "carencia_dias", rotulo: "Suspender após (dias de atraso)", tipo: "number", valor: assinatura.carencia_dias, atributos: 'min="0" max="90"', ajuda: "O site para de receber pedidos; o painel continua." })}
           </div>
+          <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>
+        </form>`}
+
+      ${empresa && html`
+        <form class="cartao" id="f-empresa" novalidate>
+          <div class="cartao__cab"><div><h2>Empresa</h2><small class="texto-suave">Aparece nos <a class="link" href="#/termos" target="_blank" rel="noopener">termos de uso</a> e na <a class="link" href="#/privacidade" target="_blank" rel="noopener">política de privacidade</a>.</small></div></div>
+          <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "nome", rotulo: "Nome ou razão social", valor: empresa.nome, atributos: 'maxlength="120"' })}
+          <div class="grade-2">
+            ${campo({ nome: "documento", rotulo: "CNPJ ou CPF", valor: empresa.documento, atributos: 'inputmode="numeric" maxlength="18"' })}
+            ${campo({ nome: "cidade", rotulo: "Cidade/UF (foro)", valor: empresa.cidade, placeholder: "São Paulo/SP", atributos: 'maxlength="80"' })}
+          </div>
+          ${campo({ nome: "email", rotulo: "E-mail de contato", tipo: "email", valor: empresa.email, ajuda: "Para cancelamentos e pedidos sobre dados pessoais." })}
+          <p class="texto-suave">Os textos são um modelo claro e completo (LGPD, mensalidade, suspensão, cancelamento). Antes de crescer, vale a revisão de um advogado.</p>
           <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>
         </form>`}
 
@@ -123,6 +138,18 @@ export async function telaConfiguracoes(conteiner, eu) {
         </div>
       </section>`}
     </div>`);
+
+  const formEmpresa = conteiner.querySelector("#f-empresa");
+  if (formEmpresa) {
+    ativarCampos(formEmpresa);
+    formEmpresa.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      await ocupado(formEmpresa.querySelector("[type=submit]"), async () => {
+        try { await api("PUT", "empresa", dadosDe(formEmpresa)); toast("Dados da empresa salvos."); }
+        catch (erro) { mostrarErros(formEmpresa, erro); }
+      });
+    });
+  }
 
   const formAssinatura = conteiner.querySelector("#f-assinatura");
   if (formAssinatura) {

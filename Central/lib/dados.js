@@ -144,6 +144,8 @@ export const ESQUEMA = [
   `alter table clientes add column if not exists assinatura_isenta boolean not null default false`,
   `alter table clientes add column if not exists suspensa_em timestamptz`,
   `alter table clientes add column if not exists assinatura_estado jsonb`,       // o que a loja já sabe (evita escrever à toa)
+  `alter table clientes add column if not exists termos_versao text`,            // os termos que valiam quando ela pagou
+  `alter table clientes add column if not exists termos_aceitos_em timestamptz`,
   `create table if not exists tentativas_login (
     chave text primary key,                     -- 'ip:…', 'conta:…', 'codigo:…'
     falhas integer not null default 0,

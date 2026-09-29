@@ -65,6 +65,15 @@ loja pronta), quantos dias antes a cobrança sai e depois de quantos dias de atr
 Na ficha de cada cliente (seção **Mensalidade**): valor próprio, mudar o vencimento, isentar (cortesia), cobrar agora,
 suspender e reativar à mão, e o histórico das mensalidades. A Visão geral mostra quanto entra por mês.
 
+## Termos, privacidade e nota fiscal
+
+- **Termos de uso** e **Política de privacidade** da Forminha ficam públicos em `#/termos` e `#/privacidade` (links na
+  tela de entrar e na página de pagamento, que avisa: “ao pagar, você concorda…”). O nome, o CPF/CNPJ, o e-mail e a cidade
+  vêm de **Configurações → Empresa**. Quando a cliente paga a loja, a ficha guarda a versão dos termos aceitos. O texto é
+  um modelo completo (LGPD, mensalidade, suspensão, cancelamento); vale a revisão de um advogado.
+- **Nota fiscal**: emita no sistema da prefeitura (ou pelo contador) e registre o número e o link em **Pagamentos**
+  (filtro *Sem nota fiscal*). A Visão geral avisa quantos pagamentos ainda estão sem nota.
+
 ## Equipe (aba Equipe — só o dono)
 
 Cada funcionário entra com um **usuário próprio da Forminha**, nunca com e-mail: **FM** + a letra da

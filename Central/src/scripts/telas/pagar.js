@@ -96,7 +96,8 @@ export async function telaPagar(token) {
         <li>${d.tipo === "mensalidade" ? "Pronto: a confirmação aparece aqui." : "Pronto: o acesso chega no seu e-mail."}</li></ol>
       <div class="pagar__codigo"><code>${d.pix}</code></div>
       <button type="button" class="btn btn--primario btn--grande btn--bloco" data-copiar-pix>${icone("copiar", { tamanho: 17 })} Copiar código PIX</button>
-      <p class="pagar__espera"><span class="spinner spinner--pequeno"></span> Aguardando o pagamento…${d.automatico ? "" : " (a confirmação pode levar alguns minutos)"}</p>`);
+      <p class="pagar__espera"><span class="spinner spinner--pequeno"></span> Aguardando o pagamento…${d.automatico ? "" : " (a confirmação pode levar alguns minutos)"}</p>
+      <p class="pagar__termos">Ao pagar, você concorda com os <a class="link" href="#/termos" target="_blank" rel="noopener">Termos de uso</a> e a <a class="link" href="#/privacidade" target="_blank" rel="noopener">Política de privacidade</a> da Forminha.</p>`);
     desenharQr(cartao.querySelector("[data-qr]"), d);
     cartao.querySelector("[data-copiar-pix]").addEventListener("click", async () => { await copiar(d.pix); toast("Código PIX copiado."); });
   }

@@ -371,6 +371,16 @@ export function criarCentral(env = process.env, opcoes = {}) {
     })],
     ["POST", new RegExp(`^clientes/${ID}/indicacao$`), "clientes.ver", async ({ m }) => ({ corpo: await (await exigirClientes()).indicacao(m[1]) })],
 
+    /* ---------- parte legal: dados da empresa (termos e privacidade) e nota fiscal ---------- */
+    ["GET", /^publico\/empresa$/, false, async () => {
+      const e = await (await clientesParaPublico()).lerEmpresa();
+      return { corpo: { nome: e.nome, documento: e.documento, email: e.email, cidade: e.cidade, termos_versao: e.termos_versao } };
+    }],
+    ["GET", /^empresa$/, "configuracoes", async () => ({ corpo: await (await exigirClientes()).lerEmpresa() })],
+    ["PUT", /^empresa$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarEmpresa(corpo) }), "Alterou os dados da empresa"],
+    ["PUT", new RegExp(`^pagamentos/${ID}/nota$`), "pagamentos.confirmar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).registrarNota(m[1], corpo) }),
+      ({ corpo }) => [String(corpo.numero ?? "").trim() ? "Registrou nota fiscal" : "Apagou nota fiscal"]],
+
     /* ---------- mensalidade (assinatura) ---------- */
     ["GET", /^assinatura$/, true, async () => ({ corpo: await (await exigirClientes()).lerAssinatura() })],
     ["PUT", /^assinatura$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarAssinatura(corpo) }), "Alterou a mensalidade"],

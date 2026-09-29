@@ -16,6 +16,7 @@ import { api, aviso, marca, pode, quandoExpirar, raiz } from "./nucleo.js";
 import { botaoTema } from "./claro-escuro.js";
 import { telaEntrar, telaNovaSenha } from "./telas/entrar.js";
 import { abrirSeguranca } from "./telas/seguranca.js";
+import { telaLegal } from "./telas/legal.js";
 import { telaVisaoGeral } from "./telas/visao-geral.js";
 import { telaClientes } from "./telas/clientes.js";
 import { telaPagamentos } from "./telas/pagamentos.js";
@@ -89,6 +90,8 @@ function perfil(eu) {
 async function rotear() {
   const pagar = /^#\/pagar\/([A-Za-z0-9_-]{20,64})$/.exec(location.hash);
   if (pagar) return telaPagar(pagar[1]);
+  const legal = /^#\/(termos|privacidade)$/.exec(location.hash);
+  if (legal) return telaLegal(legal[1]);
   const novaSenha = /^#\/nova-senha\/([A-Za-z0-9_-]{20,})$/.exec(location.hash);
   if (novaSenha) return telaNovaSenha(novaSenha[1], () => telaEntrar(rotear));
   const eu = await api("GET", "eu").catch(() => ({ logado: false }));

@@ -23,7 +23,7 @@ function moldura(conteudo) {
       <section class="entrar__lado">
         ${botaoTema("entrar__tema")}
         <div class="entrar__caixa" data-caixa>${marca}${conteudo}</div>
-        <p class="entrar__copy">© ${new Date().getFullYear()} Forminha</p>
+        <p class="entrar__copy">© ${new Date().getFullYear()} Forminha · <a class="link" href="#/termos">Termos</a> · <a class="link" href="#/privacidade">Privacidade</a></p>
       </section>
     </main>`);
   return raiz.querySelector("[data-caixa]");

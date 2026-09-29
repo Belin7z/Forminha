@@ -157,6 +157,8 @@ export async function telaVisaoGeral(conteiner, eu) {
         <div class="painel-coluna">
         <section class="cartao">
           <div class="cartao__cab"><h2>Precisa de atenção</h2></div>
+          ${r.sem_nota > 0 && html`<a class="aviso aviso--info aviso--link visao__nota" href="#/pagamentos">${icone("documento", { tamanho: 16 })}
+            <span>${r.sem_nota} ${r.sem_nota === 1 ? "pagamento recebido está" : "pagamentos recebidos estão"} sem nota fiscal.</span></a>`}
           ${r.atencao.length ? html`<ul class="lista-simples">${r.atencao.map((a) => html`
             <li><button type="button" class="lista-simples__item" data-cliente="${a.cliente_id}">
               <span class="ponto ponto--${a.tipo === "parada" ? "perigo" : "aviso"}"></span>
