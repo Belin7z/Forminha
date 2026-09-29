@@ -193,8 +193,61 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   }
 
   /** Controles só do simulador (não existem no Supabase de verdade). */
+  /**
+   * Vendas de exemplo espalhadas pelos últimos 13 meses (mais nos meses recentes), com clientes, cupons,
+   * entregas, cancelados e pagamentos — para ver os relatórios cheios no modo de teste. Sempre as mesmas.
+   */
+  async function criarVendasDeExemplo(quantidade) {
+    const nomes = ["Ana Paula Ribeiro", "Bruno Costa", "Carla Mendes", "Diego Rocha", "Elisa Martins", "Fábio Nunes", "Gabriela Torres", "Heitor Lima"];
+    for (const [i, nome] of nomes.entries()) {
+      await fetch(`${envFuncoes.SUPABASE_URL}/auth/v1/signup`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: `cliente${i + 1}@exemplo.com`, password: "Senha1234", data: { nome } }),
+      }).catch(() => {});
+    }
+    const clientes = (await sql(db, "select id, nome from public.perfis where papel = 'cliente' order by criado_em")).rows;
+    const produtos = (await sql(db, "select id, nome, preco, unidade from public.produtos where ativo order by id")).rows;
+    if (!clientes.length || !produtos.length) return 0;
+    let semente = 42;
+    const acaso = () => (semente = (semente * 16807) % 2147483647) / 2147483647;
+    const escolher = (lista) => lista[Math.floor(acaso() * lista.length)];
+    const FORMA_RECEBIDA = { pix: "pix", dinheiro: "dinheiro", cartao_entrega: "cartao" };
+    for (let i = 0; i < quantidade; i++) {
+      const dias = Math.floor(acaso() ** 1.8 * 395); // mais pedidos nos meses recentes
+      const criado = new Date(Date.now() - dias * 86400_000);
+      criado.setUTCHours(11 + Math.floor(acaso() * 12), Math.floor(acaso() * 60)); // entre 8h e 20h em São Paulo
+      const itens = Array.from({ length: acaso() < 0.3 ? 2 : 1 }, () => { const pr = escolher(produtos); const qtd = 1 + Math.floor(acaso() * 3); return { ...pr, qtd, total: pr.preco * qtd }; });
+      const subtotal = itens.reduce((t, x) => t + x.total, 0);
+      const tipo = acaso() < 0.45 ? "entrega" : "retirada";
+      const frete = tipo === "entrega" ? 800 + Math.floor(acaso() * 8) * 100 : 0;
+      const cupom = acaso() < 0.12 ? "BEMVINDO10" : null;
+      const desconto = cupom ? Math.round(subtotal * 0.1) : 0;
+      const total = subtotal + frete - desconto;
+      const pagamento = escolher(["pix", "pix", "dinheiro", "cartao_entrega"]);
+      const status = dias <= 2 ? escolher(["novo", "confirmado", "em_preparo"]) : acaso() < 0.07 ? "cancelado" : "entregue";
+      const agendado = new Date(criado.getTime() + (1 + Math.floor(acaso() * 3)) * 86400_000);
+      const cli = escolher(clientes);
+      const [{ id }] = (await sql(db, `insert into public.pedidos (usuario_id, cliente_nome, cliente_telefone, status, tipo, data_agendada, hora_agendada, pagamento,
+          subtotal, taxa_entrega, desconto, total, cupom, criado_em, atualizado_em, motivo_cancelamento)
+        values ($1, $2, '11999990000', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $13, $14) returning id`,
+        [cli.id, cli.nome, status, tipo, agendado.toISOString().slice(0, 10), escolher(["10:00", "14:00", "16:00", "18:00"]), pagamento,
+          subtotal, frete, desconto, total, cupom, criado.toISOString(), status === "cancelado" ? "Cliente desistiu" : null])).rows;
+      await sql(db, "update public.pedidos set codigo = 'LA' || id where id = $1", [id]);
+      for (const x of itens) {
+        await sql(db, "insert into public.pedido_itens (pedido_id, produto_id, nome, unidade, preco_unit, qtd, total) values ($1, $2, $3, $4, $5, $6, $7)",
+          [id, x.id, x.nome, x.unidade, x.preco, x.qtd, x.total]);
+      }
+      if (status === "entregue" || (status !== "cancelado" && acaso() < 0.4)) {
+        await sql(db, "insert into public.pagamentos_pedido (pedido_id, valor, forma, criado_em) values ($1, $2, $3, $4)", [id, total, FORMA_RECEBIDA[pagamento], criado.toISOString()]);
+        await sql(db, "update public.pedidos set pago = $2 where id = $1", [id, total]);
+      }
+    }
+    return quantidade;
+  }
+
   async function rotaTeste(req, res, caminho) {
     const corpo = req.method === "POST" ? await lerJson(req) : {};
+    if (caminho === "/vendas-exemplo") return responder(res, 200, { criados: await criarVendasDeExemplo(Math.min(Number(corpo.quantidade) || 220, 2000)) });
     if (caminho === "/mp/aprovar") { // "o cliente pagou no app do banco": aprova no Mercado Pago simulado e dispara o aviso ao webhook
       const pag = externos.pagamentoDoPedido(String(corpo.codigo));
       if (!pag) return responder(res, 404, { message: "Nenhum PIX gerado para este pedido." });

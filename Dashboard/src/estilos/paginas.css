@@ -527,3 +527,38 @@
   .dns__linha [data-rotulo]::before { content: attr(data-rotulo); margin-right: .45rem; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-suave); }
   .dns__valor, .dns__status { grid-column: 1 / -1; }
 }
+
+/* ---------- Relatórios de vendas ---------- */
+.relatorio__controles { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-bottom: 1.2rem; }
+.relatorio__controles .segmentos { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.relatorio__controles .segmentos::-webkit-scrollbar { display: none; }
+.relatorio__controles .segmento { flex: none; white-space: nowrap; }
+.relatorio__livre { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; }
+.relatorio__livre[hidden] { display: none; }
+.relatorio__livre label { display: flex; align-items: center; gap: .4rem; font-size: .85rem; color: var(--texto-suave); }
+.segmentos--pequeno .segmento { padding: .3rem .75rem; font-size: .78rem; }
+.relatorio__coluna { display: grid; align-content: start; } /* os cartões já trazem o espaço entre eles */
+.relatorio__produto { display: grid; gap: .3rem; min-width: 9rem; }
+.relatorio__trilho { display: block; height: 4px; border-radius: 99px; background: var(--marca-100); overflow: hidden; }
+.relatorio__trilho i { display: block; height: 100%; border-radius: inherit; background: var(--detalhe); }
+.relatorio__mais { margin-top: .8rem; }
+.kpis--relatorio { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis--relatorio .kpi__valor { font-size: clamp(1.5rem, 2.3vw, 2.1rem); white-space: nowrap; }
+@media (max-width: 640px) {
+  .kpis--relatorio { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+  .kpis--relatorio .kpi { padding: 1rem; }
+  .kpis--relatorio .kpi__valor { font-size: 1.3rem; }
+  .relatorio__extra { display: none; }
+  .relatorio__produto { min-width: 0; }
+  .kpis--relatorio ~ * .tabela--compacta :is(td, th) { padding-inline: .4rem; }
+}
+.variacao { display: inline-flex; align-items: center; gap: .15rem; font-weight: 600; }
+.variacao--sobe { color: var(--sucesso); }
+.variacao--desce { color: var(--perigo); }
+.painel-grade--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 900px) { .painel-grade--2 { grid-template-columns: 1fr; } }
+@media print {
+  .relatorio__controles { display: none !important; }
+  .painel-grade--2-1, .painel-grade--3, .painel-grade--2 { grid-template-columns: 1fr 1fr; }
+  .cartao { break-inside: avoid; }
+}

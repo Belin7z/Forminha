@@ -78,6 +78,11 @@ Na **Visão geral** aparece a lista **“Primeiros passos”**: ela mostra o que
 
 ### Dashboard (equipe)
 - **Visão geral:** primeiros passos, indicadores do dia e do mês, vendas por dia, mais vendidos, formas de pagamento, favoritos e últimos pedidos.
+- **Relatórios** (só o administrador): Hoje, 7 dias, 30 dias, Este mês, Mês passado, 12 meses, Por ano ou de um dia até outro, pela **data do pedido** ou da
+  **entrega**. Faturamento, pedidos e ticket médio comparados com o período anterior, recebido e a receber, lucro estimado (pelas receitas do Estoque),
+  gráfico por hora/dia/mês/ano, produtos e categorias que mais vendem, como os clientes pagam, entrega × retirada, dias da semana e horários que mais
+  vendem, melhores clientes, cupons usados e a lista de pedidos — com **planilha** e **impressão**. No modo de teste, `VENDAS_EXEMPLO=1 npm run dev`
+  cria um ano de pedidos de exemplo para ver tudo cheio.
 - **Pedidos:** quadro por etapa e lista, busca, filtro por data, avanço rápido, detalhe com mapa, aviso ao cliente pelo **WhatsApp**,
   impressão e **alerta sonoro** de pedido novo. Cada pedido mostra a situação do pagamento (a receber, sinal pago, pago) e permite
   **registrar e estornar pagamentos**.

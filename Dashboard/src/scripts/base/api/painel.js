@@ -120,6 +120,8 @@ export const rotasPainel = [
 
   // visão geral e pedidos (rotas fixas antes de "/pedidos/:id")
   ["GET", "/resumo", ({ rpc, consulta }) => rpc("admin_resumo", consulta)],
+  // relatório de vendas: ?de=AAAA-MM-DD&ate=AAAA-MM-DD&base=pedido|entrega[&agrupar=hora|dia|mes|ano]
+  ["GET", "/relatorios/vendas", ({ rpc, consulta }) => rpc("admin_relatorio_vendas", consulta)],
   ["GET", "/pedidos/contagem", ({ rpc }) => rpc("admin_pedidos_contagem")],
   ["GET", "/pedidos/novos", ({ rpc, consulta }) => rpc("admin_pedidos_novos", consulta)],
   ["GET", "/pedidos", ({ rpc, consulta }) => rpc("admin_pedidos", consulta)],

@@ -16,7 +16,7 @@ import { alternarSom, pararNotificacoes, somAtivo } from "../nucleo/notificacoes
 import { aoMudarInstalacao, instalar, podeInstalar } from "/src/scripts/base/instalar.js";
 
 const MENU = [
-  { grupo: "Vendas", itens: [["/", "Visão geral", "grafico"], ["/pedidos", "Pedidos", "pacote", "pedidos"], ["/agenda", "Agenda", "calendario"], ["/producao", "Produção", "lista"]] },
+  { grupo: "Vendas", itens: [["/", "Visão geral", "grafico"], ["/relatorios", "Relatórios", "tendencia"], ["/pedidos", "Pedidos", "pacote", "pedidos"], ["/agenda", "Agenda", "calendario"], ["/producao", "Produção", "lista"]] },
   { grupo: "Cardápio", itens: [["/produtos", "Produtos", "bolo"], ["/categorias", "Categorias", "grade"], ["/estoque", "Estoque", "estoque", "estoque"]] },
   { grupo: "Clientes", itens: [["/clientes", "Clientes", "usuarios"], ["/avaliacoes", "Avaliações", "estrela"], ["/favoritos", "Favoritos", "coracao"]] },
   { grupo: "Loja", itens: [["/cupons", "Cupons", "percentual"], ["/entrega", "Entrega e mapa", "caminhao"], ["/configuracoes", "Configurações", "ajustes"], ["/equipe", "Equipe", "usuario"], ["/atividade", "Atividade", "relogio"]] },

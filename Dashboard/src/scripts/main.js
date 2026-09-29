@@ -33,6 +33,7 @@ import { equipe } from "./paginas/equipe.js";
 import { conta } from "./paginas/conta.js";
 import { atividade } from "./paginas/atividade.js";
 import { primeirosPassos } from "./paginas/primeiros-passos.js";
+import { relatorios } from "./paginas/relatorios.js";
 import { registrarServico } from "/src/scripts/base/instalar.js";
 
 const naoEncontrada = (ctx) => {
@@ -42,6 +43,7 @@ const naoEncontrada = (ctx) => {
 
 const ROTAS = {
   "/": visaoGeral,
+  "/relatorios": relatorios,
   "/pedidos": pedidos,
   "/pedidos/novo": novoPedido,
   "/agenda": agenda,

@@ -38,7 +38,7 @@ export function graficoBarras({ titulo, dados, formato, formatoEixo = formato, c
           <div class="grafico__barras">
             ${dados.map((d, i) => html`
               <div class="coluna">
-                <button type="button" class="barra ${i === indiceMax && "barra--max"}" style="--altura:${(d.valor / teto) * 100}%" data-dica="${d.dica ?? `${d.rotulo}: ${formato(d.valor)}`}" aria-label="${d.dica ?? `${d.rotulo}: ${formato(d.valor)}`}">
+                <button type="button" class="barra ${i === indiceMax && "barra--max"} ${i < 2 && "barra--inicio"} ${i >= dados.length - 2 && "barra--fim"}" style="--altura:${(d.valor / teto) * 100}%" data-dica="${d.dica ?? `${d.rotulo}: ${formato(d.valor)}`}" aria-label="${d.dica ?? `${d.rotulo}: ${formato(d.valor)}`}">
                   ${i === indiceMax && html`<span class="barra__valor">${formato(d.valor)}</span>`}
                 </button>
                 <span class="coluna__rotulo" aria-hidden="true">${i % passoRotulo === 0 ? d.rotulo : ""}</span>

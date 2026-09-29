@@ -53,6 +53,10 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
   await emulador.criarAdmin("admin@exemplo.com", "Admin12345");
   // um convite de primeiro acesso, para experimentar o caminho da dona de uma loja nova
   conviteTeste = (await emulador.db.query("select public._criar_convite(null, 7) as c")).rows[0].c;
+  // VENDAS_EXEMPLO=1: um ano de pedidos de exemplo, para ver Visão geral e Relatórios cheios
+  if (process.env.VENDAS_EXEMPLO === "1" && process.env.SEM_EXEMPLO !== "1") {
+    await fetch(`${emulador.url}/__teste/vendas-exemplo`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+  }
 }
 
 /* ---------- Cabeçalhos de segurança: os mesmos do vercel.json de cada app ---------- */
@@ -128,7 +132,7 @@ console.log(`
 ${emulador ? `
    Login do Dashboard (teste):  admin@exemplo.com  /  Admin12345
    Convite de primeiro acesso:  ${urlDashboard}/#/convite/${conviteTeste}
-   ${process.env.SEM_EXEMPLO === "1" ? "Cardápio: vazio (SEM_EXEMPLO=1)" : "Cupom de exemplo:            BEMVINDO10"}
+   ${process.env.SEM_EXEMPLO === "1" ? "Cardápio: vazio (SEM_EXEMPLO=1)" : "Cupom de exemplo:            BEMVINDO10"}${process.env.VENDAS_EXEMPLO === "1" ? "\n   Vendas de exemplo:           um ano de pedidos (VENDAS_EXEMPLO=1)" : ""}
    (banco local em memória: os dados somem quando você fecha este terminal)
 ` : ""}
    Para parar: Ctrl+C

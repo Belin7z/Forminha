@@ -40,7 +40,7 @@
 .segmentos--solto { margin-bottom: 1.1rem; }
 .segmento { display: inline-flex; align-items: center; gap: .35rem; border: 0; background: none; padding: .38rem .9rem; border-radius: 999px; font-size: .82rem; font-weight: 500; color: var(--marca-texto); transition: background .15s; }
 .segmento:hover { background: rgba(255, 255, 255, .6); }
-.segmento--ativo { background: var(--escura); color: #fff; font-weight: 500; box-shadow: var(--sombra-sm); }
+.segmento--ativo, .segmento--ativo:hover { background: var(--escura); color: #fff; font-weight: 500; box-shadow: var(--sombra-sm); } /* o selecionado não clareia ao passar o mouse */
 
 /* ---------- Filtros ---------- */
 .filtros-barra { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: 1rem; align-items: center; }
@@ -111,6 +111,8 @@
 .barra:hover::before, .barra:focus-visible::before { background: var(--marca-texto); }
 .barra:focus-visible { outline: 3px solid var(--marca-destaque); outline-offset: 2px; border-radius: 4px; }
 .barra__valor { position: absolute; bottom: calc(var(--altura) + 4px); font-size: .68rem; font-weight: 600; color: var(--texto); white-space: nowrap; }
+.barra--inicio .barra__valor { left: 0; }
+.barra--fim .barra__valor { right: 0; }
 .coluna__rotulo { height: 22px; font-size: .66rem; color: var(--texto-suave); text-align: center; white-space: nowrap; overflow: visible; padding-top: 5px; }
 .grafico__dica { position: absolute; z-index: 5; padding: .35rem .65rem; background: var(--escura); color: #fff; font-size: .76rem; border-radius: 8px; pointer-events: none; white-space: nowrap; box-shadow: var(--sombra); }
 .grafico__tabela { max-height: 260px; display: block; overflow-y: auto; }
