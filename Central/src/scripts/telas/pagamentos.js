@@ -31,7 +31,7 @@ export async function telaPagamentos(conteiner, eu) {
         ${r.pagamentos.map((p) => { const [t, tom] = SITUACAO[p.situacao]; return html`
           <button type="button" class="tabela__linha tabela__linha--clicavel" role="row" data-cliente="${p.cliente_id}">
             <span class="tabela__suave">${quandoCurto(p.confirmado_em ?? p.criado_em)}</span>
-            <span class="tabela__principal"><strong>${p.nome_loja}</strong><small class="so-celular">${p.cliente} · ${t}</small></span>
+            <span class="tabela__principal"><strong>${p.nome_loja}${p.tipo === "mensalidade" && html` <span class="selo selo--neutro selo--mini">Mensalidade</span>`}</strong><small class="so-celular">${p.cliente} · ${t}</small></span>
             <span>${p.cliente}</span>
             <span class="tabela__numero">${reais(p.valor_centavos)}</span>
             <span><span class="ponto ponto--${tom}">${t}</span></span>

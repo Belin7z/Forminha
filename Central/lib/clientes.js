@@ -143,25 +143,34 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   }
 
   /* ---------- cobrança ---------- */
-  async function novaCobranca(c) {
+  /**
+   * Cobrança PIX (e Mercado Pago, se ligado) com página de pagamento. `tipo` "loja" (a criação) ou "mensalidade";
+   * a cobrança nova cancela as pendentes do mesmo tipo.
+   */
+  async function novaCobranca(c, { valor = c.valor_centavos, tipo = "loja", vencimento = null, credito = 0 } = {}) {
     const cfg = await lerConfig();
     if (!cfg.pix.chave) throw new ErroHttp(409, "Antes de cobrar, informe a sua chave PIX em Configurações.");
     const pessoa = abrir(c);
-    await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and situacao = 'pendente'", [c.id]);
+    await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and situacao = 'pendente' and tipo = $2", [c.id, tipo]);
     const id = randomUUID();
     const token = randomBytes(24).toString("base64url");
     const link = `${urlBase}/#/pagar/${token}`;
-    const pix = gerarPix({ ...cfg.pix, valor: c.valor_centavos, identificador: `FM${id.replace(/-/g, "").slice(0, 20)}` });
+    const pix = gerarPix({ ...cfg.pix, valor, identificador: `FM${id.replace(/-/g, "").slice(0, 20)}` });
     let automatico = null;
     if (mp) {
       try {
-        automatico = await mp.criarCobranca({ valorCentavos: c.valor_centavos, descricao: `Loja ${c.nome_loja} - Forminha`, email: pessoa.email, referencia: id, notificacao: `${urlBase}/api/webhook/mercadopago`, chaveUnica: id });
+        const descricao = tipo === "mensalidade" ? `Mensalidade ${c.nome_loja} - Forminha` : `Loja ${c.nome_loja} - Forminha`;
+        automatico = await mp.criarCobranca({ valorCentavos: valor, descricao, email: pessoa.email, referencia: id, notificacao: `${urlBase}/api/webhook/mercadopago`, chaveUnica: id });
       } catch (e) { await anotarHistorico(c.id, "pagamento", `Mercado Pago indisponível; ficou só o PIX com a sua chave (${e.message}).`); }
     }
-    await sql(`insert into pagamentos (id, cliente_id, token_hash, link, valor_centavos, pix_copia_cola, mp_id, mp_copia_cola, mp_qr_base64)
-      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-    [id, c.id, resumo(token), cofre.cifrar(link, `pagamento:${id}`), c.valor_centavos, pix, automatico?.id ?? null, automatico?.copiaCola ?? null, automatico?.qrBase64 ?? null]);
-    await anotarHistorico(c.id, "pagamento", `Cobrança de ${(c.valor_centavos / 100).toFixed(2).replace(".", ",")} gerada${automatico ? " (PIX automático + manual)" : " (PIX com a sua chave)"}.`);
+    await sql(`insert into pagamentos (id, cliente_id, token_hash, link, valor_centavos, pix_copia_cola, mp_id, mp_copia_cola, mp_qr_base64, tipo, vencimento, credito_usado_centavos)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    [id, c.id, resumo(token), cofre.cifrar(link, `pagamento:${id}`), valor, pix, automatico?.id ?? null, automatico?.copiaCola ?? null, automatico?.qrBase64 ?? null,
+      tipo, vencimento, credito]);
+    const onde = automatico ? " (PIX automático + manual)" : " (PIX com a sua chave)";
+    await anotarHistorico(c.id, "pagamento", tipo === "mensalidade"
+      ? `Mensalidade de ${brl(valor)} gerada, vence em ${dataBRdoISO(vencimento)}${credito ? ` (${brl(credito)} de crédito abatido)` : ""}${onde}.`
+      : `Cobrança de ${(valor / 100).toFixed(2).replace(".", ",")} gerada${onde}.`);
     return { id, link };
   }
 
@@ -222,7 +231,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   async function listar() {
     const linhas = await sql("select * from clientes order by criado_em desc");
     return linhas.map((c) => {
-      try { const p = publico(c); return { id: p.id, criado_em: p.criado_em, nome: p.nome, email: p.email, telefone: p.telefone, nome_loja: p.nome_loja, valor_centavos: p.valor_centavos, situacao: p.situacao, etapa: p.etapa, parada: p.parada, loja_url: p.loja_url }; }
+      try { const p = publico(c); return { id: p.id, criado_em: p.criado_em, nome: p.nome, email: p.email, telefone: p.telefone, nome_loja: p.nome_loja, valor_centavos: p.valor_centavos, situacao: p.situacao, etapa: p.etapa, parada: p.parada, loja_url: p.loja_url, suspensa: Boolean(c.suspensa_em) }; }
       catch { return { id: c.id, criado_em: c.criado_em, nome: "(não foi possível abrir)", nome_loja: c.nome_loja, situacao: c.situacao, etapa: c.etapa, ilegivel: true }; }
     });
   }
@@ -231,11 +240,12 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const c = await linha(id);
     const pagamentos = (await sql("select * from pagamentos where cliente_id = $1 order by criado_em desc", [id])).map((p) => ({
       id: p.id, criado_em: p.criado_em, valor_centavos: p.valor_centavos, situacao: p.situacao, automatico: Boolean(p.mp_id),
+      tipo: p.tipo ?? "loja", vencimento: p.vencimento ? isoDia(p.vencimento) : null, credito_usado_centavos: p.credito_usado_centavos ?? 0, nota_fiscal: p.nota_fiscal ?? null,
       link: cofre.decifrar(p.link, `pagamento:${p.id}`), pix_copia_cola: p.pix_copia_cola, confirmado_em: p.confirmado_em, confirmado_por: p.confirmado_por,
     }));
     const historico = (await sql("select id, quando, tipo, texto from historico where cliente_id = $1 order by id desc limit 60", [id]))
       .map((h) => ({ id: h.id, quando: h.quando, tipo: h.tipo, texto: (() => { try { return cofre.decifrar(h.texto, `historico:${id}`); } catch { return "(não foi possível abrir)"; } })() }));
-    return { cliente: publico(c), pagamentos, historico, email_configurado: Boolean(email) };
+    return { cliente: publico(c), pagamentos, historico, email_configurado: Boolean(email), assinatura: await resumoAssinatura(c) };
   }
 
   async function atualizar(id, corpo) {
@@ -273,9 +283,10 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     if (!p) {
       const [atual] = await sql("select * from pagamentos where id = $1", [pagamentoId]);
       if (!atual) throw new ErroHttp(404, "Pagamento não encontrado.");
-      if (atual.situacao === "aprovado") return { cliente_id: atual.cliente_id, ja_estava: true }; // aviso repetido: não conta duas vezes
+      if (atual.situacao === "aprovado") return { cliente_id: atual.cliente_id, ja_estava: true, tipo: atual.tipo }; // aviso repetido: não conta duas vezes
       throw new ErroHttp(409, "Esta cobrança foi cancelada (há uma mais nova).");
     }
+    if (p.tipo === "mensalidade") { await mensalidadePaga(p, por); return { cliente_id: p.cliente_id, ja_estava: false, tipo: "mensalidade" }; }
     await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now()
       where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id]);
     await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "manualmente"}.`);
@@ -302,7 +313,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     if (!p) throw new ErroHttp(409, c.situacao === "pago" ? "O pagamento já está confirmado." : "Não há cobrança pendente.");
     const r = await confirmarPagamento(p.id, autorAtual() ?? "admin"); // quem confirmou fica guardado no pagamento
     if (r.cliente_id !== id) throw new ErroHttp(404, "Pagamento não encontrado.");
-    await avancar(id, { orcamento: Math.min(orcamentoMs, 20_000) }); // cria o banco já e pede para outra execução seguir
+    if (r.tipo !== "mensalidade") await avancar(id, { orcamento: Math.min(orcamentoMs, 20_000) }); // cria o banco já e pede para outra execução seguir
     return detalhe(id);
   }
 
@@ -324,7 +335,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       return { ignorado: true };
     }
     const r = await confirmarPagamento(p.id, "mercado_pago");
-    if (!r.ja_estava) continuar(r.cliente_id);
+    if (!r.ja_estava && r.tipo !== "mensalidade") continuar(r.cliente_id);
     return { ok: true };
   }
 
@@ -441,11 +452,12 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const [p] = await sql("select * from pagamentos where token_hash = $1", [resumo(token)]);
     if (!p) throw new ErroHttp(404, "Link de pagamento inválido.");
     let c = await linha(p.cliente_id);
-    if (c.situacao === "pago" && c.etapa !== "pronta") { await avancar(c.id, { orcamento: 8000 }); c = await linha(c.id); }
+    if (p.tipo !== "mensalidade" && c.situacao === "pago" && c.etapa !== "pronta") { await avancar(c.id, { orcamento: 8000 }); c = await linha(c.id); }
     const passoAtual = ORDEM.indexOf(c.etapa);
     return {
-      nome_loja: c.nome_loja, valor_centavos: p.valor_centavos, cupom: c.cupom ?? null, desconto_centavos: c.desconto_centavos ?? 0,
-      situacao: p.situacao === "cancelado" ? "cancelado" : c.situacao === "pago" ? "pago" : "pendente",
+      nome_loja: c.nome_loja, valor_centavos: p.valor_centavos, cupom: p.tipo === "mensalidade" ? null : c.cupom ?? null, desconto_centavos: p.tipo === "mensalidade" ? 0 : c.desconto_centavos ?? 0,
+      tipo: p.tipo ?? "loja", vencimento: p.vencimento ? isoDia(p.vencimento) : null, credito_usado_centavos: p.credito_usado_centavos ?? 0,
+      situacao: p.situacao === "cancelado" ? "cancelado" : p.tipo === "mensalidade" ? (p.situacao === "aprovado" ? "pago" : "pendente") : c.situacao === "pago" ? "pago" : "pendente",
       pix: p.mp_copia_cola ?? p.pix_copia_cola, qr_base64: p.mp_qr_base64 ?? null, automatico: Boolean(p.mp_id),
       loja_pronta: c.etapa === "pronta", progresso: c.situacao === "pago" ? Math.max(0, passoAtual) / (ORDEM.length - 1) : 0,
       email: mascararEmail(abrir(c).email),
@@ -539,9 +551,13 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const recentes = (await sql("select * from clientes order by criado_em desc limit 5")).map((c) => ({
       id: c.id, nome: nomeDe(c), nome_loja: c.nome_loja, situacao: c.situacao, etapa: c.etapa, parada: c.tentativas >= MAX_TENTATIVAS, criado_em: c.criado_em,
     }));
+    const atrasadas = await sql(`select c.id, c.nome_loja, p.valor_centavos, c.suspensa_em from pagamentos p join clientes c on c.id = p.cliente_id
+      where p.tipo = 'mensalidade' and p.situacao = 'pendente' and p.vencimento < (now() ${LOCAL})::date order by p.vencimento limit 5`);
     const r = {
       numeros: n,
       atencao: [
+        ...atrasadas.map((c) => ({ tipo: c.suspensa_em ? "parada" : "pagamento", cliente_id: c.id, nome_loja: c.nome_loja,
+          texto: c.suspensa_em ? "Loja suspensa: mensalidade atrasada" : "Mensalidade atrasada", valor_centavos: c.valor_centavos })),
         ...paradas.map((c) => ({ tipo: "parada", cliente_id: c.id, nome_loja: c.nome_loja, texto: "A criação da loja parou" })),
         ...esperando.map((c) => ({ tipo: "pagamento", cliente_id: c.id, nome_loja: c.nome_loja, texto: "Pagamento pendente há mais de 2 dias", valor_centavos: c.valor_centavos })),
       ],
@@ -573,6 +589,8 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return {
       ...r,
       financeiro: { mes: Number(f.mes), mes_anterior: Number(f.mes_anterior), total: Number(f.total), pendente: Number(f.pendente), vendas: f.vendas, meses },
+      // mensalidades: quanto entra todo mês (as lojas no ar que pagam) e quantas estão atrasadas
+      recorrente: await recorrencia(),
       // meta do mês e onde ele fecha se o ritmo continuar
       meta: {
         ...(await lerMetas()), faturamento_feito: Number(f.mes), lojas_feitas: f.vendas_mes, dia: f.dia, dias_no_mes: f.dias_no_mes,
@@ -586,7 +604,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   async function listarPagamentos({ situacao = "" } = {}) {
     const filtro = ["pendente", "aprovado", "cancelado"].includes(situacao) ? situacao : null;
     const linhas = await sql(`select p.id, p.cliente_id, p.valor_centavos, p.situacao, p.criado_em, p.confirmado_em, p.confirmado_por, p.mp_id,
-        c.nome_loja, c.dados, c.id as cid
+        p.tipo, p.nota_fiscal, to_char(p.vencimento, 'YYYY-MM-DD') as vencimento, c.nome_loja, c.dados, c.id as cid
       from pagamentos p join clientes c on c.id = p.cliente_id ${filtro ? "where p.situacao = $1" : ""}
       order by coalesce(p.confirmado_em, p.criado_em) desc limit 300`, filtro ? [filtro] : []);
     const [t] = await sql(`select coalesce(sum(valor_centavos) filter (where situacao = 'aprovado'), 0)::bigint as recebido,
@@ -597,6 +615,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
         id: p.id, cliente_id: p.cliente_id, cliente: nomeDe({ id: p.cid, dados: p.dados }), nome_loja: p.nome_loja, valor_centavos: p.valor_centavos,
         situacao: p.situacao, criado_em: p.criado_em, confirmado_em: p.confirmado_em, automatico: Boolean(p.mp_id),
         confirmado_por: p.confirmado_por === "mercado_pago" ? "Mercado Pago" : p.confirmado_por === "admin" ? "Manual" : p.confirmado_por,
+        tipo: p.tipo ?? "loja", vencimento: p.vencimento ?? null, nota_fiscal: p.nota_fiscal ?? null,
       })),
     };
   }
@@ -645,6 +664,218 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
         confirmado_por: l.confirmado_por === "mercado_pago" ? "Mercado Pago" : l.confirmado_por === "admin" ? "Manual" : l.confirmado_por,
       })),
     };
+  }
+
+  /* ==========================================================
+     ASSINATURA (mensalidade)
+       • a primeira vence N dias depois da loja pronta (padrão 30);
+       • a cobrança sai alguns dias antes (padrão 5), com o crédito de indicação abatido;
+       • vencida: lembrete; passada a carência (padrão 7 dias), a loja para de receber
+         pedidos pelo site (o painel continua); pagou, volta na hora e o vencimento avança 1 mês;
+       • a loja fica sabendo pela ficha "forminha" (o painel mostra o aviso com o link).
+     ========================================================== */
+  const PADRAO_ASSINATURA = { valor_centavos: 0, primeira_em_dias: 30, aviso_antes_dias: 5, carencia_dias: 7 };
+  async function lerAssinatura() {
+    const [l] = await sql("select valor from configuracoes where chave = 'assinatura'");
+    return { ...PADRAO_ASSINATURA, ...(l?.valor ?? {}) };
+  }
+  async function salvarAssinatura(corpo) {
+    const d = { valor_centavos: Math.round(Number(corpo.valor_centavos ?? 0)), primeira_em_dias: Math.round(Number(corpo.primeira_em_dias ?? 30)),
+      aviso_antes_dias: Math.round(Number(corpo.aviso_antes_dias ?? 5)), carencia_dias: Math.round(Number(corpo.carencia_dias ?? 7)) };
+    const campos = {};
+    if (!Number.isFinite(d.valor_centavos) || d.valor_centavos < 0 || d.valor_centavos > 10_000_000) campos.valor = "Mensalidade: de R$ 0 a R$ 100.000 (0 = sem mensalidade).";
+    if (!Number.isFinite(d.primeira_em_dias) || d.primeira_em_dias < 0 || d.primeira_em_dias > 365) campos.primeira_em_dias = "De 0 a 365 dias.";
+    if (!Number.isFinite(d.aviso_antes_dias) || d.aviso_antes_dias < 0 || d.aviso_antes_dias > 30) campos.aviso_antes_dias = "De 0 a 30 dias.";
+    if (!Number.isFinite(d.carencia_dias) || d.carencia_dias < 0 || d.carencia_dias > 90) campos.carencia_dias = "De 0 a 90 dias.";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    await sql("insert into configuracoes (chave, valor) values ('assinatura', $1::jsonb) on conflict (chave) do update set valor = excluded.valor", [JSON.stringify(d)]);
+    return lerAssinatura();
+  }
+
+  const valorMensal = (c, cfg) => (c.mensalidade_centavos ?? cfg.valor_centavos) || 0;
+  const cobravel = (c, cfg) => c.situacao === "pago" && c.etapa === "pronta" && !c.assinatura_isenta && valorMensal(c, cfg) > 0;
+  const pendenteDe = async (id) => (await sql(`select *, to_char(vencimento, 'YYYY-MM-DD') as venc from pagamentos
+    where cliente_id = $1 and tipo = 'mensalidade' and situacao = 'pendente' order by criado_em desc limit 1`, [id]))[0] ?? null;
+
+  /** A situação da mensalidade (a mesma que vai para a ficha da loja). */
+  async function estadoAssinatura(c, cfg, hoje = hojeSP()) {
+    if (c.situacao !== "pago" || c.etapa !== "pronta") return null;
+    if (!cobravel(c, cfg)) return { situacao: c.assinatura_isenta ? "isenta" : "sem_mensalidade", vencimento: null, valor_centavos: 0, link: null, suspensa: false };
+    const pend = await pendenteDe(c.id);
+    const venc = pend?.venc ?? (c.proximo_vencimento ? isoDia(c.proximo_vencimento) : null);
+    const situacao = c.suspensa_em ? "suspensa" : pend ? (pend.venc < hoje ? "atrasada" : "aberta") : "em_dia";
+    return { situacao, vencimento: venc, valor_centavos: pend?.valor_centavos ?? valorMensal(c, cfg), link: pend ? cofre.decifrar(pend.link, `pagamento:${pend.id}`) : null,
+      suspensa: Boolean(c.suspensa_em) };
+  }
+
+  /** Para a ficha da cliente na Central. */
+  async function resumoAssinatura(c) {
+    const cfg = await lerAssinatura();
+    const e = await estadoAssinatura(c, cfg);
+    if (!e) return null;
+    return { ...e, mensalidade_centavos: c.mensalidade_centavos ?? null, padrao_centavos: cfg.valor_centavos, isenta: c.assinatura_isenta,
+      proximo_vencimento: c.proximo_vencimento ? isoDia(c.proximo_vencimento) : null, credito_centavos: c.credito_centavos ?? 0,
+      suspensa_em: c.suspensa_em ?? null, pendente_id: (await pendenteDe(c.id))?.id ?? null };
+  }
+
+  /** Conta para a loja (ficha "forminha") a situação da mensalidade — só quando mudou. */
+  async function sincronizarAssinatura(c, cfg) {
+    const e = await estadoAssinatura(c, cfg);
+    if (!e || !c.loja_ref) return false;
+    if (JSON.stringify(e) === JSON.stringify(c.assinatura_estado ?? null)) return false;
+    try {
+      await lojas.escreverFicha(c.loja_ref, { assinatura: e });
+      await sql("update clientes set assinatura_estado = $2::jsonb where id = $1", [c.id, JSON.stringify(e)]);
+      return true;
+    } catch (erro) { console.error("[assinatura]", c.id, erro.message); return false; } // loja pausada: tenta de novo amanhã
+  }
+
+  async function suspender(c, motivo) {
+    const [s] = await sql("update clientes set suspensa_em = now(), atualizado_em = now() where id = $1 and suspensa_em is null returning *", [c.id]);
+    if (!s) return c;
+    await anotarHistorico(c.id, "loja", `Loja suspensa (${motivo}): o site parou de receber pedidos; o painel continua.`);
+    aviso({ tipo: "parada", titulo: `Loja suspensa: ${c.nome_loja}`, texto: motivo, cliente_id: c.id, permissao: "clientes.ver" });
+    const pend = await pendenteDe(c.id);
+    if (pend) await mandar(s, "lojaSuspensa", { link: cofre.decifrar(pend.link, `pagamento:${pend.id}`) }).catch(() => false);
+    return s;
+  }
+
+  async function reativarAssinatura(c, motivo) {
+    const [s] = await sql("update clientes set suspensa_em = null, atualizado_em = now() where id = $1 and suspensa_em is not null returning *", [c.id]);
+    if (!s) return c;
+    await anotarHistorico(c.id, "loja", `Loja reativada (${motivo}).`);
+    aviso({ tipo: "loja_pronta", titulo: `Loja reativada: ${c.nome_loja}`, texto: motivo, cliente_id: c.id, permissao: "clientes.ver" });
+    return s;
+  }
+
+  /** Mensalidade paga: o vencimento avança 1 mês, o crédito usado sai e, se estava suspensa, a loja volta. */
+  async function mensalidadePaga(p, por) {
+    const venc = isoDia(p.vencimento);
+    const [c] = await sql(`update clientes set proximo_vencimento = greatest(coalesce(proximo_vencimento, $2::date), $2::date),
+        credito_centavos = greatest(credito_centavos - $3, 0), atualizado_em = now() where id = $1 returning *`, [p.cliente_id, somarMes(venc), p.credito_usado_centavos ?? 0]);
+    await anotarHistorico(c.id, "pagamento", `Mensalidade de ${brl(p.valor_centavos)} (venceu em ${dataBRdoISO(venc)}) paga ${por === "mercado_pago" ? "pelo Mercado Pago" : "e confirmada à mão"}. Próximo vencimento: ${dataBRdoISO(somarMes(venc))}.`);
+    aviso({ tipo: "pagamento", titulo: `Mensalidade paga: ${c.nome_loja}`, texto: brl(p.valor_centavos), cliente_id: c.id, permissao: "clientes.ver" });
+    const atual = c.suspensa_em ? await reativarAssinatura(c, "mensalidade paga") : c;
+    await sincronizarAssinatura(atual, await lerAssinatura());
+  }
+
+  /** Gera a cobrança da mensalidade de agora (o crédito de indicação abate; se cobrir tudo, já conta como paga). */
+  async function gerarMensalidade(c, cfg) {
+    const valor = valorMensal(c, cfg);
+    const venc = isoDia(c.proximo_vencimento);
+    if (c.credito_centavos >= valor) {
+      const [n] = await sql(`update clientes set credito_centavos = credito_centavos - $2, proximo_vencimento = $3::date, atualizado_em = now() where id = $1 returning *`,
+        [c.id, valor, somarMes(venc)]);
+      await anotarHistorico(c.id, "pagamento", `Mensalidade de ${brl(valor)} (vence em ${dataBRdoISO(venc)}) paga com o crédito de indicação.`);
+      return { com_credito: true, cliente: n };
+    }
+    const credito = Math.min(c.credito_centavos ?? 0, Math.max(0, valor - 100)); // a cobrança nunca fica abaixo de R$ 1,00
+    const r = await novaCobranca(c, { valor: valor - credito, tipo: "mensalidade", vencimento: venc, credito });
+    await mandar(c, "mensalidade", { valorCentavos: valor - credito, vencimento: dataBRdoISO(venc), link: r.link }).catch(() => false);
+    return { com_credito: false, link: r.link };
+  }
+
+  /** Todo dia (cron): primeira data, cobrança, lembrete, suspensão e o aviso para a loja. `hoje` só muda nos testes. */
+  async function cobrarMensalidades({ hoje = hojeSP() } = {}) {
+    const cfg = await lerAssinatura();
+    const r = { geradas: 0, pagas_com_credito: 0, lembretes: 0, suspensas: 0, reativadas: 0, sincronizadas: 0, erros: 0 };
+    for (let c of await sql("select * from clientes where situacao = 'pago' and etapa = 'pronta' order by criado_em")) {
+      try {
+        if (!cobravel(c, cfg)) {
+          if (c.suspensa_em) { c = await reativarAssinatura(c, c.assinatura_isenta ? "isenta de mensalidade" : "sem mensalidade"); r.reativadas += 1; }
+          if (await sincronizarAssinatura(c, cfg)) r.sincronizadas += 1;
+          continue;
+        }
+        if (!c.proximo_vencimento) {
+          const base = isoDia(c.pronta_em ?? c.atualizado_em ?? c.criado_em);
+          [c] = await sql("update clientes set proximo_vencimento = $2::date where id = $1 returning *", [c.id, somarDias(base, cfg.primeira_em_dias)]);
+        }
+        let pend = await pendenteDe(c.id);
+        if (!pend && diasEntre(hoje, isoDia(c.proximo_vencimento)) <= cfg.aviso_antes_dias) {
+          const g = await gerarMensalidade(c, cfg);
+          if (g.com_credito) { r.pagas_com_credito += 1; c = g.cliente; } else r.geradas += 1;
+          pend = await pendenteDe(c.id);
+        }
+        if (pend) {
+          const atraso = diasEntre(pend.venc, hoje);
+          if (atraso >= 1 && !pend.lembrete_em) {
+            await sql("update pagamentos set lembrete_em = now() where id = $1", [pend.id]);
+            await mandar(c, "mensalidade", { valorCentavos: pend.valor_centavos, vencimento: dataBRdoISO(pend.venc), link: cofre.decifrar(pend.link, `pagamento:${pend.id}`), atrasada: true }).catch(() => false);
+            r.lembretes += 1;
+          }
+          if (atraso > cfg.carencia_dias && !c.suspensa_em) { c = await suspender(c, `mensalidade atrasada há ${atraso} dias`); r.suspensas += 1; }
+        }
+        if (await sincronizarAssinatura(await linha(c.id), cfg)) r.sincronizadas += 1;
+      } catch (e) { r.erros += 1; console.error("[mensalidade]", c.id, e.message); }
+    }
+    return r;
+  }
+
+  /** Ações da ficha: valor próprio, vencimento, isenção; cobrar agora; suspender/reativar à mão. */
+  async function ajustarAssinatura(id, corpo) {
+    const c = await linha(id);
+    const campos = {};
+    const d = {};
+    if (corpo.mensalidade_centavos !== undefined) {
+      d.mensalidade_centavos = corpo.mensalidade_centavos === null || corpo.mensalidade_centavos === "" ? null : Math.round(Number(corpo.mensalidade_centavos));
+      if (d.mensalidade_centavos !== null && (!Number.isFinite(d.mensalidade_centavos) || d.mensalidade_centavos < 0 || d.mensalidade_centavos > 10_000_000)) campos.mensalidade = "Valor inválido.";
+    }
+    if (corpo.proximo_vencimento !== undefined) {
+      d.proximo_vencimento = String(corpo.proximo_vencimento);
+      if (!DATA_ISO.test(d.proximo_vencimento) || !dataValida(d.proximo_vencimento)) campos.proximo_vencimento = "Data inválida.";
+    }
+    if (corpo.isenta !== undefined) d.assinatura_isenta = Boolean(corpo.isenta);
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    const chaves = Object.keys(d);
+    if (chaves.length) {
+      await sql(`update clientes set ${chaves.map((k, i) => `${k} = $${i + 2}`).join(", ")}, atualizado_em = now() where id = $1`, [id, ...chaves.map((k) => d[k])]);
+      await anotarHistorico(id, "suporte", `Mensalidade ajustada: ${[
+        d.mensalidade_centavos !== undefined && (d.mensalidade_centavos === null ? "valor padrão" : `valor ${brl(d.mensalidade_centavos)}`),
+        d.proximo_vencimento && `vencimento ${dataBRdoISO(d.proximo_vencimento)}`,
+        d.assinatura_isenta !== undefined && (d.assinatura_isenta ? "isenta" : "volta a pagar"),
+      ].filter(Boolean).join(", ")}.`);
+      // mudou o vencimento com uma cobrança aberta: a cobrança passa a valer para a data nova
+      if (d.proximo_vencimento) await sql("update pagamentos set vencimento = $2::date, lembrete_em = null where cliente_id = $1 and tipo = 'mensalidade' and situacao = 'pendente'", [id, d.proximo_vencimento]);
+      if (d.assinatura_isenta) await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and tipo = 'mensalidade' and situacao = 'pendente'", [id]);
+    }
+    let atual = await linha(id);
+    const cfg = await lerAssinatura();
+    if (atual.suspensa_em && (!cobravel(atual, cfg) || (await estadoAssinatura({ ...atual, suspensa_em: null }, cfg))?.situacao !== "atrasada")) {
+      atual = await reativarAssinatura(atual, "ajuste da mensalidade");
+    }
+    await sincronizarAssinatura(atual, cfg);
+    return detalhe(id);
+  }
+
+  async function cobrarMensalidadeAgora(id) {
+    let c = await linha(id);
+    const cfg = await lerAssinatura();
+    if (!cobravel(c, cfg)) throw new ErroHttp(409, c.assinatura_isenta ? "Esta cliente está isenta da mensalidade." : "Esta loja não tem mensalidade (confira o valor em Configurações).");
+    if (!c.proximo_vencimento) [c] = await sql("update clientes set proximo_vencimento = $2::date where id = $1 returning *", [id, somarDias(hojeSP(), cfg.aviso_antes_dias)]);
+    await gerarMensalidade(c, cfg);
+    await sincronizarAssinatura(await linha(id), cfg);
+    return detalhe(id);
+  }
+
+  async function suspenderAgora(id, suspender_) {
+    let c = await linha(id);
+    if (c.situacao !== "pago" || c.etapa !== "pronta") throw new ErroHttp(409, "A loja ainda não está no ar.");
+    c = suspender_ ? await suspender(c, "à mão, pela Central") : await reativarAssinatura(c, "à mão, pela Central");
+    await sincronizarAssinatura(c, await lerAssinatura());
+    return detalhe(id);
+  }
+
+  /** Quanto entra todo mês com as mensalidades e quantas estão atrasadas. */
+  async function recorrencia() {
+    const cfg = await lerAssinatura();
+    const [r] = await sql(`select
+        coalesce(sum(coalesce(mensalidade_centavos, $1)) filter (where not assinatura_isenta), 0)::bigint as mensal,
+        count(*) filter (where not assinatura_isenta and coalesce(mensalidade_centavos, $1) > 0)::int as pagantes,
+        count(*) filter (where suspensa_em is not null)::int as suspensas
+      from clientes where situacao = 'pago' and etapa = 'pronta'`, [cfg.valor_centavos]);
+    const [a] = await sql(`select count(*)::int as atrasadas, coalesce(sum(valor_centavos), 0)::bigint as valor from pagamentos
+      where tipo = 'mensalidade' and situacao = 'pendente' and vencimento < (now() ${LOCAL})::date`);
+    return { mensal_centavos: Number(r.mensal), pagantes: r.pagantes, suspensas: r.suspensas, atrasadas: a.atrasadas, atrasado_centavos: Number(a.valor) };
   }
 
   /**
@@ -719,12 +950,32 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
     visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil, indicacao,
+    lerAssinatura, salvarAssinatura, cobrarMensalidades, ajustarAssinatura, cobrarMensalidadeAgora, suspenderAgora,
   };
 }
 
 /* ---------- datas do relatório de vendas ---------- */
 const UM_DIA = 86_400_000;
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/* ---------- datas da mensalidade (dias de calendário, horário de Brasília) ---------- */
+/** "AAAA-MM-DD" de um valor do banco: "date" chega como meia-noite; data e hora viram o dia de Brasília. */
+export function isoDia(v) {
+  if (!(v instanceof Date)) return String(v ?? "").slice(0, 10);
+  if (Number.isNaN(v.getTime())) return "";
+  const utc = v.toISOString();
+  return utc.slice(11, 19) === "00:00:00" ? utc.slice(0, 10) : new Date(v.getTime() - 3 * 3_600_000).toISOString().slice(0, 10);
+}
+export const hojeSP = () => new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
+export const somarDias = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+export const diasEntre = (de, ate) => Math.round((Date.parse(`${ate}T00:00:00Z`) - Date.parse(`${de}T00:00:00Z`)) / 86_400_000);
+/** +1 mês no mesmo dia (31/01 -> 28/02; 29/02 -> 29/03). */
+export function somarMes(iso) {
+  const [a, m, d] = iso.split("-").map(Number);
+  const ultimo = new Date(Date.UTC(a, m + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(a, m, Math.min(d, ultimo))).toISOString().slice(0, 10);
+}
+const dataBRdoISO = (iso) => (iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : "");
 const GRUPOS = {
   hora: { unidade: "hour", formato: "YYYY-MM-DD HH24" },
   dia: { unidade: "day", formato: "YYYY-MM-DD" },

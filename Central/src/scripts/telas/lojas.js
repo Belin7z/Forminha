@@ -23,7 +23,7 @@ function cartaoLoja(l, eu) {
           <h2 class="loja__nome">${l.nome}</h2>
           <button type="button" class="codigo" data-acao="copiar-codigo" data-codigo="${l.codigo}" title="Copiar o código">${l.codigo} ${icone("copiar", { tamanho: 13 })}</button>
         </div>
-        <span class="selo selo--${tom}">${rotulo}${l.etapa === "tabelas" && l.total ? ` · ${l.feitas} de ${l.total}` : ""}</span>
+        <span class="selo selo--${l.suspensa ? "perigo" : tom}">${l.suspensa ? "Suspensa" : rotulo}${l.etapa === "tabelas" && l.total ? ` · ${l.feitas} de ${l.total}` : ""}</span>
       </header>
       ${l.atualizar && html`<p class="loja__nota">${icone("atualizar", { tamanho: 14 })} Tem atualização do banco para esta loja.</p>`}
       ${l.dominio && !l.dominio_ativo && html`<p class="loja__nota">${icone("globo", { tamanho: 14 })} ${l.dominio}: aguardando o DNS.</p>`}

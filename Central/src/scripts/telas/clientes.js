@@ -19,6 +19,7 @@ const ETAPAS_LOJA = [
 export function situacaoDe(c) {
   if (c.situacao === "cancelado") return ["Cancelado", "neutro"];
   if (c.situacao === "interessada") return ["Interessada", "info"];
+  if (c.suspensa) return ["Loja suspensa", "perigo"];
   if (c.situacao === "aguardando_pagamento") return ["Aguardando pagamento", "aviso"];
   if (c.etapa === "pronta") return ["Loja pronta", "sucesso"];
   if (c.parada) return ["Parou — ver", "perigo"];
@@ -180,8 +181,8 @@ export async function novaCliente(depois, eu) {
 }
 
 /** Link da página de pagamento, pronto para mandar. */
-function painelCobranca({ link, cliente, emailEnviado }) {
-  const msg = `Olá, ${cliente.nome.split(" ")[0]}! Para ativar a sua loja ${cliente.nome_loja}, é só pagar o PIX de ${reais(cliente.valor_centavos)} por este link: ${link}`;
+function painelCobranca({ link, cliente, emailEnviado, mensagem = null }) {
+  const msg = mensagem ?? `Olá, ${cliente.nome.split(" ")[0]}! Para ativar a sua loja ${cliente.nome_loja}, é só pagar o PIX de ${reais(cliente.valor_centavos)} por este link: ${link}`;
   return html`
     <div class="bloco-link">
       <p class="bloco-link__rotulo">Página de pagamento</p>
@@ -205,8 +206,9 @@ export function abrirFicha(id, depois, eu) {
 
   const secaoPagamento = () => {
     const c = d.cliente;
-    const pendente = d.pagamentos.find((p) => p.situacao === "pendente");
-    const aprovado = d.pagamentos.find((p) => p.situacao === "aprovado");
+    const daLoja = d.pagamentos.filter((p) => p.tipo !== "mensalidade");
+    const pendente = daLoja.find((p) => p.situacao === "pendente");
+    const aprovado = daLoja.find((p) => p.situacao === "aprovado");
     return html`
       <section class="ficha__cartao">
         <h3>${icone("dinheiro", { tamanho: 17 })} Pagamento <span class="ficha__valor">${reais(c.valor_centavos)}</span></h3>
@@ -267,6 +269,44 @@ export function abrirFicha(id, depois, eu) {
     </section>`;
   };
 
+  const SITUACAO_MENSAL = {
+    em_dia: ["Em dia", "sucesso"], aberta: ["Cobrança aberta", "info"], atrasada: ["Atrasada", "aviso"], suspensa: ["Loja suspensa", "perigo"],
+    isenta: ["Isenta", "neutro"], sem_mensalidade: ["Sem mensalidade", "neutro"],
+  };
+  const secaoMensalidade = () => {
+    const a = d.assinatura;
+    if (!a) return "";
+    const [rotulo, tom] = SITUACAO_MENSAL[a.situacao] ?? ["—", "neutro"];
+    const pend = d.pagamentos.find((p) => p.tipo === "mensalidade" && p.situacao === "pendente");
+    const mensais = d.pagamentos.filter((p) => p.tipo === "mensalidade" && p.situacao !== "cancelado").slice(0, 6);
+    const vence = (iso) => (iso ? iso.split("-").reverse().join("/") : "—");
+    return html`
+      <section class="ficha__cartao" data-secao-mensalidade>
+        <h3>${icone("calendario", { tamanho: 17 })} Mensalidade <span class="selo selo--${tom}">${rotulo}</span></h3>
+        <dl class="ficha__dados">
+          <div><dt>Valor</dt><dd>${a.isenta ? "Isenta" : reais(a.mensalidade_centavos ?? a.padrao_centavos)}${a.mensalidade_centavos !== null && !a.isenta ? " (próprio)" : ""}</dd></div>
+          <div><dt>Próximo vencimento</dt><dd>${vence(a.vencimento ?? a.proximo_vencimento)}</dd></div>
+          ${a.credito_centavos > 0 && html`<div><dt>Crédito</dt><dd>${reais(a.credito_centavos)}</dd></div>`}
+        </dl>
+        ${pend && html`
+          ${painelCobranca({ link: pend.link, cliente: d.cliente,
+            mensagem: `Olá, ${d.cliente.nome.split(" ")[0]}! A mensalidade da sua loja ${d.cliente.nome_loja} (${reais(pend.valor_centavos)}, vence em ${vence(pend.vencimento)}) pode ser paga por PIX neste link: ${pend.link}` })}
+          <div class="ficha__acoes">
+            ${p("pagamentos.confirmar") && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="pago-mensalidade" data-pagamento="${pend.id}">${icone("check", { tamanho: 15 })} Mensalidade recebida</button>`}
+          </div>`}
+        <div class="ficha__acoes">
+          ${p("pagamentos.cobrar") && !pend && !a.isenta && a.situacao !== "sem_mensalidade" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="cobrar-mensalidade">${icone("dinheiro", { tamanho: 15 })} Cobrar agora</button>`}
+          ${p("pagamentos.cobrar") && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="ajustar-mensalidade">${icone("editar", { tamanho: 15 })} Ajustar</button>`}
+          ${p("lojas.suporte") && (a.suspensa
+            ? html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar-loja">${icone("checkCirculo", { tamanho: 15 })} Reativar a loja</button>`
+            : html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="suspender-loja">Suspender</button>`)}
+        </div>
+        ${mensais.length > 0 && html`<ul class="ficha__mensais">${mensais.map((m) => html`
+          <li><span>Vence ${vence(m.vencimento)}</span><span>${reais(m.valor_centavos)}</span>
+            <span class="ponto ponto--${m.situacao === "aprovado" ? "sucesso" : "aviso"}">${m.situacao === "aprovado" ? "Paga" : "Em aberto"}</span></li>`)}</ul>`}
+      </section>`;
+  };
+
   const secaoIndicacao = () => (d.cliente.situacao !== "pago" ? "" : html`
     <section class="ficha__cartao" data-secao-indicacao>
       <h3>${icone("usuarios", { tamanho: 17 })} Indicação ${d.cliente.credito_centavos > 0 && html`<span class="selo selo--sucesso">${reais(d.cliente.credito_centavos)} de crédito</span>`}</h3>
@@ -308,7 +348,7 @@ export function abrirFicha(id, depois, eu) {
         ${selo(c)}
       </div>
       <div class="ficha__grade">
-        <div>${secaoPagamento()}${secaoLoja()}${secaoIndicacao()}</div>
+        <div>${secaoPagamento()}${secaoLoja()}${secaoMensalidade()}${secaoIndicacao()}</div>
         <div>${secaoSuporte()}</div>
       </div>`);
   }
@@ -336,6 +376,37 @@ export function abrirFicha(id, depois, eu) {
     }
   }
 
+  function ajustarMensalidade() {
+    const a = d.assinatura;
+    const janela = abrirModal({
+      titulo: "Mensalidade", largura: 460,
+      corpo: html`
+        <form id="form-mensalidade" class="form-empilhado" novalidate>
+          <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "mensalidade", rotulo: "Valor próprio (R$)", mascara: "moeda", valor: a.mensalidade_centavos !== null ? emReais(a.mensalidade_centavos) : "",
+            placeholder: emReais(a.padrao_centavos), ajuda: `Em branco: o valor padrão (${reais(a.padrao_centavos)}).` })}
+          ${campo({ nome: "proximo_vencimento", rotulo: "Próximo vencimento", tipo: "date", valor: a.vencimento ?? a.proximo_vencimento ?? "" })}
+          ${interruptor({ nome: "isenta", rotulo: "Isenta de mensalidade", marcado: a.isenta, ajuda: "Cortesia ou parceria: não cobra e não suspende." })}
+        </form>`,
+      rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-mensalidade" class="btn btn--primario">Salvar</button>`,
+    });
+    const form = janela.el.querySelector("form");
+    ativarCampos(form);
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const v = dadosDe(form);
+      await ocupado(janela.el.querySelector('[form="form-mensalidade"]'), async () => {
+        try {
+          d = await api("PUT", `clientes/${id}/assinatura`, {
+            mensalidade_centavos: v.mensalidade.trim() ? paraCentavos(v.mensalidade) : null, isenta: v.isenta,
+            ...(v.proximo_vencimento && { proximo_vencimento: v.proximo_vencimento }),
+          });
+          janela.fechar(); desenhar(); toast("Mensalidade ajustada.");
+        } catch (erro) { mostrarErros(form, erro); }
+      });
+    });
+  }
+
   const agir = (botao, tarefa) => ocupado(botao, async () => {
     try { await tarefa(); } catch (erro) { toast(erro.message, "erro"); }
   });
@@ -360,6 +431,19 @@ export function abrirFicha(id, depois, eu) {
       if (ok) return agir(alvo, async () => { d = await api("POST", `clientes/${id}/cancelar`, {}); desenhar(); });
       return;
     }
+    if (acao === "pago-mensalidade") {
+      const ok = await confirmar({ titulo: "Mensalidade recebida?", mensagem: "Confirme só se o PIX já caiu na sua conta. Se a loja estava suspensa, ela volta na hora.", rotulo: "Sim, recebi" });
+      if (ok) return agir(alvo, async () => { d = await api("POST", `clientes/${id}/pagamento-recebido`, { pagamento_id: alvo.dataset.pagamento }); desenhar(); toast("Mensalidade confirmada."); });
+      return;
+    }
+    if (acao === "cobrar-mensalidade") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/assinatura/cobrar`, {}); desenhar(); toast("Cobrança da mensalidade gerada."); });
+    if (acao === "suspender-loja") {
+      const ok = await confirmar({ titulo: "Suspender a loja?", mensagem: "O site para de receber pedidos (o painel da dona continua). Pagando a mensalidade, volta na hora.", rotulo: "Suspender", perigo: true });
+      if (ok) return agir(alvo, async () => { d = await api("POST", `clientes/${id}/assinatura/suspender`, {}); desenhar(); });
+      return;
+    }
+    if (acao === "reativar-loja") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/assinatura/reativar`, {}); desenhar(); toast("Loja reativada."); });
+    if (acao === "ajustar-mensalidade") return ajustarMensalidade();
     if (acao === "indicacao") {
       return agir(alvo, async () => {
         const r = await api("POST", `clientes/${id}/indicacao`, {});

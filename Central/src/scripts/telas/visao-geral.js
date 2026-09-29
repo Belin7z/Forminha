@@ -133,6 +133,8 @@ export async function telaVisaoGeral(conteiner, eu) {
         ${numero({ rotulo: "Clientes", valor: n.clientes, nota: `+${n.novas_no_mes} neste mês${n.interessadas ? ` · ${n.interessadas} ${n.interessadas === 1 ? "interessada" : "interessadas"}` : ""}`, ic: "usuarios" })}
         ${numero({ rotulo: "Lojas no ar", valor: n.lojas_prontas, nota: n.criando ? `${n.criando} sendo ${n.criando === 1 ? "criada" : "criadas"}` : "", ic: "home" })}
         ${numero({ rotulo: "Aguardando pagamento", valor: n.aguardando, nota: f?.pendente ? reais(f.pendente) : "", ic: "relogio" })}
+        ${r.recorrente && r.recorrente.pagantes > 0 && numero({ rotulo: "Mensalidades por mês", valor: reais(r.recorrente.mensal_centavos),
+          nota: `${r.recorrente.pagantes} ${r.recorrente.pagantes === 1 ? "loja" : "lojas"}${r.recorrente.atrasadas ? ` · ${r.recorrente.atrasadas} ${r.recorrente.atrasadas === 1 ? "atrasada" : "atrasadas"}` : ""}`, ic: "calendario" })}
       </section>
 
       <div class="painel-grade">

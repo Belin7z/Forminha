@@ -59,6 +59,17 @@ export async function telaPagar(token) {
       parar = true;
       return;
     }
+    if (d.situacao === "pago" && d.tipo === "mensalidade") {
+      montar(cartao, html`
+        <div class="pagar__estado pagar__estado--ok">
+          <span class="pagar__check">${icone("check", { tamanho: 30 })}</span>
+          <h1>Mensalidade paga</h1>
+          <p class="pagar__loja">${d.nome_loja}</p>
+          <p class="texto-suave">Obrigado! A loja segue recebendo pedidos normalmente.</p>
+        </div>`);
+      parar = true;
+      return;
+    }
     if (d.situacao === "pago") {
       montar(cartao, html`
         <div class="pagar__estado pagar__estado--ok">
@@ -75,12 +86,14 @@ export async function telaPagar(token) {
     }
     if (!primeira) return; // pendente: não redesenha (o QR e o código ficam como estão)
     montar(cartao, html`
-      <p class="pagar__sobre">Pagamento da loja</p>
+      <p class="pagar__sobre">${d.tipo === "mensalidade" ? "Mensalidade da loja" : "Pagamento da loja"}</p>
       <h1 class="pagar__loja-titulo">${d.nome_loja}</h1>
       <p class="pagar__valor">${reais(d.valor_centavos)}</p>
+      ${d.tipo === "mensalidade" && d.vencimento && html`<p class="pagar__desconto pagar__vence">Vence em ${d.vencimento.split("-").reverse().join("/")}${d.credito_usado_centavos > 0 ? ` · ${reais(d.credito_usado_centavos)} de crédito já abatido` : ""}</p>`}
       ${d.desconto_centavos > 0 && html`<p class="pagar__desconto">Cupom ${d.cupom}: você economizou ${reais(d.desconto_centavos)}</p>`}
       <div class="pagar__qr" data-qr></div>
-      <ol class="pagar__passos"><li>Abra o app do seu banco e escolha <strong>PIX</strong>.</li><li>Leia o QR Code ou use o código abaixo.</li><li>Pronto: o acesso chega no seu e-mail.</li></ol>
+      <ol class="pagar__passos"><li>Abra o app do seu banco e escolha <strong>PIX</strong>.</li><li>Leia o QR Code ou use o código abaixo.</li>
+        <li>${d.tipo === "mensalidade" ? "Pronto: a confirmação aparece aqui." : "Pronto: o acesso chega no seu e-mail."}</li></ol>
       <div class="pagar__codigo"><code>${d.pix}</code></div>
       <button type="button" class="btn btn--primario btn--grande btn--bloco" data-copiar-pix>${icone("copiar", { tamanho: 17 })} Copiar código PIX</button>
       <p class="pagar__espera"><span class="spinner spinner--pequeno"></span> Aguardando o pagamento…${d.automatico ? "" : " (a confirmação pode levar alguns minutos)"}</p>`);

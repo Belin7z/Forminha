@@ -248,6 +248,11 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   async function rotaTeste(req, res, caminho) {
     const corpo = req.method === "POST" ? await lerJson(req) : {};
     if (caminho === "/vendas-exemplo") return responder(res, 200, { criados: await criarVendasDeExemplo(Math.min(Number(corpo.quantidade) || 220, 2000)) });
+    if (caminho === "/assinatura") { // "a Central escreveu a situação da mensalidade na ficha da loja"
+      await sql(db, `insert into public.configuracoes (chave, valor) values ('forminha', $1::jsonb)
+        on conflict (chave) do update set valor = public.configuracoes.valor || excluded.valor`, [JSON.stringify({ assinatura: corpo })]);
+      return responder(res, 200, { ok: true });
+    }
     if (caminho === "/mp/aprovar") { // "o cliente pagou no app do banco": aprova no Mercado Pago simulado e dispara o aviso ao webhook
       const pag = externos.pagamentoDoPedido(String(corpo.codigo));
       if (!pag) return responder(res, 404, { message: "Nenhum PIX gerado para este pedido." });

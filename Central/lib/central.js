@@ -371,6 +371,14 @@ export function criarCentral(env = process.env, opcoes = {}) {
     })],
     ["POST", new RegExp(`^clientes/${ID}/indicacao$`), "clientes.ver", async ({ m }) => ({ corpo: await (await exigirClientes()).indicacao(m[1]) })],
 
+    /* ---------- mensalidade (assinatura) ---------- */
+    ["GET", /^assinatura$/, true, async () => ({ corpo: await (await exigirClientes()).lerAssinatura() })],
+    ["PUT", /^assinatura$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarAssinatura(corpo) }), "Alterou a mensalidade"],
+    ["PUT", new RegExp(`^clientes/${ID}/assinatura$`), "pagamentos.cobrar", async ({ m, corpo }) => ({ corpo: await (await exigirClientes()).ajustarAssinatura(m[1], corpo) }), "Ajustou a mensalidade"],
+    ["POST", new RegExp(`^clientes/${ID}/assinatura/cobrar$`), "pagamentos.cobrar", async ({ m }) => ({ corpo: await (await exigirClientes()).cobrarMensalidadeAgora(m[1]) }), "Gerou cobrança de mensalidade"],
+    ["POST", new RegExp(`^clientes/${ID}/assinatura/(suspender|reativar)$`), "lojas.suporte", async ({ m }) => ({ corpo: await (await exigirClientes()).suspenderAgora(m[1], m[2] === "suspender") }),
+      ({ m }) => [m[2] === "suspender" ? "Suspendeu a loja" : "Reativou a loja"]],
+
     ["GET", /^funil$/, "clientes.ver", async ({ url, quem }) => ({
       corpo: await (await exigirClientes()).funil({ de: url.searchParams.get("de"), ate: url.searchParams.get("ate"), financeiro: quem.permissoes.includes("financeiro.ver") }),
     })],
@@ -540,7 +548,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
         if (chaveRecusada(e)) await avisarDaChave([mensagemDeChaveRecusada(e.quem, e.status, e.message)]).catch(() => {});
         throw e;
       }
-      if (clientes) { await garantirEsquema(); resultado.criacoes_retomadas = await clientes.retomarParadas(); }
+      if (clientes) {
+        await garantirEsquema();
+        resultado.criacoes_retomadas = await clientes.retomarParadas();
+        resultado.mensalidades = await clientes.cobrarMensalidades().catch((e) => ({ erro: e.message }));
+      }
       if (resultado.falhas > 0) await alertarErro(`${resultado.falhas} ${resultado.falhas === 1 ? "loja não respondeu" : "lojas não responderam"} hoje`,
         "Na verificação diária, alguma loja não respondeu. Abra Lojas na Central e confira se alguma está pausada ou com problema.");
       // cópia da Central esquecida: lembra uma vez por semana

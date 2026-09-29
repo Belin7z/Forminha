@@ -80,3 +80,10 @@
 /* "Instalar o app" no menu: botão com a mesma cara dos links */
 .lateral__link--botao { width: 100%; border: 0; background: none; font: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
 .instalar-passos { display: grid; gap: .55rem; margin: 0 0 1rem; padding-left: 1.3rem; line-height: 1.5; }
+
+/* aviso da mensalidade da Forminha (entre o topo e a página) */
+.aviso-assinatura__lugar { width: 100%; max-width: 1320px; margin-inline: auto; padding: 0 1.8rem; }
+.aviso-assinatura__lugar:empty { display: none; }
+.aviso-assinatura { margin-top: 1.2rem; align-items: center; flex-wrap: wrap; }
+.aviso-assinatura > span { flex: 1; min-width: 12rem; }
+@media (max-width: 720px) { .aviso-assinatura__lugar { padding: 0 1rem; } }

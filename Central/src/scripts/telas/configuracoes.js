@@ -28,7 +28,11 @@ export async function telaConfiguracoes(conteiner, eu) {
   const r = eu.recursos ?? {};
   const webhook = `${location.origin}/api/webhook/mercadopago`;
   let cfg = null;
-  if (r.clientes) { try { cfg = await api("GET", "configuracoes"); } catch { /* mostra só as conexões */ } }
+  let assinatura = null;
+  if (r.clientes) {
+    try { cfg = await api("GET", "configuracoes"); } catch { /* mostra só as conexões */ }
+    try { assinatura = await api("GET", "assinatura"); } catch { /* sem mensalidade por enquanto */ }
+  }
   const conta = await api("GET", "conta").catch(() => ({ nome: "", email: "", usuario: "" }));
 
   montar(conteiner, html`
@@ -48,6 +52,19 @@ export async function telaConfiguracoes(conteiner, eu) {
           <div class="cartao__cab"><h2>Cobrança</h2></div>
           ${aviso("aviso", "Ligue o banco e a criptografia (Conexões).")}
         </section>`}
+
+      ${assinatura && html`
+        <form class="cartao" id="f-assinatura" novalidate>
+          <div class="cartao__cab"><div><h2>Mensalidade</h2><small class="texto-suave">Cobrada todo mês das lojas no ar, por PIX.</small></div></div>
+          <div class="form-erro" data-erro-geral hidden></div>
+          ${campo({ nome: "valor", rotulo: "Valor por mês (R$)", mascara: "moeda", valor: emReais(assinatura.valor_centavos), ajuda: "0,00 = sem mensalidade. Dá para usar um valor próprio na ficha de cada cliente." })}
+          <div class="grade-2">
+            ${campo({ nome: "primeira_em_dias", rotulo: "1ª vence depois de (dias)", tipo: "number", valor: assinatura.primeira_em_dias, atributos: 'min="0" max="365"', ajuda: "Contando da loja pronta." })}
+            ${campo({ nome: "aviso_antes_dias", rotulo: "Cobrar antes (dias)", tipo: "number", valor: assinatura.aviso_antes_dias, atributos: 'min="0" max="30"', ajuda: "A cobrança sai por e-mail." })}
+            ${campo({ nome: "carencia_dias", rotulo: "Suspender após (dias de atraso)", tipo: "number", valor: assinatura.carencia_dias, atributos: 'min="0" max="90"', ajuda: "O site para de receber pedidos; o painel continua." })}
+          </div>
+          <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>
+        </form>`}
 
       <section class="cartao">
         <div class="cartao__cab"><h2>Conexões</h2></div>
@@ -106,6 +123,21 @@ export async function telaConfiguracoes(conteiner, eu) {
         </div>
       </section>`}
     </div>`);
+
+  const formAssinatura = conteiner.querySelector("#f-assinatura");
+  if (formAssinatura) {
+    ativarCampos(formAssinatura);
+    formAssinatura.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const d = dadosDe(formAssinatura);
+      await ocupado(formAssinatura.querySelector("[type=submit]"), async () => {
+        try {
+          await api("PUT", "assinatura", { valor_centavos: paraCentavos(d.valor || "0"), primeira_em_dias: Number(d.primeira_em_dias), aviso_antes_dias: Number(d.aviso_antes_dias), carencia_dias: Number(d.carencia_dias) });
+          toast("Mensalidade salva. A próxima verificação diária já usa os valores novos.");
+        } catch (erro) { mostrarErros(formAssinatura, erro); }
+      });
+    });
+  }
 
   const ultimo = conteiner.querySelector("[data-ultimo-backup]");
   const mostrarUltimo = (em) => { if (ultimo) ultimo.textContent = em ? `· última em ${quando(em)}` : "· nenhuma ainda"; };

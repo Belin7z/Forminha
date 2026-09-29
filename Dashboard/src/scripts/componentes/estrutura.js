@@ -43,6 +43,7 @@ export function montarEstrutura({ aoSair }) {
       <div class="lateral__fundo" id="lateral-fundo" data-acao="fechar-menu" hidden></div>
       <div class="painel__corpo">
         <header class="topo" id="topo"></header>
+        <div id="aviso-assinatura" class="aviso-assinatura__lugar"></div>
         <main id="pagina" class="pagina" tabindex="-1"></main>
       </div>
     </div>`);

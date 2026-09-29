@@ -50,6 +50,21 @@ cortesia), atualizar o banco, reativar e excluir. Em cada loja pronta:
   sozinho (links de login e do WhatsApp, o painel e a ficha da cliente). A dona também pode ligar pelo
   painel dela, em **Configurações → Domínio**. O domínio é comprado e pago pela doceria.
 
+## Mensalidade (assinatura)
+
+Em **Configurações → Mensalidade**: valor por mês (0 = sem mensalidade), em quantos dias vence a primeira (contando da
+loja pronta), quantos dias antes a cobrança sai e depois de quantos dias de atraso a loja é suspensa. Todo dia a Central:
+
+1. cobra a mensalidade alguns dias antes do vencimento (PIX + página de pagamento + e-mail), já abatendo o **crédito de
+   indicação** (se o crédito cobrir tudo, a mensalidade conta como paga);
+2. um dia depois do vencimento, manda um lembrete;
+3. passada a carência, **suspende** a loja: o site continua no ar, mas deixa de receber pedidos (aparece como pausado, com
+   um recado para chamar no WhatsApp); o painel da dona continua funcionando e mostra o aviso com **Pagar agora**;
+4. pagou (sozinho, pelo Mercado Pago, ou em *Mensalidade recebida* na ficha): a loja volta na hora e o vencimento avança 1 mês.
+
+Na ficha de cada cliente (seção **Mensalidade**): valor próprio, mudar o vencimento, isentar (cortesia), cobrar agora,
+suspender e reativar à mão, e o histórico das mensalidades. A Visão geral mostra quanto entra por mês.
+
 ## Equipe (aba Equipe — só o dono)
 
 Cada funcionário entra com um **usuário próprio da Forminha**, nunca com e-mail: **FM** + a letra da

@@ -35,6 +35,7 @@ import { atividade } from "./paginas/atividade.js";
 import { primeirosPassos } from "./paginas/primeiros-passos.js";
 import { relatorios } from "./paginas/relatorios.js";
 import { registrarServico } from "/src/scripts/base/instalar.js";
+import { mostrarAvisoAssinatura } from "./componentes/aviso-assinatura.js";
 
 const naoEncontrada = (ctx) => {
   ctx.raiz.innerHTML = String(html`<div class="vazio"><span class="vazio__ico">${icone("busca", { tamanho: 38 })}</span><h3>Página não encontrada</h3>
@@ -84,6 +85,7 @@ function abrirPainel(usuario) {
   });
   iniciarNotificacoes();
   roteador.iniciar();
+  mostrarAvisoAssinatura(); // mensalidade vencendo, vencida ou loja suspensa
   if (novaLoja) toast("Bem-vinda! Em 5 passos curtos a loja fica com a sua cara.");
   // computador esquecido aberto: encerra a sessão depois de 2 horas sem uso
   iniciarInatividade(async () => {

@@ -71,6 +71,28 @@ export const modelos = {
       botao: { texto: "Criar senha nova", link },
     }),
   }),
+  /** Para a dona: a mensalidade (vai vencer ou venceu). */
+  mensalidade: ({ nome, nomeLoja, valorCentavos, vencimento, link, atrasada = false }) => ({
+    assunto: atrasada ? `Mensalidade da ${nomeLoja} em atraso` : `Mensalidade da ${nomeLoja}: vence em ${vencimento}`,
+    texto: `Olá, ${nome}!\n\n${atrasada ? `A mensalidade da sua loja "${nomeLoja}" venceu em ${vencimento}. Para a loja continuar recebendo pedidos pelo site, pague por este link:` : `A mensalidade da sua loja "${nomeLoja}" (${brl(valorCentavos)}) vence em ${vencimento}. Pague pelo PIX neste link:`} ${link}\n\nForminha`,
+    html: moldura({
+      titulo: atrasada ? "Mensalidade em atraso" : "Sua mensalidade",
+      paragrafos: [`Olá, ${esc(nome)}!`,
+        atrasada ? `A mensalidade da loja <strong>${esc(nomeLoja)}</strong> venceu em <strong>${esc(vencimento)}</strong>. Pague para a loja continuar recebendo pedidos pelo site.`
+          : `A mensalidade da loja <strong>${esc(nomeLoja)}</strong> (<strong>${esc(brl(valorCentavos))}</strong>) vence em <strong>${esc(vencimento)}</strong>.`],
+      botao: { texto: "Pagar com PIX", link },
+    }),
+  }),
+  /** Para a dona: a loja parou de receber pedidos pelo site (mensalidade muito atrasada). */
+  lojaSuspensa: ({ nome, nomeLoja, link }) => ({
+    assunto: `A ${nomeLoja} parou de receber pedidos pelo site`,
+    texto: `Olá, ${nome}!\n\nA mensalidade da loja "${nomeLoja}" está atrasada e a loja parou de receber pedidos pelo site (o seu painel continua funcionando). Pague por este link e ela volta na hora: ${link}\n\nForminha`,
+    html: moldura({
+      titulo: "A loja parou de receber pedidos",
+      paragrafos: [`Olá, ${esc(nome)}!`, `A mensalidade da loja <strong>${esc(nomeLoja)}</strong> está atrasada e o site parou de receber pedidos. O seu painel continua funcionando.`, "Pague pelo link e a loja volta na hora."],
+      botao: { texto: "Pagar e reativar", link },
+    }),
+  }),
   /** Para você: link para criar uma senha nova da Central (pedido em "Esqueci a senha"). */
   recuperarCentral: ({ link }) => ({
     assunto: "Forminha: criar uma senha nova para a Central",

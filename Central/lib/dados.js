@@ -133,6 +133,17 @@ export const ESQUEMA = [
     base text not null default '',
     ligada_em timestamptz
   )`,
+  // mensalidade (assinatura): a cobrança mensal usa a mesma tabela de pagamentos (tipo 'mensalidade')
+  `alter table pagamentos add column if not exists tipo text not null default 'loja'`, // 'loja' (a criação) ou 'mensalidade'
+  `alter table pagamentos add column if not exists vencimento date`,
+  `alter table pagamentos add column if not exists credito_usado_centavos integer not null default 0`,
+  `alter table pagamentos add column if not exists lembrete_em timestamptz`,
+  `alter table pagamentos add column if not exists nota_fiscal jsonb`,          // { numero, link, emitida_em }
+  `alter table clientes add column if not exists mensalidade_centavos integer`,  // vazio = o valor padrão
+  `alter table clientes add column if not exists proximo_vencimento date`,
+  `alter table clientes add column if not exists assinatura_isenta boolean not null default false`,
+  `alter table clientes add column if not exists suspensa_em timestamptz`,
+  `alter table clientes add column if not exists assinatura_estado jsonb`,       // o que a loja já sabe (evita escrever à toa)
   `create table if not exists tentativas_login (
     chave text primary key,                     -- 'ip:…', 'conta:…', 'codigo:…'
     falhas integer not null default 0,

@@ -36,6 +36,7 @@ function resumoDoBanco(s) {
     etapa, feitas: s.feitas, total: s.total, atualizar: s.semeada && s.pendentes.length > 0,
     email: s.ficha?.email ?? null, loja: enderecoLoja(s.ficha), painel: enderecoPainel(s.ficha),
     dominio: s.ficha?.dominio?.nome ?? null, dominio_ativo: Boolean(s.ficha?.dominio?.ativo_em),
+    suspensa: Boolean(s.ficha?.assinatura?.suspensa),
   };
 }
 
@@ -467,6 +468,9 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       aviso: "Dados do banco da loja (pedidos, clientes, produtos, estoque…). As fotos ficam no armazenamento do Supabase.", tabelas };
   }
 
-  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja,
+  /** Escreve na ficha "forminha" da loja (ex.: a situação da mensalidade). */
+  const escreverFicha = (ref, dados) => gravarFicha(sb, ref, dados);
+
+  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
     conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio };
 }
