@@ -11,7 +11,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { toast } from "/src/scripts/base/ui.js";
 import { api, quandoCurto } from "./nucleo.js";
 
-const ICONES = { pagamento: "dinheiro", loja_pronta: "checkCirculo", parada: "alerta", cadastro: "usuario", indicacao: "usuarios" };
+const ICONES = { pagamento: "dinheiro", loja_pronta: "checkCirculo", parada: "alerta", cadastro: "usuario", indicacao: "usuarios", erro: "alerta", backup: "baixar" };
 const estado = { avisos: [], naoVistos: 0, ultimo: 0, conhecido: null, relogio: null, conteiner: null, aberto: false, aoAbrirCliente: null };
 
 const podeNotificar = () => typeof Notification !== "undefined" && Notification.permission === "granted";
@@ -30,7 +30,7 @@ function desenhar() {
       <div class="sino__cab"><strong>Avisos</strong>
         ${podePedirNotificacao() && html`<button type="button" class="link sino__permitir" data-sino="permitir">Avisar também no computador</button>`}</div>
       ${estado.avisos.length ? html`<ul class="sino__lista">${estado.avisos.map((a) => html`
-        <li><button type="button" class="sino__item ${a.novo && "sino__item--novo"}" data-sino="item" data-cliente="${a.cliente_id ?? ""}">
+        <li><button type="button" class="sino__item ${a.novo && "sino__item--novo"}" data-sino="item" data-cliente="${a.cliente_id ?? ""}" data-tipo="${a.tipo}">
           <span class="sino__ico sino__ico--${a.tipo}">${icone(ICONES[a.tipo] ?? "sino", { tamanho: 16 })}</span>
           <span class="sino__texto"><strong>${a.titulo}</strong>${a.texto && html`<small>${a.texto}</small>`}<time>${quandoCurto(a.em)}</time></span>
         </button></li>`)}</ul>`
@@ -110,6 +110,7 @@ document.addEventListener("click", async (ev) => {
   if (acao === "item") {
     fechar();
     if (alvo.dataset.cliente) estado.aoAbrirCliente?.(alvo.dataset.cliente);
+    else if (alvo.dataset.tipo === "backup") location.hash = "#/configuracoes";
   }
 });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") fechar(); });

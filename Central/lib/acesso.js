@@ -10,7 +10,7 @@
    • Cada troca de senha muda a "versão": quem estava logado em outro
      aparelho sai na hora.
    ========================================================== */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { SENHA_MINIMA, conferirSenha, resumirSenha } from "./sessao.js";
 import { ErroHttp } from "./erros.js";
 import { lerUsuario } from "./equipe.js";
@@ -102,5 +102,39 @@ export function criarAcesso({ banco = null, preparar = async () => {}, hashInici
     return contaDe({ ...r, nome: n });
   }
 
-  return { entrar, versao, conta, trocarSenha, salvarConta, salvarNome };
+  /** Só confere a senha (para ações sensíveis, como desligar a verificação em duas etapas). */
+  const conferirSenhaDono = async (senha) => senhaCerta(await ler(), senha);
+
+  /* ---------- esqueci a senha (link por e-mail, uso único, 30 minutos) ---------- */
+  const resumoDoLink = (t) => createHash("sha256").update(String(t)).digest("hex");
+
+  /** Devolve o código do link se o e-mail for o da conta (senão null — quem pede não fica sabendo). */
+  async function pedirRecuperacao(email) {
+    exigirBanco();
+    const r = await ler();
+    const { email: daConta } = contaDe(r);
+    if (!daConta || limpar(email) !== daConta) return null;
+    const token = randomBytes(32).toString("base64url");
+    await gravar({ ...r, base: marca(hashInicial), versao: r?.versao ?? 0, recuperacao: { resumo: resumoDoLink(token), expira: Date.now() + 30 * 60_000 } });
+    return token;
+  }
+
+  /** Senha nova pelo link: confere o link (uma vez só) e derruba as sessões abertas. */
+  async function recuperar({ token, nova, repita }) {
+    exigirBanco();
+    const r = await ler();
+    const rec = r?.recuperacao;
+    const valido = rec && rec.expira > Date.now() && rec.resumo === resumoDoLink(token);
+    if (!valido) throw new ErroHttp(410, "Este link venceu ou já foi usado. Peça outro em “Esqueci a senha”.");
+    const campos = {};
+    if (String(nova ?? "").length < SENHA_MINIMA) campos.nova = `Use ${SENHA_MINIMA} caracteres ou mais.`;
+    else if (String(nova).length > 200) campos.nova = "Senha longa demais.";
+    else if (nova !== repita) campos.repita = "As duas não conferem.";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    const { recuperacao: _usado, ...resto } = r;
+    await gravar({ ...resto, hash: await resumirSenha(nova), base: marca(hashInicial), versao: (r?.versao ?? 0) + 1, trocada_em: new Date().toISOString() });
+    return { ok: true };
+  }
+
+  return { entrar, versao, conta, trocarSenha, salvarConta, salvarNome, conferirSenhaDono, pedirRecuperacao, recuperar, marca: marca(hashInicial) };
 }

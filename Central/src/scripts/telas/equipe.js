@@ -34,7 +34,8 @@ export async function telaEquipe(conteiner) {
         <div class="tabela__linha tabela__cab" role="row"><span>Nome</span><span>Usuário</span><span>Função</span><span>Situação</span><span>Último acesso</span><span></span></div>
         ${dados.funcionarios.map((f) => html`
           <div class="tabela__linha ${!f.ativo && "tabela__linha--apagada"}" role="row" data-id="${f.id}">
-            <span class="tabela__principal"><strong>${f.nome}</strong>
+            <span class="tabela__principal"><strong>${f.nome}${f.duas_etapas && html` <button type="button" class="selo selo--sucesso selo--botao" data-acao="duas-etapas"
+                title="Verificação em duas etapas ligada. Clique para desligar (celular perdido)">2 etapas</button>`}</strong>
               <small class="so-celular">${f.usuario} · ${f.funcao_nome} · ${situacao(f)[0]}</small></span>
             <span class="tabela__mono">${f.usuario}</span>
             <span>${f.funcao_nome}</span>
@@ -67,6 +68,12 @@ export async function telaEquipe(conteiner) {
     if (!f) return;
     const agir = (tarefa) => ocupado(alvo, async () => { try { await tarefa(); await carregar(); } catch (erro) { toast(erro.message, "erro"); } });
     if (acao === "editar") return formulario({ funcionario: f, funcoes: dados.funcoes, depois: carregar });
+    if (acao === "duas-etapas") {
+      const ok = await confirmar({ titulo: "Desligar a verificação em duas etapas?", rotulo: "Desligar", perigo: true,
+        mensagem: `${f.nome} (${f.usuario}) passa a entrar só com a senha e pode ligar de novo em Segurança da conta. Use quando a pessoa perdeu o celular.` });
+      if (ok) return agir(async () => { await api("POST", `equipe/${f.id}/duas-etapas/desligar`, {}); toast("Verificação desligada.", "info"); });
+      return;
+    }
     if (acao === "senha") {
       if (!(await confirmar({ titulo: "Gerar senha nova?", mensagem: `${primeiroNome(f.nome)} sai da Central e cria outra senha no próximo acesso.`, rotulo: "Gerar" }))) return;
       return agir(async () => mostrarAcesso(await api("POST", `equipe/${f.id}/nova-senha`, {})));

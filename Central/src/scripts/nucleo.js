@@ -20,7 +20,9 @@ export async function api(metodo, caminho, corpo) {
   } catch { throw Object.assign(new Error("Sem conexão com a Central. Confira a internet."), { status: 0 }); }
   const dados = await r.json().catch(() => ({}));
   if (!r.ok) {
-    if (r.status === 401 && caminho !== "entrar" && !caminho.startsWith("publico/")) aoExpirar();
+    // 401 no meio do uso = a sessão acabou; nas telas de entrar (senha, código, senha nova) é só a resposta errada
+    const deEntrar = caminho === "entrar" || caminho.startsWith("entrar/") || caminho.startsWith("senha/") || caminho.startsWith("publico/");
+    if (r.status === 401 && !deEntrar) aoExpirar();
     throw Object.assign(new Error(dados.erro ?? "Algo deu errado."), { status: r.status, campos: dados.campos });
   }
   return dados;

@@ -162,6 +162,12 @@ export function criarEquipe({ banco, cofre, preparar = async () => {} }) {
     return abrir(novo);
   }
 
+  /** Só confere a senha da pessoa (para ações sensíveis, como desligar a verificação em duas etapas). */
+  async function conferirSenhaDe(id, senha) {
+    const f = await linha(id);
+    return conferirSenha(String(senha ?? ""), f.senha_hash);
+  }
+
   /* ---------- atividades ---------- */
   async function registrar({ quem, usuario, acao, alvo = "" }) {
     await sql("insert into atividades (quem, usuario, acao, alvo) values ($1, $2, $3, $4)", [quem, usuario, acao, String(alvo ?? "").slice(0, 120)]);
@@ -176,5 +182,5 @@ export function criarEquipe({ banco, cofre, preparar = async () => {} }) {
     return c?.nome_loja ?? "";
   }
 
-  return { listar, criar, editar, novaSenha, definirAtivo, excluir, entrar, daSessao, trocarMinhaSenha, registrar, atividades, lojaDaCliente };
+  return { listar, criar, editar, novaSenha, definirAtivo, excluir, entrar, daSessao, trocarMinhaSenha, conferirSenhaDe, registrar, atividades, lojaDaCliente };
 }

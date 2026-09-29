@@ -25,12 +25,16 @@ import { FUNCOES, PERMISSOES, TODAS, criarEquipe, lerUsuario } from "./equipe.js
 import { comAutor } from "./autoria.js";
 import { criarAvisos } from "./avisos.js";
 import { criarCupons } from "./cupons.js";
+import { criarProtecao } from "./protecao.js";
+import { criarDuasEtapas } from "./duasetapas.js";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 export { ErroHttp };
 const OBRIGATORIAS = ["CENTRAL_SENHA_HASH", "SEGREDO_SESSAO", "SUPABASE_ACCESS_TOKEN", "VERCEL_TOKEN", "FORMINHA_ORG", "DATABASE_URL", "CHAVE_CRIPTOGRAFIA"];
 const ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
 // com senha temporária, o funcionário só consegue criar a própria senha (e sair)
 const LIVRES_NA_TROCA = new Set(["eu", "sair", "minha-senha"]);
+const TABELAS_DA_CENTRAL = ["clientes", "pagamentos", "historico", "configuracoes", "funcionarios", "atividades", "avisos", "cupons", "duas_etapas"];
 
 export function criarCentral(env = process.env, opcoes = {}) {
   const org = String(env.FORMINHA_ORG ?? "").trim();
@@ -68,8 +72,26 @@ export function criarCentral(env = process.env, opcoes = {}) {
     return !env[k];
   });
   if (erroCofre) faltando.push("CHAVE_CRIPTOGRAFIA (inválida)");
-  const tentativas = new Map(); // freio de senha errada (por endereço, nesta instância)
   const acesso = criarAcesso({ banco, preparar: garantirEsquema ?? undefined, hashInicial: env.CENTRAL_SENHA_HASH, emailInicial: env.CENTRAL_EMAIL });
+  // senha errada muitas vezes: bloqueia por um tempo (no banco, vale para todas as cópias da Central)
+  const protecao = criarProtecao({ banco, preparar: garantirEsquema ?? undefined });
+  // verificação em duas etapas (código do aplicativo no celular), para o dono e a equipe
+  const duas = banco && cofre ? criarDuasEtapas({ banco, cofre, preparar: garantirEsquema, marcaDono: acesso.marca }) : null;
+
+  /* segunda etapa do login: um "desafio" assinado (vale 5 min) diz quem já acertou a senha; não serve como sessão */
+  const chaveDesafio = () => `${env.SEGREDO_SESSAO}:desafio`;
+  function assinarDesafio(quem, versao) {
+    const corpo = Buffer.from(JSON.stringify({ u: quem.id, v: versao, exp: Math.floor(Date.now() / 1000) + 300 })).toString("base64url");
+    return `${corpo}.${createHmac("sha256", chaveDesafio()).update(corpo).digest("base64url")}`;
+  }
+  function lerDesafio(texto) {
+    const [corpo, assinatura] = String(texto ?? "").split(".");
+    if (!corpo || !assinatura) return null;
+    const esperado = Buffer.from(createHmac("sha256", chaveDesafio()).update(corpo).digest("base64url"));
+    const recebido = Buffer.from(assinatura);
+    if (esperado.length !== recebido.length || !timingSafeEqual(esperado, recebido)) return null;
+    try { const d = JSON.parse(Buffer.from(corpo, "base64url").toString()); return d.exp > Date.now() / 1000 ? d : null; } catch { return null; }
+  }
 
   /* ---------- quem está usando ---------- */
   const DONO = { tipo: "dono", id: "dono", usuario: "Dono", nome: "Dono", funcao: "dono", funcao_nome: "Dono", trocar_senha: false, permissoes: TODAS };
@@ -123,6 +145,28 @@ export function criarCentral(env = process.env, opcoes = {}) {
   }
 
   /**
+   * Algo deu errado: aviso no sino do dono e e-mail para você. Erros iguais são juntados
+   * (um aviso a cada 30 min; no máximo um e-mail a cada 6 h por tipo de erro).
+   */
+  const ultimoAlerta = new Map();
+  async function alertarErro(titulo, detalhe) {
+    if (!avisos || !banco) return;
+    if (Date.now() - (ultimoAlerta.get(titulo) ?? 0) < 30 * 60_000) return;
+    ultimoAlerta.set(titulo, Date.now());
+    try {
+      const [recente] = await banco.consultar("select 1 from avisos where tipo = 'erro' and titulo = $1 and em > now() - interval '30 minutes' limit 1", [titulo]);
+      if (recente) return;
+      await avisos.registrar({ tipo: "erro", titulo, texto: String(detalhe).slice(0, 280), permissao: "dono" });
+      if (!email || !env.SMTP_USUARIO) return;
+      const [enviados] = await banco.consultar("select valor from configuracoes where chave = 'alerta_email'");
+      if (Date.now() - Number(enviados?.valor?.[titulo] ?? 0) < 6 * 3_600_000) return;
+      await banco.consultar(`insert into configuracoes (chave, valor) values ('alerta_email', $1::jsonb)
+        on conflict (chave) do update set valor = configuracoes.valor || excluded.valor`, [JSON.stringify({ [titulo]: Date.now() })]);
+      await email.enviar({ para: env.SMTP_USUARIO, ...modelos.alertaErro({ titulo, detalhe: String(detalhe).slice(0, 500), urlCentral: urlBase }) });
+    } catch (e) { console.error("[alerta]", e.message); }
+  }
+
+  /**
    * Chamada do painel de uma loja: a dona manda o login dela (o token do Supabase da loja). Daí sai a loja
    * (o endereço do Supabase que emitiu o token) e o próprio banco da loja confirma que ela é administradora.
    */
@@ -163,9 +207,9 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const rotas = [
     ["POST", /^entrar$/, false, async ({ corpo, ip, seguro }) => {
       if (!env.CENTRAL_SENHA_HASH || !env.SEGREDO_SESSAO) throw new ErroHttp(503, 'A senha da Central ainda não foi criada. Rode "npm run configurar".');
-      const t = tentativas.get(ip) ?? { n: 0, ate: 0 };
-      if (t.ate > Date.now()) throw new ErroHttp(429, `Muitas tentativas. Aguarde ${Math.ceil((t.ate - Date.now()) / 1000)} segundos.`);
       const identificador = String(corpo.usuario ?? corpo.email ?? "");
+      const chaves = [`ip:${ip}`, `conta:${identificador.trim().toLowerCase().slice(0, 120)}`];
+      await protecao.conferir(chaves);
       let quem = null, versao = 0;
       if (lerUsuario(identificador)) { // FM?-0000: alguém da equipe
         const f = equipe ? await equipe.entrar(identificador, corpo.senha) : null;
@@ -175,16 +219,68 @@ export function criarCentral(env = process.env, opcoes = {}) {
         versao = (await acesso.versao()) ?? 0;
       }
       if (!quem) {
-        t.n += 1;
-        if (t.n >= 5) t.ate = Date.now() + 60_000 * Math.min(15, 2 ** (Math.floor(t.n / 5) - 1));
-        tentativas.set(ip, t);
+        await protecao.falhou(chaves);
         await new Promise((ok) => setTimeout(ok, 400));
         throw new ErroHttp(401, "E-mail (ou usuário) ou senha incorretos.");
       }
-      tentativas.delete(ip);
+      await protecao.acertou(chaves);
+      // com a verificação em duas etapas ligada, a senha certa ainda não basta: falta o código do celular
+      if (duas && (await duas.ligada(quem).catch(() => false))) return { corpo: { etapa: "codigo", desafio: assinarDesafio(quem, versao) } };
       if (equipe) await equipe.registrar({ quem: quem.id, usuario: quem.usuario, acao: "Entrou" }).catch(() => {});
       return { corpo: { ok: true, trocar_senha: Boolean(quem.trocar_senha) }, cookie: cookieDe(quem, versao, seguro) };
     }],
+    ["POST", /^entrar\/codigo$/, false, async ({ corpo, ip, seguro }) => {
+      const d = lerDesafio(corpo.desafio);
+      const quem = d ? await identificar({ u: d.u, v: d.v }) : null;
+      if (!quem || !duas) throw new ErroHttp(401, "O tempo para digitar o código acabou. Entre de novo.");
+      const chaves = [`codigo:${quem.id}`, `ip:${ip}`];
+      await protecao.conferir(chaves);
+      const como = await duas.conferirCodigo(quem, corpo.codigo);
+      if (!como) {
+        await protecao.falhou(chaves);
+        throw new ErroHttp(401, "Código incorreto.", { codigo: "Código incorreto. Use o código que está aparecendo agora no aplicativo." });
+      }
+      await protecao.acertou(chaves);
+      if (equipe) await equipe.registrar({ quem: quem.id, usuario: quem.usuario, acao: como === "reserva" ? "Entrou com um código de reserva" : "Entrou" }).catch(() => {});
+      const reservas = como === "reserva" ? (await duas.estado(quem)).reservas : null;
+      return { corpo: { ok: true, trocar_senha: Boolean(quem.trocar_senha), reservas_restantes: reservas }, cookie: cookieDe(quem, d.v, seguro) };
+    }],
+
+    /* ---------- esqueci a senha (só o dono: a equipe pede ao dono uma senha nova) ---------- */
+    ["POST", /^senha\/esqueci$/, false, async ({ corpo, ip }) => {
+      const chaves = [`esqueci:${ip}`];
+      await protecao.conferir(chaves);
+      await protecao.falhou(chaves); // cada pedido conta: freia quem tenta muitas vezes
+      if (!email || !banco) throw new ErroHttp(503, 'O e-mail da Central não está configurado. No computador, rode "npm run configurar" (opção 7) para criar uma senha nova.');
+      const token = await acesso.pedirRecuperacao(corpo.email);
+      if (token) await email.enviar({ para: String(corpo.email).trim().toLowerCase(), ...modelos.recuperarCentral({ link: `${urlBase}/#/nova-senha/${token}` }) });
+      return { corpo: { ok: true, mensagem: "Se esse for o e-mail da conta, o link chega em instantes (confira também o spam)." } };
+    }],
+    ["POST", /^senha\/nova$/, false, async ({ corpo, ip }) => {
+      const chaves = [`nova-senha:${ip}`];
+      await protecao.conferir(chaves);
+      try { return { corpo: await acesso.recuperar(corpo) }; }
+      catch (e) { if (e.status === 410) await protecao.falhou(chaves); throw e; }
+    }],
+
+    /* ---------- verificação em duas etapas (cada pessoa liga a sua) ---------- */
+    ["GET", /^seguranca$/, true, async ({ quem }) => ({ corpo: { duas_etapas: duas ? await duas.estado(quem) : null } })],
+    ["POST", /^seguranca\/duas-etapas\/iniciar$/, true, async ({ quem }) => {
+      if (!duas) throw new ErroHttp(503, "Ligue o banco e a criptografia da Central para usar a verificação em duas etapas.");
+      const conta = quem.tipo === "dono" ? (await acesso.conta()).email || "dono" : quem.usuario;
+      return { corpo: await duas.iniciar(quem, conta) };
+    }],
+    ["POST", /^seguranca\/duas-etapas\/ativar$/, true, async ({ quem, corpo }) => {
+      if (!duas) throw new ErroHttp(503, "Verificação em duas etapas indisponível.");
+      return { corpo: await duas.ativar(quem, corpo.codigo) };
+    }, "Ligou a verificação em duas etapas"],
+    ["POST", /^seguranca\/duas-etapas\/desligar$/, true, async ({ quem, corpo }) => {
+      if (!duas) throw new ErroHttp(503, "Verificação em duas etapas indisponível.");
+      const senhaOk = quem.tipo === "dono" ? await acesso.conferirSenhaDono(corpo.senha) : await exigirEquipe().conferirSenhaDe(quem.id, corpo.senha);
+      if (!senhaOk) throw new ErroHttp(422, "Senha incorreta.", { senha: "Senha incorreta." });
+      if (!(await duas.conferirCodigo(quem, corpo.codigo))) throw new ErroHttp(422, "Código incorreto.", { codigo: "Código incorreto." });
+      return { corpo: await duas.desligar(quem) };
+    }, "Desligou a verificação em duas etapas"],
     ["POST", /^sair$/, false, async ({ seguro }) => ({ corpo: { ok: true }, cookie: cookieDeSaida(seguro) })],
     ["GET", /^eu$/, false, async ({ quem }) => {
       const dono = quem?.tipo === "dono";
@@ -287,7 +383,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
     /* ---------- equipe (só você) ---------- */
     ["GET", /^equipe$/, "equipe", async () => ({
       corpo: {
-        funcionarios: await exigirEquipe().listar(),
+        funcionarios: await (async () => {
+          const lista = await exigirEquipe().listar();
+          const ligadas = duas ? await duas.ligadasEntre(lista.map((f) => f.id)).catch(() => new Set()) : new Set();
+          return lista.map((f) => ({ ...f, duas_etapas: ligadas.has(f.id) }));
+        })(),
         funcoes: Object.entries(FUNCOES).map(([id, f]) => ({ id, nome: f.nome, prefixo: `FM${f.letra}`, descricao: f.descricao, permissoes: f.permissoes })),
         permissoes: PERMISSOES,
       },
@@ -297,7 +397,41 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["POST", new RegExp(`^equipe/${ID}/nova-senha$`), "equipe", async ({ m }) => ({ corpo: await exigirEquipe().novaSenha(m[1]) }), ({ r }) => ["Gerou senha nova", r.corpo.funcionario.usuario]],
     ["POST", new RegExp(`^equipe/${ID}/ativo$`), "equipe", async ({ m, corpo }) => ({ corpo: await exigirEquipe().definirAtivo(m[1], corpo.ativo) }),
       ({ r }) => [r.corpo.ativo ? "Reativou funcionário" : "Desativou funcionário", r.corpo.usuario]],
-    ["DELETE", new RegExp(`^equipe/${ID}$`), "equipe", async ({ m }) => ({ corpo: await exigirEquipe().excluir(m[1]) }), ({ r }) => ["Excluiu funcionário", r.corpo.usuario]],
+    ["DELETE", new RegExp(`^equipe/${ID}$`), "equipe", async ({ m }) => {
+      const r = await exigirEquipe().excluir(m[1]);
+      if (duas) await duas.desligar({ id: m[1] }).catch(() => {});
+      return { corpo: r };
+    }, ({ r }) => ["Excluiu funcionário", r.corpo.usuario]],
+    ["POST", new RegExp(`^equipe/${ID}/duas-etapas/desligar$`), "equipe", async ({ m }) => {
+      if (!duas) throw new ErroHttp(503, "Verificação em duas etapas indisponível.");
+      await exigirEquipe().conferirSenhaDe(m[1], ""); // confere que existe (404 se não)
+      await duas.desligar({ id: m[1] });
+      return { corpo: { ok: true } };
+    }, "Desligou as duas etapas de um funcionário"],
+
+    /* ---------- cópias de segurança ---------- */
+    ["GET", /^backup$/, "dono", async () => {
+      if (!banco) throw new ErroHttp(503, "Ligue o banco da Central para baixar a cópia.");
+      await garantirEsquema();
+      const tabelas = {};
+      for (const t of TABELAS_DA_CENTRAL) tabelas[t] = await banco.consultar(`select * from ${t}`);
+      const agora = new Date().toISOString();
+      await banco.consultar(`insert into configuracoes (chave, valor) values ('backup', $1::jsonb)
+        on conflict (chave) do update set valor = excluded.valor`, [JSON.stringify({ ultimo_em: agora })]);
+      return { corpo: { forminha: "central", versao: 1, gerado_em: agora,
+        aviso: "Os dados pessoais continuam criptografados: para abrir, é preciso a CHAVE_CRIPTOGRAFIA (guarde-a junto, em lugar seguro).", tabelas } };
+    }, "Baixou a cópia da Central"],
+    ["GET", /^backup\/situacao$/, "dono", async () => {
+      if (!banco) return { corpo: { ultimo_em: null } };
+      await garantirEsquema();
+      const [l] = await banco.consultar("select valor from configuracoes where chave = 'backup'");
+      return { corpo: { ultimo_em: l?.valor?.ultimo_em ?? null } };
+    }],
+    ["GET", /^lojas\/([a-z]+)\/backup$/, "lojas.suporte", async ({ m }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await lojas.copiaDaLoja(loja), alvo: loja.nome };
+    }, "Baixou a cópia de uma loja"],
     ["GET", /^atividades$/, "equipe", async ({ url }) => ({ corpo: { atividades: await exigirEquipe().atividades({ quem: url.searchParams.get("quem") || null }) } })],
 
     /* ---------- público: página de pagamento (pelo link único) ---------- */
@@ -407,6 +541,18 @@ export function criarCentral(env = process.env, opcoes = {}) {
         throw e;
       }
       if (clientes) { await garantirEsquema(); resultado.criacoes_retomadas = await clientes.retomarParadas(); }
+      if (resultado.falhas > 0) await alertarErro(`${resultado.falhas} ${resultado.falhas === 1 ? "loja não respondeu" : "lojas não responderam"} hoje`,
+        "Na verificação diária, alguma loja não respondeu. Abra Lojas na Central e confira se alguma está pausada ou com problema.");
+      // cópia da Central esquecida: lembra uma vez por semana
+      if (banco && avisos) {
+        const [b] = await banco.consultar("select valor from configuracoes where chave = 'backup'");
+        const dias = b?.valor?.ultimo_em ? Math.floor((Date.now() - Date.parse(b.valor.ultimo_em)) / 86_400_000) : null;
+        const [lembrou] = await banco.consultar("select 1 from avisos where tipo = 'backup' and em > now() - interval '7 days' limit 1");
+        if ((dias === null || dias >= 7) && !lembrou) {
+          await avisos.registrar({ tipo: "backup", titulo: dias === null ? "Baixe a primeira cópia da Central" : `Faz ${dias} dias que você não baixa a cópia da Central`,
+            texto: "Configurações → Cópias de segurança. Guarde o arquivo junto com a CHAVE_CRIPTOGRAFIA.", permissao: "dono" });
+        }
+      }
       // chave perto de vencer: um e-mail 15 dias antes e todo dia na última semana
       const vencendo = chavesVencendo(env).filter((c) => c.dias <= 7 || c.dias === 15);
       resultado.aviso_de_chave = await avisarDaChave(vencendo.map(textoDoPrazo)).catch(() => false);
@@ -450,9 +596,10 @@ export function criarCentral(env = process.env, opcoes = {}) {
   async function tratar(req, res) {
     let quem = null;
     let extras = null;
+    let rota = "";
     try {
       const url = new URL(req.url, "http://central");
-      const rota = (url.searchParams.get("rota") ?? url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
+      rota = (url.searchParams.get("rota") ?? url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
       const metodo = req.method;
       const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v[0] : v]));
       const seguro = cabecalhos["x-forwarded-proto"] === "https" || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(cabecalhos.host ?? "");
@@ -484,10 +631,19 @@ export function criarCentral(env = process.env, opcoes = {}) {
     } catch (erro) {
       if (erro instanceof ErroHttp) return responder(res, erro.status, { erro: erro.message, campos: erro.campos }, null, extras);
       // chave vencida ou sem permissão: para você, diz o que fazer; para visitantes, nada muda
-      if (erro instanceof ErroProvedor) console.error("[provedor]", erro.status, erro.message); // aparece nos registros da Vercel (sem chaves)
-      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status, erro.message) : erro.message }, null, extras);
-      if (erro instanceof ErroCofre) { console.error("[cofre]", erro.message); return responder(res, 500, { erro: "Não foi possível abrir os dados protegidos (confira a CHAVE_CRIPTOGRAFIA)." }); }
+      if (erro instanceof ErroProvedor) {
+        console.error("[provedor]", erro.status, erro.message); // aparece nos registros da Vercel (sem chaves)
+        if (chaveRecusada(erro)) await alertarErro(`A chave do ${erro.quem} foi recusada`, mensagemDeChaveRecusada(erro.quem, erro.status, erro.message));
+        else if (!erro.status || erro.status >= 500) await alertarErro(`${erro.quem} com problema`, `${erro.message} (em ${rota || "?"})`);
+        return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status, erro.message) : erro.message }, null, extras);
+      }
+      if (erro instanceof ErroCofre) {
+        console.error("[cofre]", erro.message);
+        await alertarErro("Não foi possível abrir os dados protegidos", "Confira a CHAVE_CRIPTOGRAFIA nas variáveis da Vercel.");
+        return responder(res, 500, { erro: "Não foi possível abrir os dados protegidos (confira a CHAVE_CRIPTOGRAFIA)." });
+      }
       console.error(erro);
+      await alertarErro("Erro inesperado na Central", `${String(erro?.message ?? erro).slice(0, 300)} (em ${rota || "?"})`);
       responder(res, 500, { erro: "Erro inesperado na Central. Tente de novo." });
     }
   }

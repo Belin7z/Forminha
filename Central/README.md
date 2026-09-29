@@ -79,6 +79,21 @@ aparelho sai na hora). No banco fica só o resumo da senha (scrypt), nunca a sen
 `npm run configurar`, opção **7** — vale mais que o que foi mudado pelo painel. Errar 5 vezes seguidas dá
 uma pausa crescente, e a mensagem de erro não diz se foi o e-mail ou a senha.
 
+## Segurança do acesso
+
+- **Tentativas**: 5 senhas (ou códigos) erradas bloqueiam por 1 minuto, depois 2, 4, 8… até 15. O bloqueio fica no
+  banco, então vale em todas as cópias da Central na Vercel, por endereço e por conta.
+- **Verificação em duas etapas** (perfil → *Segurança da conta*): além da senha, o código de 6 números do aplicativo de
+  autenticação (Google Authenticator, Microsoft Authenticator, Authy). Ao ligar, saem 8 códigos de reserva de uso único.
+  Cada pessoa da equipe liga a sua; se alguém perder o celular, o dono desliga na tela Equipe (selo “2 etapas”).
+- **Esqueci a senha** (dono): link por e-mail, vale 30 minutos e uma vez só; derruba as sessões abertas. Sem e-mail
+  configurado, o caminho continua sendo `npm run configurar` (opção 7), que também desliga as duas etapas do dono.
+- **Alertas**: erro inesperado, serviço fora do ar ou chave recusada viram aviso no sino do dono e e-mail (erros iguais
+  são juntados: um aviso a cada 30 minutos e no máximo um e-mail a cada 6 horas).
+- **Cópias de segurança**: Configurações → *Baixar cópia da Central* (dados pessoais continuam criptografados: guarde junto
+  com a `CHAVE_CRIPTOGRAFIA`) e Lojas → *Cópia* (os dados de cada loja). A Central lembra toda semana.
+- **Testes automáticos**: a cada envio ao GitHub, os testes do painel/loja e da Central rodam sozinhos (aba *Actions*).
+
 ## Segurança dos dados
 
 - **Dados pessoais cifrados** (AES-256-GCM): nome, e-mail, WhatsApp, CPF/CNPJ, observações, notas,

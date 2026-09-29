@@ -610,3 +610,24 @@ kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--bord
   .tabela--cupons .tabela__linha { grid-template-columns: minmax(0, 1fr) 4.5rem 6.5rem; }
   .tabela--cupons .tabela__linha > :is(:nth-child(3), :nth-child(4)) { display: none; }
 }
+
+/* ---------- segurança: entrar com código, esqueci a senha, duas etapas, cópias ---------- */
+.entrar__esqueci { display: block; margin: 1rem auto 0; font-size: .88rem; }
+.entrar__texto { margin: -.2rem 0 1.1rem; color: var(--texto-suave); font-size: .92rem; }
+.entrar__texto--pequeno { margin: 1rem 0 0; font-size: .82rem; }
+.campo--codigo input { font: 600 1.4rem/1.2 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .3em; text-align: center; }
+.seguranca { display: grid; gap: .9rem; }
+.seguranca__estado { display: flex; align-items: center; gap: .5rem; margin: 0; font-weight: 600; }
+.seguranca__passos { margin: 0; padding-left: 1.3rem; display: grid; gap: .4rem; font-size: .92rem; list-style: decimal; }
+.seguranca__qr { justify-self: center; width: 200px; height: 200px; padding: 8px; border-radius: 12px; background: #fff; }
+.seguranca__manual summary, .seguranca__desligar summary { cursor: pointer; font-size: .88rem; color: var(--texto-suave); }
+.seguranca__chave { display: block; margin-top: .5rem; padding: .6rem .8rem; border-radius: 8px; background: var(--marca-50); font: 500 .95rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: .08em; word-break: break-all; }
+.seguranca__reservas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
+.seguranca__reservas code { display: block; padding: .45rem .6rem; border-radius: 8px; background: var(--marca-50); font: 500 .95rem/1.3 ui-monospace, "Cascadia Mono", Consolas, monospace; text-align: center; letter-spacing: .06em; }
+.seguranca__desligar[open] summary { margin-bottom: .8rem; }
+.config-seguranca { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+.config-seguranca p { margin: 0 0 .5rem; }
+@media (max-width: 720px) { .config-seguranca { grid-template-columns: 1fr; } }
+.selo--botao { margin-left: .4rem; border: 0; font: inherit; font-size: .68rem; cursor: pointer; vertical-align: middle; }
+.sino__ico--erro { background: var(--perigo-bg); color: var(--perigo); }
+.sino__ico--backup { background: var(--aviso-bg); color: var(--aviso, #a8620a); }

@@ -4,6 +4,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { montarDominio } from "/src/scripts/base/dns.js";
+import { baixarJson } from "./configuracoes.js";
 import { api, aviso, dorme, pode } from "../nucleo.js";
 
 const ETAPAS = {
@@ -35,6 +36,7 @@ function cartaoLoja(l, eu) {
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("email", { tamanho: 15 })} Convite da dona</button>`}
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="pagamento">${icone("cartao", { tamanho: 15 })} Pagamento online</button>`}
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="dominio">${icone("globo", { tamanho: 15 })} Domínio</button>`}
+        ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="copia" title="Baixar os dados da loja num arquivo">${icone("baixar", { tamanho: 15 })} Cópia</button>`}
         ${suporte && l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
         ${suporte && l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
         ${pode(eu, "lojas.excluir") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
@@ -104,6 +106,15 @@ export async function telaLojas(conteiner, eu) {
     if (acao === "convite") return novoConvite(loja);
     if (acao === "pagamento") return pagamentoOnline(loja);
     if (acao === "dominio") return dominioDaLoja(loja, carregar);
+    if (acao === "copia") {
+      return ocupado(alvo, async () => {
+        try {
+          const copia = await api("GET", `lojas/${loja.ref}/backup`);
+          baixarJson(`forminha-loja-${loja.codigo}-${copia.gerado_em.slice(0, 10)}.json`, copia);
+          toast("Cópia da loja baixada.");
+        } catch (erro) { toast(erro.message, "erro"); }
+      });
+    }
     if (acao === "atualizar") return atualizarBanco(loja, carregar);
     if (acao === "reativar") {
       await ocupado(alvo, async () => {

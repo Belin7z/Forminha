@@ -447,6 +447,26 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return { ...resumoDoDominio(ficha), mudou: true };
   }
 
-  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas,
+  /**
+   * Cópia de segurança dos dados da loja (todas as tabelas do banco dela, em JSON). As fotos ficam no
+   * armazenamento do Supabase e não entram. Lojas muito grandes: use o painel do Supabase (Database → Backups).
+   */
+  async function copiaDaLoja(loja) {
+    if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de baixar a cópia.");
+    const nomes = (await sb.sql(loja.ref, `select table_name from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name`)).map((l) => l.table_name).filter((n) => /^[a-z_][a-z0-9_]*$/.test(n));
+    const tabelas = {};
+    let tamanho = 0;
+    for (const n of nomes) {
+      const [l] = await sb.sql(loja.ref, `select coalesce(json_agg(t), '[]'::json) as linhas from public."${n}" t`);
+      tabelas[n] = typeof l?.linhas === "string" ? JSON.parse(l.linhas) : l?.linhas ?? [];
+      tamanho += JSON.stringify(tabelas[n]).length;
+      if (tamanho > 4_000_000) throw new ErroHttp(413, "Esta loja é grande demais para baixar por aqui. Use o painel do Supabase: Database → Backups.");
+    }
+    return { forminha: "loja", versao: 1, loja: { nome: loja.nome, codigo: loja.codigo, ref: loja.ref }, gerado_em: new Date().toISOString(),
+      aviso: "Dados do banco da loja (pedidos, clientes, produtos, estoque…). As fotos ficam no armazenamento do Supabase.", tabelas };
+  }
+
+  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja,
     conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio };
 }

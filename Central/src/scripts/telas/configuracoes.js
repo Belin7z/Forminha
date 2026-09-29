@@ -1,10 +1,20 @@
-/* TELA — Configurações (só o dono): cobrança, conexões, conta e senha de acesso */
+/* TELA — Configurações (só o dono): cobrança, conexões, conta, senha de acesso, segurança e cópias de segurança */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { emReais, paraCentavos } from "/src/scripts/base/formatacao.js";
-import { api, aviso } from "../nucleo.js";
+import { api, aviso, quando } from "../nucleo.js";
+import { abrirSeguranca } from "./seguranca.js";
+
+/** Baixa um JSON como arquivo. */
+function baixarJson(nome, dados) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 1)], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: nome });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+export { baixarJson };
 
 const item = (ligado, titulo, como) => html`
   <li class="conexao ${ligado ? "conexao--on" : ""}">
@@ -78,7 +88,43 @@ export async function telaConfiguracoes(conteiner, eu) {
           <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Trocar senha</button></div>`
         : aviso("aviso", "Ligue o banco da Central (Conexões).")}
       </form>
+
+      ${r.trocar_senha && html`
+      <section class="cartao">
+        <div class="cartao__cab"><h2>Segurança e cópias</h2></div>
+        <div class="config-seguranca">
+          <div>
+            <p><strong>Verificação em duas etapas</strong></p>
+            <p class="texto-suave">Além da senha, o código do aplicativo no celular. Recomendado para você e para a equipe.</p>
+            <button type="button" class="btn btn--suave btn--pequeno" data-acao="seguranca">${icone("cadeado", { tamanho: 15 })} Segurança da conta</button>
+          </div>
+          <div>
+            <p><strong>Cópia da Central</strong> <small class="texto-suave" data-ultimo-backup></small></p>
+            <p class="texto-suave">Clientes, pagamentos, histórico, equipe e cupons num arquivo. Os dados pessoais continuam criptografados: guarde o arquivo junto com a <code>CHAVE_CRIPTOGRAFIA</code>. A Central lembra toda semana. A cópia de cada loja fica em Lojas → Cópia.</p>
+            <button type="button" class="btn btn--suave btn--pequeno" data-acao="backup">${icone("baixar", { tamanho: 15 })} Baixar cópia da Central</button>
+          </div>
+        </div>
+      </section>`}
     </div>`);
+
+  const ultimo = conteiner.querySelector("[data-ultimo-backup]");
+  const mostrarUltimo = (em) => { if (ultimo) ultimo.textContent = em ? `· última em ${quando(em)}` : "· nenhuma ainda"; };
+  if (ultimo) api("GET", "backup/situacao").then((s) => mostrarUltimo(s.ultimo_em)).catch(() => {});
+  conteiner.addEventListener("click", async (ev) => {
+    const alvo = ev.target.closest("[data-acao]");
+    if (!alvo) return;
+    if (alvo.dataset.acao === "seguranca") return abrirSeguranca();
+    if (alvo.dataset.acao === "backup") {
+      await ocupado(alvo, async () => {
+        try {
+          const copia = await api("GET", "backup");
+          baixarJson(`forminha-central-${copia.gerado_em.slice(0, 10)}.json`, copia);
+          mostrarUltimo(copia.gerado_em);
+          toast("Cópia baixada. Guarde em lugar seguro.");
+        } catch (erro) { toast(erro.message, "erro"); }
+      });
+    }
+  });
 
   const formSenha = conteiner.querySelector("#f-senha");
   const formConta = conteiner.querySelector("#f-conta");

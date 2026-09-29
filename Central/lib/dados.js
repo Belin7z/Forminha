@@ -122,6 +122,23 @@ export const ESQUEMA = [
   `alter table clientes add column if not exists desconto_centavos integer not null default 0`,
   `alter table clientes add column if not exists indicada_por uuid references clientes (id) on delete set null`,
   `alter table clientes add column if not exists credito_centavos integer not null default 0`, // ganho indicando (abate nas mensalidades)
+  // segurança: verificação em duas etapas (dono e equipe) e tentativas de login (valem para todas as cópias da Central)
+  `create table if not exists duas_etapas (
+    quem text primary key,                      -- 'dono' ou o id do funcionário
+    segredo text,                               -- CIFRADO
+    pendente text,                              -- CIFRADO: enquanto a pessoa ainda não digitou o primeiro código
+    ativo boolean not null default false,
+    reserva jsonb not null default '[]'::jsonb, -- só o resumo dos códigos de reserva
+    ultimo_passo bigint,                        -- o mesmo código não vale duas vezes
+    base text not null default '',
+    ligada_em timestamptz
+  )`,
+  `create table if not exists tentativas_login (
+    chave text primary key,                     -- 'ip:…', 'conta:…', 'codigo:…'
+    falhas integer not null default 0,
+    bloqueado_ate timestamptz,
+    atualizado_em timestamptz not null default now()
+  )`,
 ];
 
 /** Cria as tabelas uma vez por instância (a primeira requisição paga o custo, as outras não). */

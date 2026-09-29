@@ -14,7 +14,8 @@ import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/fo
 import { iniciais } from "/src/scripts/base/formatacao.js";
 import { api, aviso, marca, pode, quandoExpirar, raiz } from "./nucleo.js";
 import { botaoTema } from "./claro-escuro.js";
-import { telaEntrar } from "./telas/entrar.js";
+import { telaEntrar, telaNovaSenha } from "./telas/entrar.js";
+import { abrirSeguranca } from "./telas/seguranca.js";
 import { telaVisaoGeral } from "./telas/visao-geral.js";
 import { telaClientes } from "./telas/clientes.js";
 import { telaPagamentos } from "./telas/pagamentos.js";
@@ -79,6 +80,7 @@ function perfil(eu) {
         <div class="perfil__cab"><strong>${nome}</strong>${detalhe && html`<small>${detalhe}</small>`}</div>
         ${pode(eu, "configuracoes") && html`<a role="menuitem" href="#/configuracoes" class="perfil__item">${icone("ajustes", { tamanho: 17 })} Configurações</a>`}
         ${!dono && html`<button type="button" role="menuitem" class="perfil__item" data-acao="minha-senha">${icone("cadeado", { tamanho: 17 })} Trocar minha senha</button>`}
+        ${eu.recursos?.trocar_senha && html`<button type="button" role="menuitem" class="perfil__item" data-acao="seguranca">${icone("cadeado", { tamanho: 17 })} Segurança da conta</button>`}
         <button type="button" role="menuitem" class="perfil__item" data-acao="sair">${icone("sair", { tamanho: 17 })} Sair</button>
       </div>
     </div>`;
@@ -87,6 +89,8 @@ function perfil(eu) {
 async function rotear() {
   const pagar = /^#\/pagar\/([A-Za-z0-9_-]{20,64})$/.exec(location.hash);
   if (pagar) return telaPagar(pagar[1]);
+  const novaSenha = /^#\/nova-senha\/([A-Za-z0-9_-]{20,})$/.exec(location.hash);
+  if (novaSenha) return telaNovaSenha(novaSenha[1], () => telaEntrar(rotear));
   const eu = await api("GET", "eu").catch(() => ({ logado: false }));
   if (!eu.logado) return telaEntrar(rotear);
   if (eu.quem?.trocar_senha) return telaPrimeiraSenha(eu, rotear);
@@ -189,6 +193,7 @@ raiz.addEventListener("click", async (ev) => {
   if (acao === "fechar-menu") raiz.querySelector(".app")?.classList.remove("app--menu");
   if (acao === "minha-senha") return trocarMinhaSenha();
   if (acao === "buscar") return buscar();
+  if (acao === "seguranca") return abrirSeguranca();
   if (acao === "sair") {
     await api("POST", "sair", {}).catch(() => {});
     history.replaceState(null, "", "#/");

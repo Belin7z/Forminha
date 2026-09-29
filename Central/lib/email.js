@@ -71,6 +71,26 @@ export const modelos = {
       botao: { texto: "Criar senha nova", link },
     }),
   }),
+  /** Para você: link para criar uma senha nova da Central (pedido em "Esqueci a senha"). */
+  recuperarCentral: ({ link }) => ({
+    assunto: "Forminha: criar uma senha nova para a Central",
+    texto: `Para criar uma senha nova para a Central da Forminha, use este link (vale 30 minutos e uma vez só): ${link}\n\nSe não foi você, ignore este e-mail: a senha continua a mesma.\n\nForminha`,
+    html: moldura({
+      titulo: "Criar uma senha nova",
+      paragrafos: ["Recebemos um pedido para trocar a senha da Central da Forminha. O link vale 30 minutos e funciona uma vez só.", "Se não foi você, ignore este e-mail: a senha continua a mesma."],
+      botao: { texto: "Criar senha nova", link },
+    }),
+  }),
+  /** Para você: algo deu errado na Central (erros parecidos são juntados: no máximo um e-mail a cada 6 horas). */
+  alertaErro: ({ titulo, detalhe, urlCentral }) => ({
+    assunto: `Forminha: ${titulo}`,
+    texto: `${titulo}\n\n${detalhe}\n\nO aviso também aparece no sino da Central: ${urlCentral}`,
+    html: moldura({
+      titulo,
+      paragrafos: [esc(detalhe), "O aviso também aparece no sino da Central. Se continuar acontecendo, confira as chaves em Configurações."],
+      botao: { texto: "Abrir a Central", link: urlCentral },
+    }),
+  }),
   /** Para você (dona da Central): uma chave vai vencer ou foi recusada. `linhas` já vêm prontas. */
   alertaChaves: ({ linhas, urlCentral }) => ({
     assunto: `Forminha: ${linhas[0]}`,
