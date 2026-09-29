@@ -1,17 +1,70 @@
 /* ==========================================================
-   E-MAIL — mensagens para as clientes da Forminha, pelo Gmail.
-   Usa uma "senha de app" do Google (SMTP_USUARIO + SMTP_SENHA),
-   nunca a senha normal da conta. Sem isso configurado, a Central
-   segue funcionando e mostra os links no painel para você enviar.
+   E-MAIL — mensagens para as clientes da Forminha.
+   • E-mail profissional (Resend): sai do seu domínio, ex.:
+     contato@forminha.com.br (RESEND_API_KEY + EMAIL_REMETENTE).
+   • Gmail: uma "senha de app" do Google (SMTP_USUARIO + SMTP_SENHA),
+     nunca a senha normal da conta.
+   Com os dois ligados, vai pelo Resend e, se ele falhar, pelo Gmail.
+   Sem nenhum, a Central segue funcionando e mostra os links no
+   painel para você enviar.
    ========================================================== */
 import nodemailer from "nodemailer";
 
-export function criarEmail({ usuario, senha, nome = "Forminha", transporte = null }) {
-  if (!transporte && (!usuario || !senha)) return null;
+/** Envio pela API do Resend (https://resend.com/docs/api-reference/emails/send-email). */
+function viaResend({ chave, remetente, nome, responderPara, fetchFn }) {
+  return {
+    provedor: "resend",
+    async enviar({ para, assunto, texto, html }) {
+      const r = await fetchFn("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { authorization: `Bearer ${chave}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          from: `${nome.replace(/[<>"]/g, "")} <${remetente}>`, to: [para], subject: assunto, text: texto, html,
+          ...(responderPara && { reply_to: responderPara }),
+        }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(`Resend recusou o e-mail (${r.status}): ${d.message ?? "sem detalhe"}`);
+      }
+    },
+  };
+}
+
+function viaGmail({ usuario, senha, nome, transporte }) {
   const t = transporte ?? nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: usuario, pass: senha } });
   return {
+    provedor: "gmail",
     async enviar({ para, assunto, texto, html }) {
       await t.sendMail({ from: { name: nome, address: usuario ?? "forminha@teste.local" }, to: para, subject: assunto, text: texto, html });
+    },
+  };
+}
+
+/**
+ * O carteiro da Central. `resend` = a chave da API (re_…) e `remetente` = o endereço do seu domínio;
+ * `usuario`/`senha` = o Gmail. Devolve null se nada estiver configurado.
+ */
+export function criarEmail({
+  usuario, senha, nome = "Forminha", transporte = null,
+  resend = null, remetente = null, responderPara = null, fetchFn = globalThis.fetch,
+} = {}) {
+  const caminhos = [];
+  if (resend && remetente) caminhos.push(viaResend({ chave: resend, remetente, nome, responderPara, fetchFn }));
+  if (transporte || (usuario && senha)) caminhos.push(viaGmail({ usuario, senha, nome, transporte }));
+  if (!caminhos.length) return null;
+  return {
+    provedor: caminhos[0].provedor,
+    reserva: caminhos[1]?.provedor ?? null,
+    async enviar(mensagem) {
+      let primeiroErro = null;
+      for (const c of caminhos) {
+        try { return await c.enviar(mensagem); } catch (e) {
+          primeiroErro ??= e;
+          if (c !== caminhos.at(-1)) console.error(`[e-mail] ${c.provedor} falhou, tentando o próximo:`, e.message);
+        }
+      }
+      throw primeiroErro;
     },
   };
 }

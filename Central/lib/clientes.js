@@ -134,7 +134,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   }
   const abrir = (c) => cofre.decifrar(c.dados, ctx(c.id), { json: true });
 
-  /* ---------- e-mails (se o Gmail estiver configurado) ---------- */
+  /* ---------- e-mails (se o Resend ou o Gmail estiver configurado) ---------- */
   async function mandar(c, modelo, dados) {
     if (!email) return false;
     const pessoa = abrir(c);

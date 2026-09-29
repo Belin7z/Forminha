@@ -86,7 +86,8 @@ export async function telaConfiguracoes(conteiner, eu) {
         <ul class="conexoes">
           ${item(r.clientes, "Banco da Central", html`Vercel → Storage → Neon.`)}
           ${item(r.clientes, "Criptografia", html`<code>npm run configurar</code>`)}
-          ${item(r.email, "E-mail (Gmail)", html`<code>npm run configurar</code>, opção 2.`)}
+          ${item(r.email_provedor === "resend", "E-mail profissional (Resend)", html`Opcional, com domínio próprio: <code>npm run configurar</code>, opção 8.`)}
+          ${item(r.email_provedor === "gmail" || r.email_reserva === "gmail", r.email_provedor === "resend" ? "E-mail (Gmail, reserva)" : "E-mail (Gmail)", html`<code>npm run configurar</code>, opção 2.`)}
           ${item(r.mercado_pago, "PIX automático", html`Opcional: <code>npm run configurar</code>, opção 3.`)}
           ${r.mercado_pago && item(r.assinatura_mp, "Assinatura do Mercado Pago", html`<code>npm run configurar</code>, opção 3.`)}
         </ul>

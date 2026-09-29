@@ -75,7 +75,7 @@ describe("configuração e travas", () => {
   });
   it("mostra que banco, e-mail e Mercado Pago estão ligados", async () => {
     const { dados } = await api("GET", "eu");
-    assert.deepEqual(dados.recursos, { clientes: true, email: true, mercado_pago: true, assinatura_mp: true, trocar_senha: true, equipe: true });
+    assert.deepEqual(dados.recursos, { clientes: true, email: true, email_provedor: "gmail", email_reserva: null, mercado_pago: true, assinatura_mp: true, trocar_senha: true, equipe: true });
   });
   it("sem a sua chave PIX, não dá para cadastrar", async () => {
     const r = await api("POST", "clientes", { nome: "Ana Souza", email: "ana@doceria.com", nome_loja: "Doce da Ana", valor_centavos: 19900 });

@@ -9,6 +9,7 @@
      5. Trocar só a chave do Supabase (quando vencer)
      6. Trocar só a chave da Vercel (quando vencer)
      7. Trocar só o e-mail e a senha da Central (também serve se você esqueceu)
+     8. E-mail profissional (Resend, com o seu domínio)
    A chave de criptografia dos dados é criada UMA vez, sozinha. Nada do
    que você digita aparece na tela nem fica salvo no computador: vai
    direto para as variáveis secretas do projeto "forminha" na Vercel.
@@ -130,6 +131,26 @@ async function email() {
   gravar("EMAIL_NOME", nome);
 }
 
+async function emailProfissional() {
+  console.log("\nE-MAIL PROFISSIONAL (Resend, com o seu domínio — ex.: contato@forminha.com.br)");
+  console.log("   Precisa de um domínio seu. O plano grátis do Resend manda até 100 e-mails por dia.");
+  console.log("   1. Crie a conta em https://resend.com e, em Domains, adicione o seu domínio.");
+  console.log("   2. Copie os registros de DNS que ele mostrar para onde você comprou o domínio e espere ficar \"Verified\".");
+  console.log("   3. Em API Keys, crie uma chave (permissão: Sending access).");
+  const chave = await perguntar("   Chave da API (começa com re_; Enter para pular): ", { secreto: true });
+  if (!chave) { console.log("   Pulei o e-mail profissional: os e-mails continuam saindo pelo Gmail (se estiver ligado)."); return; }
+  if (!/^re_\w{8,}$/.test(chave)) { console.error("✖ A chave do Resend começa com re_ (sem espaços)."); process.exit(1); }
+  const remetente = (await perguntar("   Endereço que envia (do domínio verificado, ex.: contato@forminha.com.br): ")).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(remetente)) { console.error("✖ E-mail inválido."); process.exit(1); }
+  const responder = (await perguntar("   Para onde vão as respostas das clientes (o e-mail que você lê; Enter = o Gmail da Central): ")).trim().toLowerCase();
+  if (responder && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(responder)) { console.error("✖ E-mail inválido."); process.exit(1); }
+  const nome = (await perguntar("   Nome que aparece como remetente [Forminha]: ")) || "Forminha";
+  gravar("RESEND_API_KEY", chave);
+  gravar("EMAIL_REMETENTE", remetente);
+  if (responder) gravar("EMAIL_RESPONDER", responder);
+  gravar("EMAIL_NOME", nome);
+}
+
 async function mercadoPago() {
   console.log("\nPIX AUTOMÁTICO (Mercado Pago)");
   console.log("   Em https://www.mercadopago.com.br/developers/panel/app → sua aplicação → Credenciais de produção.");
@@ -155,6 +176,7 @@ console.log("  4) Tudo");
 console.log("  5) Trocar só a chave do Supabase (quando vencer)");
 console.log("  6) Trocar só a chave da Vercel (quando vencer)");
 console.log("  7) Trocar só o e-mail e a senha da Central (também serve se você esqueceu)");
+console.log("  8) E-mail profissional (Resend, com o seu domínio)");
 console.log("\nAgora digite SÓ O NÚMERO da opção (para a primeira vez: 1). As chaves são pedidas depois, uma de cada vez.");
 const opcao = await perguntar("Número da opção (aparece como •): ", { secreto: true }); // escondido: se colarem uma chave aqui, ela não aparece na tela
 if (opcao.length > 2) {
@@ -162,13 +184,14 @@ if (opcao.length > 2) {
   console.error("  Por segurança, apague essa chave no site onde você a criou e crie outra. Depois rode de novo e digite só o número.");
   process.exit(1);
 }
-if (!["1", "2", "3", "4", "5", "6", "7"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 7."); process.exit(1); }
+if (!["1", "2", "3", "4", "5", "6", "7", "8"].includes(opcao)) { console.error("✖ Escolha um número de 1 a 8."); process.exit(1); }
 if (["1", "4"].includes(opcao)) await senhaEChaves();
 if (opcao === "5") await chaveSupabase();
 if (opcao === "6") await chaveVercel();
 if (opcao === "7") await senhaDaCentral();
 await criptografia(); // sempre confere: cria só se ainda não existir
 if (["2", "4"].includes(opcao)) await email();
+if (["8", "4"].includes(opcao)) await emailProfissional();
 if (["3", "4"].includes(opcao)) await mercadoPago();
 if (!existe("DATABASE_URL") && !existe("POSTGRES_URL")) {
   console.log("\n! Falta o banco da Central: na Vercel, projeto forminha → Storage → Create Database → Neon → conectar ao projeto.");

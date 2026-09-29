@@ -54,7 +54,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
   let cofre = null, erroCofre = null;
   try { cofre = env.CHAVE_CRIPTOGRAFIA ? criarCofre(env.CHAVE_CRIPTOGRAFIA) : null; } catch (e) { erroCofre = e.message; }
   const garantirEsquema = banco ? preparadorDeEsquema(banco) : null;
-  const email = opcoes.email !== undefined ? opcoes.email : criarEmail({ usuario: env.SMTP_USUARIO, senha: env.SMTP_SENHA, nome: env.EMAIL_NOME || "Forminha" });
+  // e-mail profissional (Resend, do seu domínio) e/ou Gmail; as respostas das clientes vão para EMAIL_RESPONDER (ou o Gmail)
+  const email = opcoes.email !== undefined ? opcoes.email : criarEmail({
+    usuario: env.SMTP_USUARIO, senha: env.SMTP_SENHA, nome: env.EMAIL_NOME || "Forminha",
+    resend: env.RESEND_API_KEY, remetente: env.EMAIL_REMETENTE, responderPara: env.EMAIL_RESPONDER || env.SMTP_USUARIO, fetchFn,
+  });
   const mp = opcoes.mercadoPago !== undefined ? opcoes.mercadoPago : env.MP_ACCESS_TOKEN ? criarMercadoPago({ token: env.MP_ACCESS_TOKEN, fetchFn }) : null;
   const avisos = banco ? criarAvisos({ banco, preparar: garantirEsquema }) : null; // o sino da Central
   const cupons = banco ? criarCupons({ banco, preparar: garantirEsquema }) : null; // cupons de desconto e indicação
@@ -137,10 +141,17 @@ export function criarCentral(env = process.env, opcoes = {}) {
     throw e;
   });
   const chaveRecusada = (e) => e instanceof ErroProvedor && ["Supabase", "Vercel"].includes(e.quem) && [401, 403].includes(e.status);
-  /** Aviso para você (o Gmail da Central): chave vencendo ou recusada. Sem e-mail configurado, fica só o aviso no painel. */
+  /** Para onde vão os alertas para você: o Gmail da Central, o e-mail de respostas ou o e-mail da sua conta. */
+  async function emailDoDono() {
+    if (env.SMTP_USUARIO || env.EMAIL_RESPONDER) return env.SMTP_USUARIO || env.EMAIL_RESPONDER;
+    const conta = await acesso.conta().catch(() => null);
+    return conta?.email || env.CENTRAL_EMAIL || null;
+  }
+  /** Aviso para você: chave vencendo ou recusada. Sem e-mail configurado, fica só o aviso no painel. */
   async function avisarDaChave(linhas) {
-    if (!email || !env.SMTP_USUARIO || !linhas.length) return false;
-    await email.enviar({ para: env.SMTP_USUARIO, ...modelos.alertaChaves({ linhas, urlCentral: urlBase }) });
+    const para = email && linhas.length ? await emailDoDono() : null;
+    if (!para) return false;
+    await email.enviar({ para, ...modelos.alertaChaves({ linhas, urlCentral: urlBase }) });
     return true;
   }
 
@@ -157,12 +168,13 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const [recente] = await banco.consultar("select 1 from avisos where tipo = 'erro' and titulo = $1 and em > now() - interval '30 minutes' limit 1", [titulo]);
       if (recente) return;
       await avisos.registrar({ tipo: "erro", titulo, texto: String(detalhe).slice(0, 280), permissao: "dono" });
-      if (!email || !env.SMTP_USUARIO) return;
+      const para = email ? await emailDoDono() : null;
+      if (!para) return;
       const [enviados] = await banco.consultar("select valor from configuracoes where chave = 'alerta_email'");
       if (Date.now() - Number(enviados?.valor?.[titulo] ?? 0) < 6 * 3_600_000) return;
       await banco.consultar(`insert into configuracoes (chave, valor) values ('alerta_email', $1::jsonb)
         on conflict (chave) do update set valor = configuracoes.valor || excluded.valor`, [JSON.stringify({ [titulo]: Date.now() })]);
-      await email.enviar({ para: env.SMTP_USUARIO, ...modelos.alertaErro({ titulo, detalhe: String(detalhe).slice(0, 500), urlCentral: urlBase }) });
+      await email.enviar({ para, ...modelos.alertaErro({ titulo, detalhe: String(detalhe).slice(0, 500), urlCentral: urlBase }) });
     } catch (e) { console.error("[alerta]", e.message); }
   }
 
@@ -296,7 +308,8 @@ export function criarCentral(env = process.env, opcoes = {}) {
           faltando: dono ? faltando : [],
           chaves: dono ? chavesVencendo(env).map((c) => ({ ...c, texto: textoDoPrazo(c) })) : [],
           recursos: quem ? {
-            clientes: Boolean(clientes), email: Boolean(email), mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET),
+            clientes: Boolean(clientes), email: Boolean(email), email_provedor: email?.provedor ?? null, email_reserva: email?.reserva ?? null,
+            mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET),
             trocar_senha: Boolean(banco), equipe: Boolean(equipe),
           } : null,
         },

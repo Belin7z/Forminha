@@ -140,12 +140,19 @@ npm run configurar
 
 Menu: **1** senha da Central + chaves do Supabase e da Vercel · **2** e-mail (Gmail com
 "senha de app") · **3** PIX automático (Mercado Pago) · **4** tudo · **5** trocar só a chave do Supabase ·
-**6** trocar só a chave da Vercel · **7** trocar só o e-mail e a senha da Central (serve também para quem esqueceu). E-mail e Mercado Pago podem ser pulados com Enter. A chave de
+**6** trocar só a chave da Vercel · **7** trocar só o e-mail e a senha da Central (serve também para quem esqueceu) ·
+**8** e-mail profissional (Resend, com o seu domínio). E-mail e Mercado Pago podem ser pulados com Enter. A chave de
 criptografia é criada sozinha **uma vez** (guarde a cópia que aparece na tela). Nada do que você digita
 aparece na tela nem fica no computador.
 
+**E-mail profissional:** com um domínio seu, os e-mails saem de um endereço como `contato@forminha.com.br`
+pelo [Resend](https://resend.com) (plano grátis: 100 por dia). Crie a conta, adicione o domínio, copie os
+registros de DNS que ele mostra, crie uma chave de API e rode a opção **8**. As respostas das clientes vão
+para o e-mail que você informar. Com o Gmail também ligado, ele vira reserva: se o Resend falhar, o e-mail
+sai pelo Gmail.
+
 **Chaves com prazo:** a chave do Supabase vence (não existe "nunca"). Ao colar, informe a validade em
-dias: a Central mostra um aviso no topo do painel 15 dias antes e manda e-mail para o seu Gmail 15 dias
+dias: a Central mostra um aviso no topo do painel 15 dias antes e manda e-mail para você 15 dias
 antes e todo dia na última semana. Para renovar, crie uma chave nova (Organization → Forminha, acesso
 total) e rode `npm run configurar`, opção **5**. Se a chave for recusada, a Central diz isso na tela.
 
@@ -163,6 +170,6 @@ O **banco da Central** é ligado na Vercel: projeto `forminha` → **Storage →
 
 Variáveis na Vercel — secretas (pelo `npm run configurar`): `CENTRAL_EMAIL`, `CENTRAL_SENHA_HASH`, `SEGREDO_SESSAO`,
 `CRON_SECRET`, `CHAVE_CRIPTOGRAFIA`, `SUPABASE_ACCESS_TOKEN`, `VERCEL_TOKEN`, `SMTP_USUARIO`,
-`SMTP_SENHA`, `EMAIL_NOME`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`; do Neon: `DATABASE_URL`;
+`SMTP_SENHA`, `EMAIL_NOME`, `RESEND_API_KEY`, `EMAIL_REMETENTE`, `EMAIL_RESPONDER`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`; do Neon: `DATABASE_URL`;
 não secretas: `FORMINHA_ORG`, `VERCEL_TIME`, `REPO_LOJA`, `REPO_PAINEL`, `SUPABASE_CHAVE_VENCE`,
 `VERCEL_CHAVE_VENCE` (datas AAAA-MM-DD gravadas pelo configurar).
