@@ -99,7 +99,7 @@ describe("pagamentos", () => {
     const financeiro = await contratar("Fábio Reis", "financeiro");
     const r = await api("GET", "pagamentos", undefined, financeiro);
     assert.equal(r.status, 200);
-    assert.deepEqual(r.dados.totais, { recebido: 19900, pendente: 25000 });
+    assert.deepEqual(r.dados.totais, { recebido: 19900, pendente: 25000, sem_nota: 1 });
     const pago = r.dados.pagamentos.find((p) => p.situacao === "aprovado");
     assert.equal(pago.nome_loja, "Doce da Maria");
     assert.equal(pago.cliente, "Maria Doces");
