@@ -23,6 +23,7 @@ import { NOME_COOKIE, cookieDeSaida, cookieDeSessao, criarSessao, lerCookie, ler
 import { criarAcesso } from "./acesso.js";
 import { FUNCOES, PERMISSOES, TODAS, criarEquipe, lerUsuario } from "./equipe.js";
 import { comAutor } from "./autoria.js";
+import { criarAvisos } from "./avisos.js";
 
 export { ErroHttp };
 const OBRIGATORIAS = ["CENTRAL_SENHA_HASH", "SEGREDO_SESSAO", "SUPABASE_ACCESS_TOKEN", "VERCEL_TOKEN", "FORMINHA_ORG", "DATABASE_URL", "CHAVE_CRIPTOGRAFIA"];
@@ -50,9 +51,11 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const garantirEsquema = banco ? preparadorDeEsquema(banco) : null;
   const email = opcoes.email !== undefined ? opcoes.email : criarEmail({ usuario: env.SMTP_USUARIO, senha: env.SMTP_SENHA, nome: env.EMAIL_NOME || "Forminha" });
   const mp = opcoes.mercadoPago !== undefined ? opcoes.mercadoPago : env.MP_ACCESS_TOKEN ? criarMercadoPago({ token: env.MP_ACCESS_TOKEN, fetchFn }) : null;
+  const avisos = banco ? criarAvisos({ banco, preparar: garantirEsquema }) : null; // o sino da Central
   const clientes = banco && cofre && lojas ? criarClientes({
     banco, cofre, lojas, email, mp, urlBase, segredoInterno: env.CRON_SECRET, fetchFn,
     agendar: opcoes.agendar ?? null, orcamentoMs: opcoes.orcamentoMs ?? 40_000, esperaBancoMs: opcoes.esperaBancoMs ?? 4000,
+    avisar: avisos ? (dados) => avisos.registrar(dados) : undefined,
   }) : null;
   const equipe = banco && cofre ? criarEquipe({ banco, cofre, preparar: garantirEsquema }) : null;
 
@@ -250,6 +253,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
       return { corpo: await (await exigirClientes()).vendas({ de: q.get("de"), ate: q.get("ate"), agrupar: q.get("agrupar") }) };
     }],
     ["GET", /^pagamentos$/, "financeiro.ver", async ({ url }) => ({ corpo: await (await exigirClientes()).listarPagamentos({ situacao: url.searchParams.get("situacao") ?? "" }) })],
+
+    /* ---------- o sino (avisos na hora) e as metas do mês ---------- */
+    ["GET", /^avisos$/, true, async ({ quem }) => ({ corpo: avisos ? await avisos.listar(quem) : { avisos: [], nao_vistos: 0, ultimo: 0 } })],
+    ["POST", /^avisos\/vistos$/, true, async ({ quem, corpo }) => ({ corpo: avisos ? await avisos.marcarVistos(quem, corpo.ate) : { ok: true } })],
+    ["GET", /^metas$/, "financeiro.ver", async () => ({ corpo: await (await exigirClientes()).lerMetas() })],
+    ["PUT", /^metas$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarMetas(corpo) }), "Definiu as metas do mês"],
 
     // o valor padrão aparece no cadastro de quem vende; mudar é só com você
     ["GET", /^configuracoes$/, true, async () => ({ corpo: await (await exigirClientes()).lerConfig() })],

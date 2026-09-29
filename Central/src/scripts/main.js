@@ -25,6 +25,8 @@ import { telaAtividade } from "./telas/atividade.js";
 import { telaConfiguracoes } from "./telas/configuracoes.js";
 import { telaPagar } from "./telas/pagar.js";
 import { telaPrimeiraSenha, trocarMinhaSenha } from "./telas/minha-senha.js";
+import { abrirFicha } from "./telas/clientes.js";
+import { ligarSino } from "./sino.js";
 
 // [endereço, nome, ícone, permissão (null = todos), tela]
 const MENU = [
@@ -95,6 +97,7 @@ async function rotear() {
           <button type="button" class="btn-icone topo__menu" data-acao="abrir-menu" aria-label="Abrir menu">${icone("menu", { tamanho: 20 })}</button>
           <p class="topo__secao">${TELAS[atual].nome}</p>
           <span class="espaco"></span>
+          ${eu.recursos?.trocar_senha && html`<div class="sino" data-sino-conteiner></div>`}
           ${botaoTema()}
           ${perfil(eu)}
         </header>
@@ -105,6 +108,8 @@ async function rotear() {
         </main>
       </div>
     </div>`);
+  const sino = raiz.querySelector("[data-sino-conteiner]");
+  if (sino) ligarSino(sino, { aoAbrirCliente: (id) => (pode(eu, "clientes.ver") ? abrirFicha(id, rotear, eu) : null) });
   await TELAS[atual].tela(raiz.querySelector("[data-conteudo]"), eu);
   if (eu.quem.tipo === "dono" && !eu.quem.nome && eu.recursos?.trocar_senha) pedirNome();
 }

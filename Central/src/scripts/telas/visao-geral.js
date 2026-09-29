@@ -1,10 +1,14 @@
 /* ==========================================================
    TELA — Visão geral: os números do negócio (faturamento só para
-   quem vê dinheiro), as vendas do mês dia a dia (ou 12 meses), o
-   que precisa de atenção, as últimas clientes e a atividade (dono).
+   quem vê dinheiro), a meta do mês, as vendas do mês dia a dia (ou
+   12 meses), o que precisa de atenção, as últimas clientes e a
+   atividade (dono).
    ========================================================== */
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
+import { abrirModal, ocupado, toast } from "/src/scripts/base/ui.js";
+import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
+import { emReais, paraCentavos } from "/src/scripts/base/formatacao.js";
 import { api, aviso, pode, quandoCurto, reais } from "../nucleo.js";
 import { graficoDeVendas } from "../grafico.js";
 import { periodo } from "../periodo.js";
@@ -15,6 +19,65 @@ function variacao(atual, anterior) {
   if (!anterior) return atual ? "primeiro mês com vendas" : "sem vendas ainda";
   const p = Math.round(((atual - anterior) / anterior) * 100);
   return `${p >= 0 ? "+" : ""}${p}% vs. mês passado`;
+}
+
+/* ---------- meta do mês ---------- */
+const pct = (feito, meta) => (meta > 0 ? Math.min(100, Math.round((feito / meta) * 100)) : 0);
+
+function barraMeta({ rotulo, feito, meta, projecao, formato }) {
+  const p = pct(feito, meta);
+  return html`
+    <div class="meta">
+      <div class="meta__linha"><span class="meta__rotulo">${rotulo}</span><span><strong>${formato(feito)}</strong> <span class="texto-suave">de ${formato(meta)}</span></span></div>
+      <div class="meta__barra ${feito >= meta && "meta__barra--batida"}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p}" aria-label="${rotulo}: ${p}% da meta">
+        <span style="width:${p}%"></span></div>
+      <p class="meta__nota">${feito >= meta
+        ? html`<span class="meta__ok">${icone("checkCirculo", { tamanho: 14 })} Meta batida!</span>`
+        : html`${p}% · no ritmo atual, o mês fecha em <strong class="${projecao >= meta ? "meta__ok" : "meta__falta"}">${formato(projecao)}</strong>`}</p>
+    </div>`;
+}
+
+function cartaoMeta(m, eu) {
+  const temMeta = m.faturamento_centavos > 0 || m.lojas > 0;
+  const podeMudar = pode(eu, "configuracoes");
+  if (!temMeta && !podeMudar) return "";
+  return html`
+    <section class="cartao">
+      <div class="cartao__cab"><div><h2>Meta do mês</h2><small class="texto-suave">dia ${m.dia} de ${m.dias_no_mes}</small></div>
+        ${podeMudar && html`<button type="button" class="link" data-acao="metas">${temMeta ? "Alterar" : "Definir meta"}</button>`}</div>
+      ${temMeta ? html`
+        ${m.faturamento_centavos > 0 && barraMeta({ rotulo: "Faturamento", feito: m.faturamento_feito, meta: m.faturamento_centavos, projecao: m.projecao_centavos, formato: reais })}
+        ${m.lojas > 0 && barraMeta({ rotulo: "Lojas vendidas", feito: m.lojas_feitas, meta: m.lojas, projecao: m.projecao_lojas, formato: (n) => String(n) })}`
+      : html`<p class="texto-suave">Quanto quer faturar e quantas lojas vender neste mês? A Central mostra o progresso e onde o mês fecha no ritmo atual.</p>`}
+    </section>`;
+}
+
+function definirMetas(m, depois) {
+  const modal = abrirModal({
+    titulo: "Meta do mês", largura: 440,
+    corpo: html`
+      <form id="form-metas" class="form-empilhado" novalidate>
+        <div class="form-erro" data-erro-geral hidden></div>
+        ${campo({ nome: "faturamento", rotulo: "Faturamento (R$)", mascara: "moeda", valor: m.faturamento_centavos ? emReais(m.faturamento_centavos) : "", placeholder: "0,00", atributos: "autofocus" })}
+        ${campo({ nome: "lojas", rotulo: "Lojas vendidas", tipo: "number", valor: m.lojas || "", placeholder: "0", atributos: 'min="0" max="10000" inputmode="numeric"' })}
+        <p class="form-empilhado__dica">Deixe em branco o que não quiser acompanhar. Vale para todo mês até você mudar.</p>
+      </form>`,
+    rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-metas" class="btn btn--primario">Salvar</button>`,
+  });
+  const form = modal.el.querySelector("form");
+  ativarCampos(form);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    await ocupado(modal.el.querySelector('[form="form-metas"]'), async () => {
+      const d = dadosDe(form);
+      try {
+        await api("PUT", "metas", { faturamento_centavos: d.faturamento ? paraCentavos(d.faturamento) : 0, lojas: Number(d.lojas) || 0 });
+        modal.fechar();
+        toast("Meta salva.");
+        depois();
+      } catch (erro) { mostrarErros(form, erro); }
+    });
+  });
 }
 
 const numero = ({ rotulo, valor, nota, ic }) => html`
@@ -28,6 +91,7 @@ export async function telaVisaoGeral(conteiner, eu) {
   document.title = "Visão geral — Forminha";
   const primeiro = String(eu.quem.nome || "").split(" ")[0];
   let visao = "mes"; // gráfico: este mês (por dia) ou 12 meses
+  let ultimo = null; // o último resumo (a meta atual vai para a janela de editar)
   montar(conteiner, html`
     <div class="central__titulo">
       <div><h1>${primeiro ? `Olá, ${primeiro}!` : "Visão geral"}</h1></div>
@@ -52,6 +116,7 @@ export async function telaVisaoGeral(conteiner, eu) {
     let r;
     try { r = await api("GET", "resumo"); }
     catch (erro) { montar(painel, aviso("aviso", erro.message)); return; }
+    ultimo = r;
     const n = r.numeros, f = r.financeiro;
     const ultimas = html`
         <section class="cartao">
@@ -72,6 +137,7 @@ export async function telaVisaoGeral(conteiner, eu) {
 
       <div class="painel-grade">
         <div class="painel-coluna">
+        ${r.meta && cartaoMeta(r.meta, eu)}
         ${f && html`
           <section class="cartao cartao--vendas">
             <div class="cartao__cab">
@@ -119,6 +185,7 @@ export async function telaVisaoGeral(conteiner, eu) {
     const cliente = ev.target.closest("[data-cliente]");
     if (cliente) return abrirFicha(cliente.dataset.cliente, carregar, eu);
     if (ev.target.closest('[data-acao="nova-cliente"]')) novaCliente(carregar, eu);
+    if (ev.target.closest('[data-acao="metas"]') && ultimo?.meta) definirMetas(ultimo.meta, carregar);
   });
   await carregar();
 }

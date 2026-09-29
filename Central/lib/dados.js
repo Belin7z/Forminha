@@ -85,6 +85,17 @@ export const ESQUEMA = [
   )`,
   `create index if not exists atividades_em_idx on atividades (em desc)`,
   `create index if not exists atividades_quem_idx on atividades (quem, em desc)`,
+  // o sino: o que acabou de acontecer (sem dados pessoais: nome da loja e valores) e até onde cada pessoa já viu
+  `create table if not exists avisos (
+    id bigint generated always as identity primary key,
+    em timestamptz not null default now(),
+    tipo text not null,                         -- pagamento | loja_pronta | parada | cadastro
+    titulo text not null,
+    texto text not null default '',
+    cliente_id uuid references clientes (id) on delete cascade,
+    permissao text                              -- quem vê: uma permissão, 'dono' ou null (todos)
+  )`,
+  `create table if not exists avisos_vistos (quem text primary key, ate bigint not null default 0)`,
 ];
 
 /** Cria as tabelas uma vez por instância (a primeira requisição paga o custo, as outras não). */

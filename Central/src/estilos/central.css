@@ -497,3 +497,39 @@
   .dns__linha [data-rotulo]::before { content: attr(data-rotulo); margin-right: .45rem; font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-suave); }
   .dns__valor, .dns__status { grid-column: 1 / -1; }
 }
+
+/* ---------- o sino: avisos na hora ---------- */
+.sino { position: relative; }
+.sino__botao { position: relative; }
+.sino__n { position: absolute; top: 2px; right: 1px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: var(--perigo); color: #fff;
+  font-size: .64rem; font-weight: 600; line-height: 17px; text-align: center; box-shadow: 0 0 0 2px var(--fundo); }
+.sino__painel { position: absolute; right: 0; top: calc(100% + .5rem); z-index: 30; width: min(360px, calc(100vw - 2rem)); max-height: min(70vh, 520px); overflow: auto;
+  padding: .4rem; border: 1px solid var(--borda); border-radius: 14px; background: var(--superficie-alta, var(--superficie)); box-shadow: var(--sombra); }
+.sino__cab { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem .6rem .6rem; border-bottom: 1px solid var(--borda); margin-bottom: .3rem; }
+.sino__permitir { font-size: .78rem; }
+.sino__lista { list-style: none; margin: 0; padding: 0; }
+.sino__item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .7rem; width: 100%; padding: .6rem; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sino__item:hover, .sino__item:focus-visible { background: var(--marca-50); }
+.sino__item--novo { background: var(--marca-25); }
+.sino__item--novo .sino__texto strong::after { content: ""; display: inline-block; width: 7px; height: 7px; margin-left: .4rem; border-radius: 50%; background: var(--perigo); vertical-align: middle; }
+.sino__ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--neutro-bg); color: var(--texto-suave); }
+.sino__ico--pagamento, .sino__ico--loja_pronta { background: var(--sucesso-bg); color: var(--sucesso); }
+.sino__ico--parada { background: var(--perigo-bg); color: var(--perigo); }
+.sino__texto { display: grid; gap: .1rem; min-width: 0; }
+.sino__texto strong { font-size: .88rem; font-weight: 600; }
+.sino__texto small { font-size: .8rem; color: var(--texto-suave); }
+.sino__texto time { font-size: .72rem; color: var(--texto-apagado); }
+.sino__vazio { margin: 0; padding: 1rem .6rem; font-size: .86rem; color: var(--texto-suave); }
+
+/* ---------- meta do mês ---------- */
+.meta { display: grid; gap: .45rem; }
+.meta + .meta { margin-top: 1.1rem; }
+.meta__linha { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; font-size: .9rem; }
+.meta__rotulo { color: var(--texto-suave); font-size: .82rem; }
+.meta__barra { height: 8px; border-radius: 999px; background: var(--marca-100); overflow: hidden; }
+.meta__barra span { display: block; height: 100%; border-radius: inherit; background: var(--escura); transition: width .4s ease; }
+.meta__barra--batida span { background: var(--sucesso); }
+.meta__nota { margin: 0; font-size: .8rem; color: var(--texto-suave); }
+.meta__ok { display: inline-flex; align-items: center; gap: .25rem; color: var(--sucesso); font-weight: 600; }
+.meta__falta { color: var(--aviso, #b26a00); }
+@media (prefers-reduced-motion: reduce) { .meta__barra span { transition: none; } }

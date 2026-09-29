@@ -70,9 +70,13 @@ export function validarCliente(corpo, { parcial = false } = {}) {
 }
 
 /* ---------- módulo ---------- */
-export function criarClientes({ banco, cofre, lojas, email = null, mp = null, urlBase, segredoInterno = "", fetchFn = fetch, orcamentoMs = 40_000, agendar = null, esperaBancoMs = 4000 }) {
+export function criarClientes({ banco, cofre, lojas, email = null, mp = null, urlBase, segredoInterno = "", fetchFn = fetch, orcamentoMs = 40_000, agendar = null, esperaBancoMs = 4000,
+  avisar = async () => {} }) {
   const sql = (t, p) => banco.consultar(t, p);
   const ctx = (id) => `cliente:${id}`;
+  const brl = (centavos) => (Number(centavos) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  /** O sino da Central (lib/avisos.js): nunca atrapalha o que estava sendo feito. */
+  const aviso = (dados) => Promise.resolve().then(() => avisar(dados)).catch(() => {});
 
   /* configurações da Central (valor padrão da loja e a SUA chave PIX) */
   async function lerConfig() {
@@ -93,6 +97,23 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const valorFinal = { valor_padrao_centavos: valor, pix };
     await sql("insert into configuracoes (chave, valor) values ('geral', $1::jsonb) on conflict (chave) do update set valor = excluded.valor", [JSON.stringify(valorFinal)]);
     return lerConfig();
+  }
+
+  /* metas do mês: faturamento e lojas vendidas (0 = sem meta) */
+  async function lerMetas() {
+    const [l] = await sql("select valor from configuracoes where chave = 'metas'");
+    return { faturamento_centavos: Number(l?.valor?.faturamento_centavos ?? 0), lojas: Number(l?.valor?.lojas ?? 0) };
+  }
+  async function salvarMetas(corpo) {
+    const faturamento = Math.round(Number(corpo.faturamento_centavos ?? 0));
+    const qtd = Math.round(Number(corpo.lojas ?? 0));
+    const campos = {};
+    if (!Number.isFinite(faturamento) || faturamento < 0 || faturamento > 1_000_000_000) campos.faturamento = "Meta de faturamento: de R$ 0 a R$ 10 milhões.";
+    if (!Number.isFinite(qtd) || qtd < 0 || qtd > 10_000) campos.lojas = "Meta de lojas: de 0 a 10.000.";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    await sql("insert into configuracoes (chave, valor) values ('metas', $1::jsonb) on conflict (chave) do update set valor = excluded.valor",
+      [JSON.stringify({ faturamento_centavos: faturamento, lojas: qtd })]);
+    return lerMetas();
   }
 
   // ações de pessoas (não as etapas automáticas da loja nem os e-mails) dizem quem fez
@@ -158,6 +179,8 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       throw e;
     }
     await anotarHistorico(id, "cadastro", "Cliente cadastrada.");
+    const autor = autorAtual();
+    if (autor && autor !== "Dono") aviso({ tipo: "cadastro", titulo: `Cliente nova: ${d.nome_loja}`, texto: `Cadastrada por ${autor} · ${brl(d.valor_centavos)}`, cliente_id: id, permissao: "dono" });
     const c = await linha(id);
     const cobranca = await novaCobranca(c);
     const enviado = await mandar(c, "cobranca", { valorCentavos: c.valor_centavos, link: cobranca.link }).catch(async (e) => {
@@ -237,6 +260,9 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     await sql(`update clientes set situacao = 'pago', etapa = 'criar_projeto', tentativas = 0, etapa_erro = null, atualizado_em = now()
       where id = $1 and situacao = 'aguardando_pagamento'`, [p.cliente_id]);
     await anotarHistorico(p.cliente_id, "pagamento", `Pagamento de ${(p.valor_centavos / 100).toFixed(2).replace(".", ",")} confirmado ${por === "mercado_pago" ? "pelo Mercado Pago" : "manualmente"}.`);
+    const [dona] = await sql("select nome_loja from clientes where id = $1", [p.cliente_id]);
+    aviso({ tipo: "pagamento", titulo: `Pagamento recebido: ${dona?.nome_loja ?? "loja"}`, texto: `${brl(p.valor_centavos)} · ${por === "mercado_pago" ? "PIX automático" : "confirmado à mão"}. A loja já está sendo criada.`,
+      cliente_id: p.cliente_id, permissao: "clientes.ver" });
     return { cliente_id: p.cliente_id, ja_estava: false };
   }
 
@@ -334,6 +360,8 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
         const enviado = await mandar(c, "boasVindas", { convite, loja: c.loja_url });
         if (!enviado) await anotarHistorico(c.id, "email", "E-mail não configurado: envie o link do convite pelo painel.");
         await anotarHistorico(c.id, "loja", "Loja pronta.");
+        aviso({ tipo: "loja_pronta", titulo: `Loja pronta: ${c.nome_loja}`, texto: enviado ? "O convite já foi por e-mail para a dona." : "Mande o link do convite para a dona (está na ficha).",
+          cliente_id: c.id, permissao: "clientes.ver" });
         return mudar({ etapa: "pronta", email_boas_vindas_em: enviado ? new Date().toISOString() : null });
       }
       default:
@@ -358,7 +386,10 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     } catch (erro) {
       const [falhou] = await sql(`update clientes set tentativas = tentativas + 1, etapa_erro = $2 where id = $1 returning *`, [id, `${c.etapa}: ${String(erro.message).slice(0, 300)}`]);
       c = falhou;
-      if (c.tentativas >= MAX_TENTATIVAS) await anotarHistorico(id, "loja", `A criação parou na etapa "${c.etapa}": ${erro.message}. Use "Tentar de novo".`);
+      if (c.tentativas >= MAX_TENTATIVAS) {
+        await anotarHistorico(id, "loja", `A criação parou na etapa "${c.etapa}": ${erro.message}. Use "Tentar de novo".`);
+        aviso({ tipo: "parada", titulo: `A criação parou: ${c.nome_loja}`, texto: `Na etapa "${c.etapa}". Abra a ficha e use "Tentar de novo".`, cliente_id: id, permissao: "lojas.suporte" });
+      }
     } finally {
       await sql("update clientes set processando_ate = null where id = $1", [id]);
     }
@@ -485,7 +516,10 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
           and confirmado_em ${LOCAL} < ${INICIO_DO_MES}), 0)::bigint as mes_anterior,
         coalesce(sum(valor_centavos) filter (where situacao = 'aprovado'), 0)::bigint as total,
         coalesce(sum(valor_centavos) filter (where situacao = 'pendente'), 0)::bigint as pendente,
-        count(*) filter (where situacao = 'aprovado')::int as vendas
+        count(*) filter (where situacao = 'aprovado')::int as vendas,
+        count(*) filter (where situacao = 'aprovado' and confirmado_em ${LOCAL} >= ${INICIO_DO_MES})::int as vendas_mes,
+        extract(day from now() ${LOCAL})::int as dia,
+        extract(day from ${INICIO_DO_MES} + interval '1 month' - interval '1 day')::int as dias_no_mes
       from pagamentos`);
     const porMes = await sql(`select to_char(date_trunc('month', confirmado_em ${LOCAL}), 'YYYY-MM') as mes, sum(valor_centavos)::bigint as total, count(*)::int as vendas
       from pagamentos where situacao = 'aprovado' and confirmado_em ${LOCAL} >= ${INICIO_DO_MES} - interval '5 months' group by 1`);
@@ -501,6 +535,12 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return {
       ...r,
       financeiro: { mes: Number(f.mes), mes_anterior: Number(f.mes_anterior), total: Number(f.total), pendente: Number(f.pendente), vendas: f.vendas, meses },
+      // meta do mês e onde ele fecha se o ritmo continuar
+      meta: {
+        ...(await lerMetas()), faturamento_feito: Number(f.mes), lojas_feitas: f.vendas_mes, dia: f.dia, dias_no_mes: f.dias_no_mes,
+        projecao_centavos: f.dia ? Math.round((Number(f.mes) / f.dia) * f.dias_no_mes) : 0,
+        projecao_lojas: f.dia ? Math.round((f.vendas_mes / f.dia) * f.dias_no_mes) : 0,
+      },
     };
   }
 
@@ -579,7 +619,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos, vendas, atualizarEnderecos,
+    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas,
   };
 }
 

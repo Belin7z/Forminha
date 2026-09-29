@@ -9,13 +9,15 @@ com o nome `<código> · <nome da loja>`, ex.: `7XT-Tna-dRe · Doce da Ana`) e *
 ## O painel
 
 Menu lateral com **Visão geral** (faturamento do mês, clientes, lojas no ar, cobranças esperando,
-vendas do mês dia a dia ou dos 12 meses, o que precisa de atenção, últimas clientes e atividade),
+**meta do mês** — faturamento e lojas vendidas, com a projeção de onde o mês fecha no ritmo atual; só o
+dono define —, vendas do mês dia a dia ou dos 12 meses, o que precisa de atenção, últimas clientes e atividade),
 **Clientes** (filtros por situação e planilha), **Vendas** (Hoje, 7 dias, 30 dias, Este mês, 12 meses,
 Por ano ou de um dia até outro: faturamento, vendas e ticket médio comparados com o período anterior,
 gráfico por hora/dia/mês/ano e cada venda, com planilha), **Pagamentos** (tudo o que foi cobrado, com
 total recebido e pendente), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
-financeiro). No topo, o **perfil**: ao clicar, Configurações (dono) ou Trocar minha senha (equipe) e
-Sair. No celular, o menu abre pelo botão ☰.
+financeiro). No topo, o **sino** (avisos na hora: pagamento recebido, loja pronta, criação parada e, para o
+dono, cliente cadastrada pela equipe; também no computador, se você deixar) e o **perfil**: ao clicar,
+Configurações (dono) ou Trocar minha senha (equipe) e Sair. No celular, o menu abre pelo botão ☰.
 
 ## Vender uma loja
 
