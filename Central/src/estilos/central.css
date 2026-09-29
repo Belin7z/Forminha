@@ -656,3 +656,12 @@ kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--bord
 .pagar__termos { margin: 1rem 0 0; font-size: .78rem; color: var(--texto-suave); text-align: center; }
 .visao__nota { margin-bottom: .8rem; }
 .entrar__copy .link { font-size: inherit; }
+
+/* ---------- banco único (Configurações) ---------- */
+.banco-unico { display: grid; gap: .9rem; }
+.banco-unico p { margin: 0; }
+.banco-unico__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.banco-unico__lista li { display: flex; align-items: center; gap: .5rem; }
+.banco-unico__lista .icone { color: var(--sucesso); flex: none; }
+.banco-unico__ok { display: flex; align-items: center; gap: .45rem; color: var(--sucesso); font-weight: 500; }
+.banco-unico__progresso { font-size: .9rem; color: var(--texto-suave); }

@@ -28,6 +28,7 @@ import { criarCupons } from "./cupons.js";
 import { criarProtecao } from "./protecao.js";
 import { criarDuasEtapas } from "./duasetapas.js";
 import { criarDominioCentral } from "./dominio-central.js";
+import { criarBancoUnico } from "./banco-unico.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export { ErroHttp };
@@ -64,10 +65,23 @@ export function criarCentral(env = process.env, opcoes = {}) {
     const cfg = await dominioCentral.ler().catch(() => undefined);
     if (cfg !== undefined) urlBase = cfg?.ativo_em ? `https://${cfg.raiz}` : urlInicial;
   }
-  const lojas = sb && vc && org ? criarLojas({
-    sb, vc, org, fetchFn,
+  const sites = {
     repoLoja: env.REPO_LOJA || "Belin7z/Forminha", repoPainel: env.REPO_PAINEL || "Belin7z/Forminha",
-    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard", urlCentral: () => urlBase,
+    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard",
+  };
+  // banco único: todas as lojas num projeto Supabase só (preparado uma vez, em Configurações)
+  const bancoUnico = banco && sb && vc && org ? criarBancoUnico({
+    sb, vc, org, site: { ...sites, urlCentral: () => urlBase },
+    lerConfig: async () => {
+      await garantirEsquema();
+      const [l] = await banco.consultar("select valor from configuracoes where chave = 'banco_unico'");
+      return l?.valor ?? null;
+    },
+    gravarConfig: (v) => banco.consultar(`insert into configuracoes (chave, valor) values ('banco_unico', $1::jsonb)
+      on conflict (chave) do update set valor = excluded.valor`, [JSON.stringify(v)]),
+  }) : null;
+  const lojas = sb && vc && org ? criarLojas({
+    sb, vc, org, fetchFn, ...sites, urlCentral: () => urlBase, unico: bancoUnico,
     baseDasLojas: dominioCentral ? async () => {
       const cfg = await dominioCentral.ler();
       return cfg ? { raiz: cfg.raiz, pronta: Boolean(cfg.coringa_em) } : null;
@@ -210,7 +224,10 @@ export function criarCentral(env = process.env, opcoes = {}) {
       ref = /^https:\/\/([a-z]{20})\.supabase\.co\/auth\/v1$/.exec(String(carga.iss))?.[1] ?? null;
     } catch { /* token estranho */ }
     if (!ref) throw new ErroHttp(401, "Entre no painel da sua loja para continuar.");
-    const loja = await lojas.porRef(ref);
+    // banco único: o token é do banco de todas as lojas; a loja vem do endereço do painel (cabeçalho x-loja)
+    const unico = bancoUnico ? await bancoUnico.pronto().catch(() => null) : null;
+    const loja = unico?.ref === ref ? await lojas.porEndereco(cabecalhos["x-loja"]) : await lojas.porRef(ref);
+    if (!loja) throw new ErroHttp(401, "Entre no painel da sua loja para continuar.");
     await lojas.conferirDona(loja, jwt);
     return loja;
   }
@@ -342,7 +359,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
           recursos: quem ? {
             clientes: Boolean(clientes), email: Boolean(email), email_provedor: email?.provedor ?? null, email_reserva: email?.reserva ?? null,
             mercado_pago: Boolean(mp), assinatura_mp: Boolean(env.MP_WEBHOOK_SECRET),
-            trocar_senha: Boolean(banco), equipe: Boolean(equipe), dominio: Boolean(dominioCentral),
+            trocar_senha: Boolean(banco), equipe: Boolean(equipe), dominio: Boolean(dominioCentral), banco_unico: Boolean(bancoUnico),
           } : null,
         },
       };
@@ -490,7 +507,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const [l] = await banco.consultar("select valor from configuracoes where chave = 'backup'");
       return { corpo: { ultimo_em: l?.valor?.ultimo_em ?? null } };
     }],
-    ["GET", /^lojas\/([a-z]+)\/backup$/, "lojas.suporte", async ({ m }) => {
+    ["GET", /^lojas\/([A-Za-z0-9-]+)\/backup$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.copiaDaLoja(loja), alvo: loja.nome };
@@ -527,58 +544,69 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const r = await lojas.criar(nome);
       return { corpo: { ...r, email, etapa: "criando" }, alvo: nome };
     }, "Criou loja sem cobrança"],
-    ["GET", /^lojas\/([a-z]+)$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await lojas.estado(await lojas.porRef(m[1])) }; }],
-    ["POST", /^lojas\/([a-z]+)\/preparar$/, "lojas.suporte", async ({ m, corpo }) => { exigirLojas(); return { corpo: await lojas.prepararPasso(await lojas.porRef(m[1]), corpo.email) }; }],
-    ["POST", /^lojas\/([a-z]+)\/publicar$/, "lojas.suporte", async ({ m }) => {
+    ["GET", /^lojas\/([A-Za-z0-9-]+)$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await lojas.estado(await lojas.porRef(m[1])) }; }],
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/preparar$/, "lojas.suporte", async ({ m, corpo }) => { exigirLojas(); return { corpo: await lojas.prepararPasso(await lojas.porRef(m[1]), corpo.email) }; }],
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/publicar$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.publicar(loja), alvo: loja.nome };
     }, "Publicou loja"],
-    ["POST", /^lojas\/([a-z]+)\/convite$/, "lojas.suporte", async ({ m, corpo }) => {
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/convite$/, "lojas.suporte", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.convite(loja, corpo.email), alvo: loja.nome };
     }, "Gerou convite"],
-    ["POST", /^lojas\/([a-z]+)\/reativar$/, "lojas.suporte", async ({ m }) => {
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/reativar$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       await lojas.reativar(loja);
       return { corpo: { etapa: "reativando" }, alvo: loja.nome };
     }, "Reativou loja"],
     // pagamento online: você cola o Access Token do Mercado Pago da doceria (ou ela mesma, pelo painel dela)
-    ["POST", /^lojas\/([a-z]+)\/pagamento$/, "lojas.suporte", async ({ m, corpo }) => {
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/pagamento$/, "lojas.suporte", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.conectarPagamento(loja, corpo.token), alvo: loja.nome };
     }, "Ligou o pagamento online"],
     // domínio próprio (ex.: suadoceria.com.br)
-    ["GET", /^lojas\/([a-z]+)\/dominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.ver(await lojas.porRef(m[1])) }; }],
-    ["POST", /^lojas\/([a-z]+)\/dominio$/, "lojas.suporte", async ({ m, corpo }) => {
+    ["GET", /^lojas\/([A-Za-z0-9-]+)\/dominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.ver(await lojas.porRef(m[1])) }; }],
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/dominio$/, "lojas.suporte", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       const r = await acoesDeDominio.ligar(loja, corpo);
       return { corpo: r, alvo: `${loja.nome} (${r.dominio})` };
     }, "Ligou domínio próprio"],
-    ["POST", /^lojas\/([a-z]+)\/dominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.conferir(await lojas.porRef(m[1])) }; }],
-    ["DELETE", /^lojas\/([a-z]+)\/dominio$/, "lojas.suporte", async ({ m }) => {
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/dominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.conferir(await lojas.porRef(m[1])) }; }],
+    ["DELETE", /^lojas\/([A-Za-z0-9-]+)\/dominio$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await acoesDeDominio.tirar(loja), alvo: loja.nome };
     }, "Tirou o domínio próprio"],
     // endereço na Forminha (anadoces.forminha.com.br)
-    ["GET", /^lojas\/([a-z]+)\/subdominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.ver(await lojas.porRef(m[1])) }; }],
-    ["POST", /^lojas\/([a-z]+)\/subdominio$/, "lojas.suporte", async ({ m, corpo }) => {
+    ["GET", /^lojas\/([A-Za-z0-9-]+)\/subdominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.ver(await lojas.porRef(m[1])) }; }],
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/subdominio$/, "lojas.suporte", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       const r = await acoesDeSub.ligar(loja, corpo);
       return { corpo: r, alvo: `${loja.nome} (${r.host})` };
     }, "Ligou o endereço na Forminha"],
-    ["POST", /^lojas\/([a-z]+)\/subdominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.conferir(await lojas.porRef(m[1])) }; }],
-    ["DELETE", /^lojas\/([a-z]+)\/subdominio$/, "lojas.suporte", async ({ m }) => {
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/subdominio\/conferir$/, "lojas.suporte", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.conferir(await lojas.porRef(m[1])) }; }],
+    ["DELETE", /^lojas\/([A-Za-z0-9-]+)\/subdominio$/, "lojas.suporte", async ({ m }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: await acoesDeSub.tirar(loja), alvo: loja.nome };
     }, "Tirou o endereço na Forminha"],
+
+    /* ---------- banco único (todas as lojas num projeto só) ---------- */
+    ["GET", /^banco-unico$/, "dono", async () => {
+      if (!bancoUnico) throw new ErroHttp(503, "Para ter o banco único, ligue o banco da Central e as chaves do Supabase e da Vercel.");
+      return { corpo: await bancoUnico.estado() };
+    }],
+    // um passo por chamada (a tela chama de novo até ficar pronto); depois, serve para atualizar as tabelas
+    ["POST", /^banco-unico\/preparar$/, "dono", async () => {
+      if (!bancoUnico) throw new ErroHttp(503, "Para ter o banco único, ligue o banco da Central e as chaves do Supabase e da Vercel.");
+      return { corpo: await bancoUnico.preparar() };
+    }, "Preparou o banco único das lojas"],
 
     /* ---------- domínio da Forminha (a Central e a base das lojas) ---------- */
     ["GET", /^dominio$/, "dono", async () => ({ corpo: reler(await exigirDominioCentral().situacao()) })],
@@ -610,7 +638,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       registrarDaDona(loja, "Tirou o domínio próprio");
       return { corpo: r };
     }],
-    ["DELETE", /^lojas\/([a-z]+)$/, "lojas.excluir", async ({ m, corpo }) => {
+    ["DELETE", /^lojas\/([A-Za-z0-9-]+)$/, "lojas.excluir", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
       return { corpo: { ok: true, ...(await lojas.excluir(loja, corpo.codigo)) }, alvo: `${loja.nome} (${loja.codigo})` };
@@ -679,7 +707,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   }
   // o painel de cada loja mora em outro endereço: estas rotas aceitam chamadas de fora (a proteção é o login da dona, não cookie)
   const CORS_DAS_LOJAS = {
-    "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type, x-loja",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS", "Access-Control-Max-Age": "600",
   };
 

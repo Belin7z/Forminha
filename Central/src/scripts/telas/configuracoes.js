@@ -7,6 +7,7 @@ import { emReais, paraCentavos } from "/src/scripts/base/formatacao.js";
 import { api, aviso, quando } from "../nucleo.js";
 import { abrirSeguranca } from "./seguranca.js";
 import { cartaoDominioForminha } from "./dominio-forminha.js";
+import { cartaoBancoUnico } from "./banco-unico.js";
 
 /** Baixa um JSON como arquivo. */
 function baixarJson(nome, dados) {
@@ -82,6 +83,12 @@ export async function telaConfiguracoes(conteiner, eu) {
           <div class="cartao__rodape"><button type="submit" class="btn btn--primario">Salvar</button></div>
         </form>`}
 
+      ${r.banco_unico && html`
+        <section class="cartao cartao--largo">
+          <div class="cartao__cab"><div><h2>Banco único das lojas</h2><small class="texto-suave">Todas as lojas novas num banco só, com os mesmos 2 sites.</small></div></div>
+          <div data-banco-unico><div class="carregando-pagina"><div class="spinner"></div></div></div>
+        </section>`}
+
       ${r.dominio && html`
         <section class="cartao cartao--largo">
           <div class="cartao__cab"><div><h2>Domínio da Forminha</h2><small class="texto-suave">A Central no seu domínio e um endereço para cada loja embaixo dele.</small></div></div>
@@ -149,6 +156,8 @@ export async function telaConfiguracoes(conteiner, eu) {
 
   const lugarDominio = conteiner.querySelector("[data-dominio-forminha]");
   if (lugarDominio) cartaoDominioForminha(lugarDominio);
+  const lugarBanco = conteiner.querySelector("[data-banco-unico]");
+  if (lugarBanco) cartaoBancoUnico(lugarBanco);
 
   const formEmpresa = conteiner.querySelector("#f-empresa");
   if (formEmpresa) {

@@ -8,13 +8,17 @@
    do pagamento (lib/clientes.js).
    SEGURANÇA: só mexe em projetos da organização FORMINHA_ORG com
    nome no padrão "<código> · <nome>" — nunca nos outros da conta.
+   Dois tipos de loja: com projeto próprio no Supabase (ref de 20 letras)
+   ou no BANCO ÚNICO (banco-unico.js; o "ref" dela é o código), onde os
+   2 sites servem todas as lojas e cada uma ganha os seus endereços.
    ========================================================== */
 import { randomBytes } from "node:crypto";
 import { ErroProvedor } from "./provedores.js";
 import { FUNCOES, montarFuncao, versaoDasFuncoes } from "./funcoes.js";
 import { enderecosDoDominio, enderecosNaForminha, nomeNoDns, normalizarDominio, normalizarSubdominio, raizDoDominio, registroDoEndereco } from "./dominios.js";
-import { gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleatoria, slug } from "./codigo.js";
-import { aplicarProxima, gerarConvite, gravarFicha, semear, situacao } from "./banco.js";
+import { PADRAO_CODIGO, gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleatoria, slug } from "./codigo.js";
+import { aplicarProxima, gerarConvite, gravarFicha, noProjeto, semear, situacao } from "./banco.js";
+import { prefixoDosPedidos } from "./banco-unico.js";
 import { EMAIL, ErroHttp } from "./erros.js";
 
 const REF = /^[a-z]{20}$/;
@@ -73,8 +77,14 @@ const listaDeRetorno = (ficha) => origensDaLoja(ficha).map((o) => `${o}/**`).joi
  * `baseDasLojas`: função que devolve o domínio da Forminha ({ raiz, pronta }) ou null — com ele pronto, cada loja
  * ganha anadoces.<raiz> e anadoces-painel.<raiz>.
  */
-export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, fetchFn = fetch }) {
+export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, unico = null, fetchFn = fetch }) {
   const centralAgora = typeof urlCentral === "function" ? urlCentral : () => urlCentral;
+  const doUnico = (loja) => loja?.tipo === "unico";
+  /** Onde rodar o SQL da loja: o projeto dela, ou DENTRO dela no banco único (banco-unico.js). */
+  const bd = (loja) => (doUnico(loja) ? { sql: unico.naLoja(loja.id), sqlBanco: unico.sqlBanco } : noProjeto(sb, loja.ref));
+  /** O projeto do Supabase onde a loja mora (o dela, ou o banco único). */
+  const refDoBanco = async (loja) => (doUnico(loja) ? (await unico.ler()).ref : loja.ref);
+  const statusDoUnico = async () => (await sb.projeto((await unico.ler()).ref)).status;
   const base = async () => (baseDasLojas ? baseDasLojas().catch(() => null) : null);
   // o domínio da própria Central (e o que vier embaixo dele) não pode virar domínio de loja
   async function reservados() {
@@ -85,8 +95,24 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return b?.raiz ? [...lista, b.raiz] : lista;
   }
 
-  /** Busca o projeto e confere que é MESMO uma loja da Forminha. */
+  /** Loja do banco único pelo código (é o "ref" dela na Central). */
+  async function doBancoUnico(codigo) {
+    if (!unico || !(await unico.pronto())) return null;
+    const [l] = await unico.sqlBanco("select id, codigo, nome, criada_em from public.lojas where codigo = $1", [codigo]);
+    return l ? { tipo: "unico", ref: l.codigo, id: l.id, codigo: l.codigo, nome: l.nome, criada_em: l.criada_em, status: await statusDoUnico() } : null;
+  }
+
+  /** Busca a loja: projeto próprio (ref de 20 letras) ou banco único (o código). Confere que é MESMO uma loja da Forminha. */
   async function porRef(ref) {
+    // o banco único inteiro (aparece na lista quando está pausado: dá para reativar por lá)
+    if (ref === "banco-unico" && unico && (await unico.pronto())) {
+      return { tipo: "unico", ref, codigo: "—", nome: "Banco único das lojas", status: await statusDoUnico() };
+    }
+    if (PADRAO_CODIGO.test(String(ref))) {
+      const l = await doBancoUnico(String(ref));
+      if (!l) throw new ErroHttp(404, "Loja não encontrada.");
+      return l;
+    }
     if (!REF.test(String(ref))) throw new ErroHttp(404, "Loja não encontrada.");
     let p;
     try { p = await sb.projeto(ref); } catch (e) { if (e.status === 404) throw new ErroHttp(404, "Loja não encontrada."); throw e; }
@@ -96,10 +122,30 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
   }
 
   async function estado(loja) {
-    const base = { ref: loja.ref, codigo: loja.codigo, nome: loja.nome, status: loja.status };
+    const base = { ref: loja.ref, codigo: loja.codigo, nome: loja.nome, status: loja.status, ...(doUnico(loja) && { banco_unico: true }) };
     const etapa = etapaDoStatus(loja.status);
     if (etapa) return { ...base, etapa };
-    return { ...base, ...resumoDoBanco(await situacao(sb, loja.ref)) };
+    return { ...base, ...resumoDoBanco(await situacao(bd(loja))) };
+  }
+
+  /** As lojas do banco único de uma vez só (uma consulta, não uma por loja). */
+  async function listarDoBancoUnico() {
+    if (!unico || !(await unico.pronto())) return [];
+    const status = await statusDoUnico().catch(() => "UNKNOWN");
+    const etapa = etapaDoStatus(status);
+    if (etapa) {
+      return [{ ref: "banco-unico", codigo: "—", nome: "Banco único das lojas", status, banco_unico: true, etapa, criada_em: "" }];
+    }
+    const linhas = await unico.sqlBanco(`select l.id, l.codigo, l.nome, l.criada_em,
+        (select c.valor from public.configuracoes c where c.loja_id = l.id and c.chave = 'forminha') as ficha,
+        exists (select 1 from public.configuracoes c where c.loja_id = l.id and c.chave = 'loja') as semeada
+      from public.lojas l`);
+    const s = await situacao({ sql: unico.sqlBanco, sqlBanco: unico.sqlBanco });
+    return linhas.map((l) => {
+      const ficha = typeof l.ficha === "string" ? JSON.parse(l.ficha) : l.ficha;
+      return { ref: l.codigo, codigo: l.codigo, nome: l.nome, status, banco_unico: true, criada_em: new Date(l.criada_em).toISOString(),
+        ...resumoDoBanco({ semeada: l.semeada, ficha, feitas: s.feitas, total: s.total, pendentes: s.pendentes }) };
+    });
   }
 
   async function listar() {
@@ -111,31 +157,52 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       try { return { ...(await estado(loja)), criada_em: p.inserted_at ?? p.created_at ?? null }; }
       catch { return { ref: loja.ref, codigo: loja.codigo, nome: loja.nome, status: loja.status, etapa: "problema" }; }
     }));
-    return lista.filter(Boolean).sort((a, b) => String(b.criada_em).localeCompare(String(a.criada_em)));
+    const doBanco = await listarDoBancoUnico().catch((e) => { console.error("[banco único]", e.message); return []; });
+    return [...lista.filter(Boolean), ...doBanco].sort((a, b) => String(b.criada_em).localeCompare(String(a.criada_em)));
   }
 
-  /** Cria o banco "<código> · <nome>". O código pode vir pronto (a criação automática o guarda antes, para nunca duplicar). */
+  /**
+   * Loja nova. Com o banco único pronto: uma linha nele (fica pronta em segundos). Senão: o projeto
+   * "<código> · <nome>" no Supabase. O código pode vir pronto (a criação automática o guarda antes, para nunca duplicar).
+   */
   async function criar(nome, codigo = gerarCodigo()) {
+    if (unico && (await unico.pronto())) {
+      const [l] = await unico.sqlBanco(`insert into public.lojas (codigo, nome, prefixo_pedido) values ($1, $2, $3)
+        on conflict (codigo) do update set nome = excluded.nome returning id`, [codigo, nome, prefixoDosPedidos(nome)]);
+      return { tipo: "unico", ref: codigo, id: l.id, codigo, nome, status: "ACTIVE_HEALTHY" };
+    }
     const p = await sb.criarProjeto({ nome: nomeDoProjeto(codigo, nome), org, senhaBanco: senhaAleatoria() });
     return { ref: p.ref ?? p.id, codigo, nome };
   }
 
-  /** Acha o projeto pelo código (para retomar uma criação que caiu no meio). */
+  /** Acha a loja pelo código (para retomar uma criação que caiu no meio). */
   async function porCodigo(codigo) {
+    const u = await doBancoUnico(codigo).catch(() => null);
+    if (u) return u;
     const p = (await sb.projetosDaOrg(org)).find((x) => lerNomeDoProjeto(x.name)?.codigo === codigo);
     return p ? { ref: p.ref ?? p.id, status: p.status, ...lerNomeDoProjeto(p.name) } : null;
+  }
+
+  /** A loja do banco único dona deste endereço (da loja ou do painel) ou deste código. */
+  async function porEndereco(texto) {
+    if (!unico || !(await unico.pronto())) return null;
+    const t = String(texto ?? "").trim().split(":")[0];
+    if (!t) return null;
+    const [l] = await unico.sqlBanco(`select l.codigo from public.lojas l where l.codigo = $1
+      union select l.codigo from public.loja_enderecos e join public.lojas l on l.id = e.loja_id where e.host = lower($1)`, [t]);
+    return l ? doBancoUnico(l.codigo) : null;
   }
 
   /** Uma migração por chamada; quando acabam, o seed. Serve também para ATUALIZAR lojas antigas. */
   async function prepararPasso(loja, emailDona) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "O banco desta loja ainda não está pronto. Aguarde um instante.");
-    const r = await aplicarProxima(sb, loja.ref);
+    const r = await aplicarProxima(bd(loja));
     if (r.aplicada) return { etapa: "tabelas", feitas: r.feitas, total: r.total, aplicada: r.aplicada.nome };
-    const s = await situacao(sb, loja.ref);
+    const s = await situacao(bd(loja));
     if (!s.semeada) {
       const email = String(emailDona ?? s.ficha?.email ?? "").trim().toLowerCase();
       if (!EMAIL.test(email)) throw new ErroHttp(422, "Informe o e-mail da dona da loja.", { email: "Informe o e-mail da dona da loja." });
-      await semear(sb, loja.ref, { nome: loja.nome, codigo: loja.codigo, email });
+      await semear(bd(loja), { nome: loja.nome, codigo: loja.codigo, email });
     }
     return estado(loja);
   }
@@ -153,12 +220,48 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return `https://${vercelApp ?? `${site.nome}.vercel.app`}`;
   }
 
+  /**
+   * Banco único: a loja não ganha sites próprios — ganha os SEUS endereços nos dois sites de todas as lojas
+   * (nome.vercel.app e nome-painel.vercel.app; o painel acha a loja trocando "-painel." por ".").
+   */
+  async function publicarNoBancoUnico(loja, ficha) {
+    const c = await unico.pronto();
+    if (!c) throw new ErroHttp(409, "O banco único não está pronto.");
+    if (!ficha.loja?.url || !ficha.painel?.url) {
+      const nomeBase = slug(loja.nome);
+      let feito = false;
+      for (const rotulo of [nomeBase, `${nomeBase}-${loja.codigo.toLowerCase().replace(/[^a-z0-9]/g, "")}`]) {
+        const eLoja = { host: `${rotulo}.vercel.app`, site: "loja" }, ePainel = { host: `${rotulo}-painel.vercel.app`, site: "painel" };
+        try { await ligarEndereco(c.loja, eLoja, loja); }
+        catch (e) { if (e instanceof ErroHttp && rotulo === nomeBase) continue; throw e; }
+        try { await ligarEndereco(c.painel, ePainel, loja); }
+        catch (e) {
+          await vc.removerDominio(c.loja.id, eLoja.host).catch(() => null);
+          if (e instanceof ErroHttp && rotulo === nomeBase) continue;
+          throw e;
+        }
+        ficha.loja = { id: c.loja.id, nome: c.loja.nome, url: `https://${eLoja.host}` };
+        ficha.painel = { id: c.painel.id, nome: c.painel.nome, url: `https://${ePainel.host}` };
+        await gravarFicha(bd(loja), { loja: ficha.loja, painel: ficha.painel });
+        feito = true;
+        break;
+      }
+      if (!feito) throw new ErroHttp(409, "Não achei um endereço livre para esta loja na Vercel. Tente de novo com outro nome de loja.");
+    }
+    await aplicarEnderecos(loja, ficha, { publicarPainel: false }); // o banco passa a reconhecer os endereços; o login aceita voltar para eles
+    return ficha;
+  }
+
   /** Cria e publica a loja e o painel (não duplica se chamado de novo) e ajusta o login das clientes. */
   async function publicar(loja) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "O banco desta loja não está ativo.");
-    const s = await situacao(sb, loja.ref);
+    const s = await situacao(bd(loja));
     if (s.pendentes.length || !s.semeada) throw new ErroHttp(409, "O banco da loja ainda não foi preparado.");
     const ficha = s.ficha ?? {};
+    if (doUnico(loja)) {
+      await publicarNoBancoUnico(loja, ficha);
+      return automatizarSub(loja, ficha);
+    }
     const supabaseUrl = `https://${loja.ref}.supabase.co`;
     const chave = await sb.chavePublica(loja.ref);
     const nomeBase = slug(loja.nome);
@@ -167,21 +270,25 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       const site = await criarSite({ nomeBase, alternativo: `${nomeBase}-${sufixo}`, repo: repoLoja, pasta: pastaLoja, variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave } });
       await vc.publicar({ projetoId: site.id, nome: site.nome, repo: repoLoja });
       ficha.loja = { ...site, url: await enderecoDoSite(site) };
-      await gravarFicha(sb, loja.ref, { loja: ficha.loja });
+      await gravarFicha(bd(loja), { loja: ficha.loja });
     }
     if (!ficha.painel?.id) {
       const site = await criarSite({ nomeBase: `${nomeBase}-painel`, alternativo: `${nomeBase}-${sufixo}-painel`, repo: repoPainel, pasta: pastaPainel,
         variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave, URL_LOJA: ficha.loja.url, ...(centralAgora() && { URL_CENTRAL: centralAgora() }) } });
       await vc.publicar({ projetoId: site.id, nome: site.nome, repo: repoPainel });
       ficha.painel = { ...site, url: await enderecoDoSite(site) };
-      await gravarFicha(sb, loja.ref, { painel: ficha.painel });
+      await gravarFicha(bd(loja), { painel: ficha.painel });
     }
     // login das clientes: links de e-mail voltam para a loja/painel; sem SMTP próprio no projeto, a conta já nasce confirmada
     await sb.configurarLogin(loja.ref, {
       site_url: enderecoLoja(ficha), uri_allow_list: listaDeRetorno(ficha),
       external_email_enabled: true, mailer_autoconfirm: true, password_min_length: 8, password_required_characters: SENHA_LETRAS_E_NUMEROS,
     });
-    // com o domínio da Forminha pronto, a loja já ganha anadoces.<domínio> (se der errado, fica no da Vercel e dá para ligar depois)
+    return automatizarSub(loja, ficha);
+  }
+
+  /** Com o domínio da Forminha pronto, a loja já ganha anadoces.<domínio> (se der errado, fica no da Vercel e dá para ligar depois). */
+  async function automatizarSub(loja, ficha) {
     let final = ficha;
     const b = await base();
     if (b?.pronta && !ficha.sub) {
@@ -193,11 +300,11 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
 
   async function convite(loja, emailDona) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de gerar um convite.");
-    const s = await situacao(sb, loja.ref);
+    const s = await situacao(bd(loja));
     if (!s.ficha?.painel?.url) throw new ErroHttp(409, "A loja ainda não foi publicada.");
     const email = String(emailDona ?? s.ficha.email ?? "").trim().toLowerCase();
     if (!EMAIL.test(email)) throw new ErroHttp(422, "Informe o e-mail da dona da loja.", { email: "Informe o e-mail da dona da loja." });
-    const codigo = await gerarConvite(sb, loja.ref, email);
+    const codigo = await gerarConvite(bd(loja), email);
     return { link: `${enderecoPainel(s.ficha)}/#/convite/${codigo}`, email, loja: loja.nome, vale_dias: 7 };
   }
 
@@ -205,14 +312,15 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       na hora, fica só na memória desta requisição e nunca vai para a tela nem para os registros. */
   async function linkRedefinirSenha(loja, emailDona) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes.");
-    const s = await situacao(sb, loja.ref);
+    const s = await situacao(bd(loja));
     const destino = enderecoLoja(s.ficha);
     if (!destino) throw new ErroHttp(409, "A loja ainda não foi publicada.");
-    const segredo = await sb.chaveSecreta(loja.ref);
+    const ref = await refDoBanco(loja);
+    const segredo = await sb.chaveSecreta(ref);
     const cabecalhos = { apikey: segredo, "Content-Type": "application/json", ...(segredo.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${segredo}` }) };
     let r;
     try {
-      r = await fetchFn(`https://${loja.ref}.supabase.co/auth/v1/admin/generate_link`, {
+      r = await fetchFn(`https://${ref}.supabase.co/auth/v1/admin/generate_link`, {
         method: "POST", headers: cabecalhos, body: JSON.stringify({ type: "recovery", email: emailDona, redirect_to: destino }),
       });
     } catch (e) { throw new ErroProvedor("Supabase", 0, `sem conexão (${e.message})`); }
@@ -226,14 +334,48 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
 
   async function reativar(loja) {
     if (!["INACTIVE", "PAUSING"].includes(loja.status)) throw new ErroHttp(409, "Esta loja não está pausada.");
-    await sb.reativar(loja.ref);
+    await sb.reativar(await refDoBanco(loja)); // no banco único, reativa o banco de todas as lojas
+  }
+
+  /**
+   * Banco único: tira os endereços da loja dos sites de todas as lojas, apaga as fotos dela e a linha da loja
+   * (que leva junto todos os dados, pelas ligações do banco). Logins que não são de mais nenhuma loja saem também.
+   */
+  async function excluirDoBancoUnico(loja) {
+    const c = await unico.pronto();
+    const enderecos = await unico.sqlBanco("select host from public.loja_enderecos where loja_id = $1", [loja.id]);
+    for (const { host } of enderecos) {
+      for (const site of [c.loja, c.painel]) await vc.removerDominio(site.id, host).catch(semDominioNoSite);
+    }
+    await apagarFotosDoBancoUnico(c.ref, loja.id).catch((e) => console.error("[fotos]", e.message));
+    await unico.sqlBanco("delete from public.lojas where id = $1", [loja.id]);
+    await unico.sqlBanco("delete from auth.users u where not exists (select 1 from public.perfis p where p.id = u.id)");
+    await atualizarLoginDoBancoUnico();
+    return { sites_apagados: [], enderecos_soltos: enderecos.map((e) => e.host) };
+  }
+
+  /** As fotos da loja ficam na pasta dela ("<id>/…") nos baldes "produtos" e "site". */
+  async function apagarFotosDoBancoUnico(ref, id) {
+    const segredo = await sb.chaveSecreta(ref);
+    const cab = { apikey: segredo, "Content-Type": "application/json", ...(segredo.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${segredo}` }) };
+    for (const balde of ["produtos", "site"]) {
+      const r = await fetchFn(`https://${ref}.supabase.co/storage/v1/object/list/${balde}`, { method: "POST", headers: cab, body: JSON.stringify({ prefix: `${id}/`, limit: 1000 }) });
+      if (!r.ok) continue;
+      const nomes = (await r.json().catch(() => [])).map((o) => `${id}/${o.name}`).filter((n) => !n.endsWith("/"));
+      if (nomes.length) await fetchFn(`https://${ref}.supabase.co/storage/v1/object/${balde}`, { method: "DELETE", headers: cab, body: JSON.stringify({ prefixes: nomes }) });
+    }
   }
 
   /** Apaga os 2 sites e o banco inteiro (dados, logins e fotos). Exige o código exato. */
   async function excluir(loja, codigoDigitado) {
     if (String(codigoDigitado ?? "").trim() !== loja.codigo) throw new ErroHttp(422, "Digite o código da loja exatamente como aparece para confirmar.", { codigo: "O código não confere." });
+    if (doUnico(loja)) {
+      if (!loja.id) throw new ErroHttp(409, "Escolha uma loja.");
+      if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "O banco único está pausado: reative primeiro (1–2 min).");
+      return excluirDoBancoUnico(loja);
+    }
     let ficha = null;
-    if (loja.status === "ACTIVE_HEALTHY") ficha = (await situacao(sb, loja.ref).catch(() => null))?.ficha ?? null;
+    if (loja.status === "ACTIVE_HEALTHY") ficha = (await situacao(bd(loja)).catch(() => null))?.ficha ?? null;
     else if (loja.status === "INACTIVE") throw new ErroHttp(409, "A loja está pausada: reative primeiro (1–2 min) para os sites dela também serem apagados.");
     for (const site of [ficha?.loja, ficha?.painel]) {
       if (site?.id) await vc.excluirProjeto(site.id).catch((e) => { if (e.status !== 404) throw e; });
@@ -254,6 +396,22 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
         const chave = await sb.chavePublica(ref);
         const r = await fetchFn(`https://${ref}.supabase.co/rest/v1/rpc/loja_config`, { method: "POST", headers: { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "application/json" }, body: "{}" });
         if (r.ok) resultado.cutucadas += 1; else resultado.falhas += 1;
+      } catch { resultado.falhas += 1; }
+    }
+    // o banco único: uma chamada só vale por todas as lojas dele
+    const c = unico ? await unico.pronto().catch(() => null) : null;
+    if (c) {
+      try {
+        const p = await sb.projeto(c.ref);
+        if (p.status === "INACTIVE") { await sb.reativar(c.ref); resultado.reativadas += 1; }
+        else if (p.status === "ACTIVE_HEALTHY") {
+          const [l] = await unico.sqlBanco("select codigo from public.lojas order by criada_em limit 1");
+          const chave = await sb.chavePublica(c.ref);
+          const r = await fetchFn(`https://${c.ref}.supabase.co/rest/v1/rpc/loja_config`, {
+            method: "POST", headers: { apikey: chave, Authorization: `Bearer ${chave}`, "Content-Type": "application/json", ...(l && { "x-loja": l.codigo }) }, body: "{}",
+          });
+          if (r.ok || !l) resultado.cutucadas += 1; else resultado.falhas += 1;
+        }
       } catch { resultado.falhas += 1; }
     }
     return resultado;
@@ -286,32 +444,36 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       throw new ErroHttp(422, "Cole o Access Token do Mercado Pago (começa com APP_USR-).", { token: "Cole o Access Token (começa com APP_USR-)." });
     }
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de ligar o pagamento online.");
-    let s = await situacao(sb, loja.ref);
+    if (doUnico(loja)) return conectarPagamentoNoBancoUnico(loja, token);
+    let s = await situacao(bd(loja));
     if (!s.ficha?.loja?.url) throw new ErroHttp(409, "Publique a loja antes de ligar o pagamento online.");
     const conta = await contaMercadoPago(token);
-    for (let i = 0; i < s.pendentes.length; i++) await aplicarProxima(sb, loja.ref); // o banco precisa das regras de pagamento mais novas
+    for (let i = 0; i < s.pendentes.length; i++) await aplicarProxima(bd(loja)); // o banco precisa das regras de pagamento mais novas
     await atualizarFuncoes(loja);
     const segredo = randomBytes(24).toString("hex");
-    s = await situacao(sb, loja.ref);
+    s = await situacao(bd(loja));
     await sb.definirSegredos(loja.ref, { MP_ACCESS_TOKEN: token, SEGREDO_GATEWAY: segredo, ORIGENS_PERMITIDAS: origensDaLoja(s.ficha).join(",") });
     await sb.sql(loja.ref, "select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo, conta, cartao: true })]);
-    await gravarFicha(sb, loja.ref, { pagamento_conectado_em: new Date().toISOString() });
+    await gravarFicha(bd(loja), { pagamento_conectado_em: new Date().toISOString() });
     return { conectado: true, conta, pix: true, cartao: true };
   }
 
   /** Instala (ou atualiza) as funções do servidor na loja e anota a versão. */
   async function atualizarFuncoes(loja) {
+    if (doUnico(loja)) throw new ErroHttp(409, "No banco único, as funções são de todas as lojas: atualize em Configurações → Banco único.");
     for (const nome of FUNCOES) await sb.implantarFuncao(loja.ref, nome, montarFuncao(nome));
-    await gravarFicha(sb, loja.ref, { funcoes_versao: versaoDasFuncoes() });
+    await gravarFicha(bd(loja), { funcoes_versao: versaoDasFuncoes() });
   }
 
   /** Quem chama pelo painel da loja é administradora dela? (o próprio banco da loja responde, com o login da pessoa) */
   async function conferirDona(loja, jwt) {
-    const chave = await sb.chavePublica(loja.ref);
+    const ref = await refDoBanco(loja);
+    const chave = await sb.chavePublica(ref);
     let r;
     try {
-      r = await fetchFn(`https://${loja.ref}.supabase.co/rest/v1/rpc/admin_gateway`, {
-        method: "POST", headers: { apikey: chave, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ p: {} }),
+      r = await fetchFn(`https://${ref}.supabase.co/rest/v1/rpc/admin_gateway`, {
+        method: "POST", headers: { apikey: chave, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json", ...(doUnico(loja) && { "x-loja": loja.codigo }) },
+        body: JSON.stringify({ p: {} }),
       });
     } catch (e) { throw new ErroProvedor("Supabase", 0, `sem conexão (${e.message})`); }
     if (!r.ok) throw new ErroHttp(403, "Só a administradora da loja pode fazer isso. Entre de novo no painel.");
@@ -325,13 +487,22 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
 
   async function fichaPublicada(loja) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de mexer no domínio.");
-    const s = await situacao(sb, loja.ref);
+    const s = await situacao(bd(loja));
     if (!s.ficha?.loja?.id || !s.ficha?.painel?.id) throw new ErroHttp(409, "Publique a loja antes de ligar um domínio próprio.");
     return s.ficha;
   }
 
-  /** Liga um endereço a um dos sites (se já estiver ligado nele, tudo certo). */
-  async function ligarEndereco(site, e) {
+  /**
+   * Liga um endereço a um dos sites (se já estiver ligado nele, tudo certo). No banco único o site é de todas as
+   * lojas: o endereço só serve se não for de OUTRA loja (senão uma loja tomaria o endereço da outra).
+   */
+  async function ligarEndereco(site, e, loja = null) {
+    if (doUnico(loja)) {
+      const [dono] = await unico.sqlBanco("select loja_id from public.loja_enderecos where host = $1", [e.host]);
+      if (dono && dono.loja_id !== loja.id) {
+        throw new ErroHttp(409, `O endereço ${e.host} já é de outra loja.`, { dominio: "Esse endereço já é de outra loja." });
+      }
+    }
     try {
       await vc.adicionarDominio(site.id, { name: e.host, ...(e.redirecionar && { redirect: e.redirecionar, redirectStatusCode: 308 }) });
     } catch (erro) {
@@ -388,6 +559,16 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
    * as funções (volta do checkout do cartão, links do WhatsApp) e o painel (link "ver loja").
    */
   async function aplicarEnderecos(loja, ficha, { publicarPainel }) {
+    if (doUnico(loja)) {
+      // banco único: o banco passa a reconhecer os endereços da loja (x-loja) e o login aceita voltar para eles;
+      // o painel acha o endereço da loja sozinho (config.js) e as funções leem os endereços no banco
+      const hosts = [...new Set(origensDaLoja(ficha).map((o) => new URL(o).host))];
+      await unico.sqlBanco(`with fora as (delete from public.loja_enderecos where loja_id = $1 and host <> all (select jsonb_array_elements_text($2::jsonb)) returning 1)
+        insert into public.loja_enderecos (host, loja_id) select h, $1::uuid from jsonb_array_elements_text($2::jsonb) h
+        on conflict (host) do nothing`, [loja.id, JSON.stringify(hosts)]);
+      await atualizarLoginDoBancoUnico();
+      return;
+    }
     await sb.configurarLogin(loja.ref, { site_url: enderecoLoja(ficha), uri_allow_list: listaDeRetorno(ficha) });
     await sb.definirSegredos(loja.ref, { ORIGENS_PERMITIDAS: origensDaLoja(ficha).join(","), URL_LOJA: enderecoLoja(ficha) });
     if (publicarPainel) {
@@ -409,7 +590,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     const mudou = novo.ativo_em !== d.ativo_em || novo.painel_ativo_em !== d.painel_ativo_em;
     if (!mudou) return { ficha, mudou };
     const atualizada = { ...ficha, dominio: novo };
-    await gravarFicha(sb, loja.ref, { dominio: novo });
+    await gravarFicha(bd(loja), { dominio: novo });
     await aplicarEnderecos(loja, atualizada, { publicarPainel: novo.ativo_em !== d.ativo_em });
     return { ficha: atualizada, mudou };
   }
@@ -439,10 +620,10 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       nome, painel: usarPainel, adicionado_em: mesmo ? antigo.adicionado_em : new Date().toISOString(),
       ativo_em: mesmo ? antigo.ativo_em ?? null : null, painel_ativo_em: mesmo && usarPainel ? antigo.painel_ativo_em ?? null : null,
     };
-    for (const e of enderecosDoDominio(nome, novo)) await ligarEndereco(siteDoEndereco(ficha, e), e);
+    for (const e of enderecosDoDominio(nome, novo)) await ligarEndereco(siteDoEndereco(ficha, e), e, loja);
     const antes = { loja: enderecoLoja(ficha), painel: enderecoPainel(ficha) };
     ficha = { ...ficha, dominio: novo };
-    await gravarFicha(sb, loja.ref, { dominio: novo });
+    await gravarFicha(bd(loja), { dominio: novo });
     await aplicarEnderecos(loja, ficha, { publicarPainel: antes.loja !== enderecoLoja(ficha) });
     const r = await conferirDominio(loja);
     return { ...r, mudou: r.mudou || r.endereco_loja !== antes.loja || r.endereco_painel !== antes.painel };
@@ -459,7 +640,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     for (const e of enderecosDoDominio(d.nome, d)) {
       const site = siteDoEndereco(ficha, e);
       const pd = await vc.dominioDoProjeto(site.id, e.host).catch(semDominioNoSite);
-      if (!pd) await ligarEndereco(site, e); // alguém tirou pela Vercel: liga de novo
+      if (!pd) await ligarEndereco(site, e, loja); // alguém tirou pela Vercel: liga de novo
       else if (!pd.verified) await vc.verificarDominio(site.id, e.host).catch(() => null);
     }
     const enderecos = await lerEnderecos(ficha);
@@ -474,7 +655,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     if (!d?.nome) return { ...resumoDoDominio(ficha), mudou: false };
     await soltarEnderecos(ficha, enderecosDoDominio(d.nome, d));
     ficha = { ...ficha, dominio: null };
-    await gravarFicha(sb, loja.ref, { dominio: null });
+    await gravarFicha(bd(loja), { dominio: null });
     await aplicarEnderecos(loja, ficha, { publicarPainel: Boolean(d.ativo_em) });
     return { ...resumoDoDominio(ficha), mudou: true };
   }
@@ -483,7 +664,9 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
 
   /** O nome sugerido: o do site da loja na Vercel (já é único); se não servir, nome + código. */
   function rotuloSugerido(ficha) {
-    for (const t of [ficha.loja?.nome, `${slug(ficha.nome ?? "loja")}-${String(ficha.codigo ?? "").toLowerCase()}`]) {
+    let doEndereco = null; // "doce-da-bia" de https://doce-da-bia.vercel.app (no banco único, o site é de todas as lojas)
+    try { doEndereco = new URL(ficha.loja?.url).hostname.split(".")[0]; } catch { /* sem endereço */ }
+    for (const t of [doEndereco, ficha.loja?.nome, `${slug(ficha.nome ?? "loja")}-${String(ficha.codigo ?? "").toLowerCase()}`]) {
       try { return normalizarSubdominio(t); } catch { /* tenta o próximo */ }
     }
     return `loja-${randomBytes(3).toString("hex")}`;
@@ -529,7 +712,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     if (!mudou) return { ficha, mudou };
     const antes = enderecoLoja(ficha);
     const atualizada = { ...ficha, sub: novo };
-    await gravarFicha(sb, loja.ref, { sub: novo });
+    await gravarFicha(bd(loja), { sub: novo });
     await aplicarEnderecos(loja, atualizada, { publicarPainel: antes !== enderecoLoja(atualizada) });
     return { ficha: atualizada, mudou };
   }
@@ -542,7 +725,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     const ligados = [];
     try {
       for (const e of lista) {
-        await ligarEndereco(siteDoEndereco(ficha, e), e);
+        await ligarEndereco(siteDoEndereco(ficha, e), e, loja);
         ligados.push(e);
       }
     } catch (erro) {
@@ -556,7 +739,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     const antes = { loja: enderecoLoja(ficha), painel: enderecoPainel(ficha) };
     const novo = mesmo ? antigo : { rotulo, raiz, adicionado_em: new Date().toISOString(), ativo_em: null, painel_ativo_em: null };
     const atual = { ...ficha, sub: novo };
-    await gravarFicha(sb, loja.ref, { sub: novo });
+    await gravarFicha(bd(loja), { sub: novo });
     // os endereços novos entram na lista de quem pode chamar a loja (e o antigo sai)
     await aplicarEnderecos(loja, atual, { publicarPainel: antes.loja !== enderecoLoja(atual) });
     const r = await ativarSubSePronto(loja, atual, await lerEnderecosSub(atual));
@@ -588,7 +771,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     for (const e of enderecosNaForminha(ficha.sub.rotulo, ficha.sub.raiz)) {
       const site = siteDoEndereco(ficha, e);
       const pd = await vc.dominioDoProjeto(site.id, e.host).catch(semDominioNoSite);
-      if (!pd) await ligarEndereco(site, e);
+      if (!pd) await ligarEndereco(site, e, loja);
       else if (!pd.verified) await vc.verificarDominio(site.id, e.host).catch(() => null);
     }
     return subdominio(loja);
@@ -601,7 +784,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     const antes = enderecoLoja(ficha);
     await soltarEnderecos(ficha, enderecosNaForminha(s.rotulo, s.raiz));
     ficha = { ...ficha, sub: null };
-    await gravarFicha(sb, loja.ref, { sub: null });
+    await gravarFicha(bd(loja), { sub: null });
     await aplicarEnderecos(loja, ficha, { publicarPainel: antes !== enderecoLoja(ficha) });
     return { ...resumoDoSub(ficha, await base()), mudou: true };
   }
@@ -612,12 +795,14 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
    */
   async function copiaDaLoja(loja) {
     if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de baixar a cópia.");
-    const nomes = (await sb.sql(loja.ref, `select table_name from information_schema.tables
+    // no banco único, isto roda DENTRO da loja: cada tabela devolve só as linhas dela
+    const { sql } = bd(loja);
+    const nomes = (await sql(`select table_name from information_schema.tables
       where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name`)).map((l) => l.table_name).filter((n) => /^[a-z_][a-z0-9_]*$/.test(n));
     const tabelas = {};
     let tamanho = 0;
     for (const n of nomes) {
-      const [l] = await sb.sql(loja.ref, `select coalesce(json_agg(t), '[]'::json) as linhas from public."${n}" t`);
+      const [l] = await sql(`select coalesce(json_agg(t), '[]'::json) as linhas from public."${n}" t`);
       tabelas[n] = typeof l?.linhas === "string" ? JSON.parse(l.linhas) : l?.linhas ?? [];
       tamanho += JSON.stringify(tabelas[n]).length;
       if (tamanho > 4_000_000) throw new ErroHttp(413, "Esta loja é grande demais para baixar por aqui. Use o painel do Supabase: Database → Backups.");
@@ -626,10 +811,30 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       aviso: "Dados do banco da loja (pedidos, clientes, produtos, estoque…). As fotos ficam no armazenamento do Supabase.", tabelas };
   }
 
-  /** Escreve na ficha "forminha" da loja (ex.: a situação da mensalidade). */
-  const escreverFicha = (ref, dados) => gravarFicha(sb, ref, dados);
+  /** Escreve na ficha "forminha" da loja (ex.: a situação da mensalidade). `ref`: o do projeto ou o código (banco único). */
+  async function escreverFicha(ref, dados) {
+    const loja = PADRAO_CODIGO.test(String(ref)) ? await doBancoUnico(String(ref)) : { ref };
+    if (!loja) throw new ErroHttp(404, "Loja não encontrada.");
+    await gravarFicha(bd(loja), dados);
+  }
 
-  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
+  /**
+   * Banco único: o login de todas as lojas aceita voltar só para os endereços delas (links de e-mail, como o
+   * "esqueci a senha"). A lista é refeita a partir dos endereços registrados no banco.
+   */
+  async function atualizarLoginDoBancoUnico() {
+    const c = await unico.pronto();
+    if (!c) return;
+    const linhas = await unico.sqlBanco("select host from public.loja_enderecos order by host");
+    await sb.configurarLogin(c.ref, { site_url: c.loja.url, uri_allow_list: linhas.map((l) => `https://${l.host}/**`).join(",") });
+  }
+
+  /** Pagamento online no banco único: as funções são de todas as lojas; a chave de cada loja fica guardada (e cifrada) no banco. */
+  async function conectarPagamentoNoBancoUnico(loja, token) {
+    throw new ErroHttp(409, "O pagamento online das lojas do banco único chega na próxima atualização. Por enquanto, o PIX fica manual.");
+  }
+
+  return { porRef, porCodigo, porEndereco, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
     conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio,
     subdominio, definirSubdominio, conferirSubdominio, removerSubdominio };
 }

@@ -28,6 +28,7 @@ function cartaoLoja(l, eu) {
       </header>
       ${l.atualizar && html`<p class="loja__nota">${icone("atualizar", { tamanho: 14 })} Tem atualização do banco para esta loja.</p>`}
       ${l.dominio && !l.dominio_ativo && html`<p class="loja__nota">${icone("globo", { tamanho: 14 })} ${l.dominio}: aguardando o DNS.</p>`}
+      ${l.banco_unico && l.ref === "banco-unico" && html`<p class="loja__nota">${icone("alerta", { tamanho: 14 })} O banco único está ${l.etapa === "pausada" ? "pausado" : "indisponível"}: as lojas dele voltam quando ele voltar.</p>`}
       ${(l.loja || l.painel) && html`<div class="loja__links">
         ${l.loja && html`<a href="${l.loja}" target="_blank" rel="noopener" class="link">${icone("home", { tamanho: 15 })} ${l.loja.replace("https://", "")}</a>`}
         ${l.painel && html`<a href="${l.painel}" target="_blank" rel="noopener" class="link">${icone("grade", { tamanho: 15 })} ${l.painel.replace("https://", "")}</a>`}
@@ -40,7 +41,7 @@ function cartaoLoja(l, eu) {
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="copia" title="Baixar os dados da loja num arquivo">${icone("baixar", { tamanho: 15 })} Cópia</button>`}
         ${suporte && l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
         ${suporte && l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
-        ${pode(eu, "lojas.excluir") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
+        ${pode(eu, "lojas.excluir") && l.ref !== "banco-unico" && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
       </footer>
     </article>`;
 }
@@ -211,9 +212,11 @@ function acompanharCriacao(loja, email, depois) {
         estado = await api("POST", `lojas/${loja.ref}/preparar`, email ? { email } : {});
       }
       passo("tabelas", "feito", "Tudo pronto e a loja zerada.");
-      passo("sites", "fazendo", "Criando os 2 sites na Vercel…");
+      // banco único: a loja não ganha sites próprios, só os endereços dela nos sites de todas as lojas
+      const unico = loja.tipo === "unico" || loja.banco_unico || estado.banco_unico;
+      passo("sites", "fazendo", unico ? "Ligando os endereços da loja…" : "Criando os 2 sites na Vercel…");
       const sites = estado.etapa === "sites" ? await api("POST", `lojas/${loja.ref}/publicar`, {}) : estado;
-      passo("sites", "feito", "Publicados — ficam no ar em 1 a 2 minutos.");
+      passo("sites", "feito", unico ? "Endereços prontos — abrem em alguns segundos." : "Publicados — ficam no ar em 1 a 2 minutos.");
       passo("convite", "fazendo");
       const convite = await api("POST", `lojas/${loja.ref}/convite`, email ? { email } : {});
       passo("convite", "feito", `Para ${convite.email}.`);

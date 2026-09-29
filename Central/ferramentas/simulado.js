@@ -42,6 +42,8 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
   // dns: endereços cujo DNS já aponta para a Vercel · dominiosDeOutraConta: raízes que a Vercel pede para provar (TXT)
   const estado = { projetos: new Map(), sites: new Map(), publicacoes: [], cutucadas: [], chamadas: [], mp: new Map(), segredosLidos: [],
     dns: new Set(), dominiosDeOutraConta: new Set(),
+    // endereços que já são de outra conta da Vercel (ex.: um nome.vercel.app que alguém já usa)
+    tomados: new Set(),
     // o projeto da própria Central na Vercel ("forminha"), que recebe o domínio da Forminha
     central: { id: "prj_central", nome: "forminha", variaveis: {}, dominios: new Map() } };
   /** Um site da Vercel pelo id ou pelo nome (como a API aceita); a Central também conta. */
@@ -132,6 +134,7 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       const s = siteDe(decodeURIComponent(m[1]));
       if (!s) return json(404, { error: { code: "not_found", message: "Project not found" } });
       if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(String(corpo?.name ?? ""))) return json(400, { error: { code: "invalid_domain", message: "Invalid domain name" } });
+      if (estado.tomados.has(corpo.name)) return json(409, { error: { code: "domain_taken", message: `The domain ${corpo.name} is already in use by another account.` } });
       for (const outro of todosOsSites()) {
         if (outro !== s && outro.dominios?.has(corpo.name)) return json(409, { error: { code: "domain_already_in_use", message: `Cannot add ${corpo.name} since it's already in use by another project.` } });
       }
@@ -240,7 +243,9 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     if (doProjeto && u.pathname === "/rest/v1/rpc/admin_gateway") {
       let carga = {};
       try { carga = JSON.parse(Buffer.from(String(token).replace(/^Bearer /, "").split(".")[1], "base64url").toString()); } catch { /* token estranho */ }
-      return carga.papel === "admin" && carga.iss === `https://${doProjeto[1]}.supabase.co/auth/v1` ? json(200, { ativo: false }) : json(401, { message: "Faça login como administrador." });
+      // banco único: o token diz de qual loja a pessoa é administradora, e o banco só confirma se a chamada disser a mesma loja
+      const lojaCerta = !carga.loja || cab.get("x-loja") === carga.loja;
+      return carga.papel === "admin" && lojaCerta && carga.iss === `https://${doProjeto[1]}.supabase.co/auth/v1` ? json(200, { ativo: false }) : json(401, { message: "Faça login como administrador." });
     }
     if (doProjeto && u.pathname === "/auth/v1/admin/generate_link" && metodo === "POST") {
       const p = estado.projetos.get(doProjeto[1]);
@@ -255,6 +260,9 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       if (!apontado(nome)) return json(200, { Status: 3, Answer: [] });
       return json(200, { Status: 0, Answer: [{ name: `${nome}.`, type: 5, TTL: 300, data: "cname.vercel-dns.com." }, { name: "cname.vercel-dns.com.", type: 1, TTL: 60, data: "76.76.21.21" }] });
     }
+    // arquivos (fotos) de um projeto: a lista e o apagar (só para a Central limpar a pasta de uma loja)
+    if (doProjeto && u.pathname.startsWith("/storage/v1/object/list/") && metodo === "POST") return json(200, estado.arquivos?.[corpo?.prefix] ?? []);
+    if (doProjeto && /^[/]storage[/]v1[/]object[/][a-z]+$/.test(u.pathname) && metodo === "DELETE") { (estado.apagados ??= []).push(...(corpo?.prefixes ?? [])); return json(200, []); }
     throw new Error(`o simulado não conhece ${u.href}`);
   }
 
@@ -266,7 +274,7 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
   const fechar = async () => { for (const p of estado.projetos.values()) await p.db.close().catch(() => {}); };
 
   /** Token de login de uma pessoa da loja (como o Supabase emite): diz de qual loja é e o papel. */
-  const tokenDaLoja = (ref, papel = "admin") => ["e30", Buffer.from(JSON.stringify({ iss: `https://${ref}.supabase.co/auth/v1`, sub: "u1", papel })).toString("base64url"), "assinatura"].join(".");
+  const tokenDaLoja = (ref, papel = "admin", loja = null) => ["e30", Buffer.from(JSON.stringify({ iss: `https://${ref}.supabase.co/auth/v1`, sub: "u1", papel, ...(loja && { loja }) })).toString("base64url"), "assinatura"].join(".");
 
   return { fetchFn, estado, pausar, aprovarMp, fechar, org, tokenDaLoja, configurarDns, env: { SUPABASE_ACCESS_TOKEN: "token-supabase-simulado", VERCEL_TOKEN: "token-vercel-simulado", FORMINHA_ORG: org } };
 }

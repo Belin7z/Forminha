@@ -20,7 +20,11 @@ export async function chamarCentral(metodo, caminho, corpo) {
   try {
     r = await fetch(`${URL_CENTRAL}/api/loja/${caminho}`, {
       method: metodo,
-      headers: { Authorization: `Bearer ${token}`, ...(corpo !== undefined && { "Content-Type": "application/json" }) },
+      headers: {
+        Authorization: `Bearer ${token}`, ...(corpo !== undefined && { "Content-Type": "application/json" }),
+        // banco único: o login vale para todas as lojas; a Central sabe qual é pelo endereço deste painel
+        ...(window.CONFIG_APP?.multiloja && { "x-loja": location.hostname }),
+      },
       body: corpo === undefined ? undefined : JSON.stringify(corpo),
     });
   } catch { throw new Error("Sem conexão com a Forminha. Confira a internet e tente de novo."); }
