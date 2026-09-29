@@ -11,7 +11,7 @@
    ========================================================== */
 import crypto from "node:crypto";
 import http from "node:http";
-import { criarBanco, executarRpc, sql } from "./banco.js";
+import { criarBanco, executarNaLoja, executarRpc, lerSeed, sql } from "./banco.js";
 import { criarExternos } from "./externos.js";
 import { cabecalhosCors, criarRpc } from "../../../supabase/functions/_shared/comum.js";
 import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
@@ -157,7 +157,8 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
     const papel = claims?.role === "authenticated" ? "authenticated" : "anon";
     const corpo = await lerJson(req);
     try {
-      const cabecalhos = Object.fromEntries(["cf-connecting-ip", "x-forwarded-for", "x-real-ip"].filter((h) => req.headers[h]).map((h) => [h, String(req.headers[h])]));
+      // como o PostgREST: todos os cabeçalhos da requisição (o x-loja diz de qual loja é a chamada)
+      const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), String(v)]));
       const dados = await executarRpc(db, { papel, claims: papel === "authenticated" ? claims : {}, cabecalhos }, funcao, corpo.p);
       if (funcao === "admin_gerar_segredo_gateway" && dados?.segredo) envFuncoes.SEGREDO_GATEWAY = dados.segredo;
       return responder(res, 200, dados === null ? "null" : dados);
@@ -402,11 +403,20 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
     url: `http://127.0.0.1:${servidor.address().port}`,
     chaveAnon, db, emails,
     /** Cria uma conta de administrador (cadastra e promove no banco, como o SQL Editor faria). */
-    async criarAdmin(email = "admin@teste.local", senha = "Admin12345") {
-      const r = await fetch(`${this.url}/auth/v1/signup`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password: senha, data: { nome: "Administrador" } }) });
+    /** Administradora de uma loja (loja = código ou endereço; sem loja = a única loja do banco). */
+    async criarAdmin(email = "admin@teste.local", senha = "Admin12345", { loja = null } = {}) {
+      const r = await fetch(`${this.url}/auth/v1/signup`, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: senha, data: { nome: "Administrador", ...(loja && { loja }) } }) });
       if (!r.ok && r.status !== 422) throw new Error(`Não criou o admin: ${r.status}`);
-      await sql(db, "update public.perfis set papel = 'admin' where lower(email) = lower($1)", [email]);
+      await sql(db, "update public.perfis set papel = 'admin' where lower(email) = lower($1) and loja_id = public._loja_de($2)", [email, loja]);
       return { email, senha };
+    },
+    /** Outra loja no mesmo banco (como a Central faz no banco único): a linha da loja, os endereços e os dados iniciais. */
+    async criarLoja({ codigo, nome = "", prefixo = "P", enderecos = [] }) {
+      const id = (await sql(db, "insert into public.lojas (codigo, nome, prefixo_pedido) values ($1, $2, $3) returning id", [codigo, nome, prefixo])).rows[0].id;
+      for (const host of enderecos) await sql(db, "insert into public.loja_enderecos (host, loja_id) values ($1, $2)", [host, id]);
+      await executarNaLoja(db, id, lerSeed());
+      return id;
     },
     async fechar() {
       servidor.closeAllConnections?.();

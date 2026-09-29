@@ -65,8 +65,10 @@ export async function semear(sb, ref, { nome, codigo, email }) {
 
 /** Junta dados na ficha "forminha" da loja (não aparece no site; a dona não consegue alterar). */
 export async function gravarFicha(sb, ref, dados) {
-  await sb.sql(ref, `insert into public.configuracoes (chave, valor) values ('forminha', $1::jsonb)
-    on conflict (chave) do update set valor = public.configuracoes.valor || excluded.valor`, [JSON.stringify(dados)]);
+  // sem "on conflict": serve antes e depois da migração 24 (quando a chave da tabela passou a incluir a loja)
+  await sb.sql(ref, `with atualizada as (
+      update public.configuracoes set valor = valor || $1::jsonb where chave = 'forminha' returning 1)
+    insert into public.configuracoes (chave, valor) select 'forminha', $1::jsonb where not exists (select 1 from atualizada)`, [JSON.stringify(dados)]);
 }
 
 /** Convite de primeiro acesso (vale 7 dias, uma vez). Devolve o código que vai no link. */

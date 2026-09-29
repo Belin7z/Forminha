@@ -14,4 +14,7 @@ insert into public.configuracoes (chave, valor) values
 ('pedidos', '{"pausados":false,"mensagem_pausa":"Estamos sem receber novos pedidos no momento. Volte em breve!","antecedencia_horas":24,"pedido_minimo":0,"intervalo_min":30,"dias_maximos":45}'),
 ('entrega', '{"entrega_ativa":true,"retirada_ativa":true,"gratis_acima":0,"taxa_padrao":0}'),
 ('pagamento', '{"pix_ativo":true,"pix_chave":"","pix_nome":"","pix_cidade":"","dinheiro_ativo":true,"cartao_ativo":true}')
-on conflict (chave) do nothing;
+on conflict do nothing;
+
+-- Estoque: as preferências padrão (uma linha por loja)
+insert into public.estoque_config default values on conflict do nothing;

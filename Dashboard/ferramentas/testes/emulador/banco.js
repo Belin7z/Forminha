@@ -99,5 +99,16 @@ export function executarRpc(db, { papel, claims = {}, cabecalhos = {} }, funcao,
   });
 }
 
+/** SQL (vários comandos) dentro de uma loja do banco único, como a Central faz ao preparar uma loja nova. */
+export function executarNaLoja(db, loja, texto) {
+  if (!/^[0-9a-f-]{36}$/.test(String(loja))) throw new Error("Loja inválida");
+  return naFila(db, () => db.exec(`begin; select set_config('forminha.loja', '${loja}', true);
+${texto}
+; commit;`));
+}
+
+/** Os dados iniciais de uma loja nova (supabase/seed.sql). */
+export const lerSeed = () => ler(path.join(PASTA_SQL, "seed.sql"));
+
 /** SQL como superusuário (para o emulador de Auth e para preparar cenários). */
 export const sql = (db, texto, params) => naFila(db, () => db.query(texto, params));

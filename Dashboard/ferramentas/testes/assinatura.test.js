@@ -17,7 +17,7 @@ let emu, painel, cliente, visitante, bolo, quando;
 const novoCliente = () => createClient(emu.url, emu.chaveAnon, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
 async function falha(promessa) { try { await promessa; } catch (e) { return e; } assert.fail("era esperado um erro"); }
 const ficha = (assinatura) => sql(emu.db, `insert into public.configuracoes (chave, valor) values ('forminha', $1::jsonb)
-  on conflict (chave) do update set valor = public.configuracoes.valor || excluded.valor`, [JSON.stringify({ assinatura })]);
+  on conflict (loja_id, chave) do update set valor = public.configuracoes.valor || excluded.valor`, [JSON.stringify({ assinatura })]);
 const pedir = () => cliente.post("/pedidos", { itens: [{ produto_id: bolo.id, qtd: 1, opcoes: { g1: ["g1i1"] } }], tipo: "retirada", ...quando, pagamento: "dinheiro" });
 
 before(async () => {
