@@ -1,4 +1,9 @@
-# Integrações: PIX automático e avisos por WhatsApp
+# Integrações: PIX automático, cartão e avisos por WhatsApp
+
+> **Loja criada pela Central da Forminha? Pule quase tudo daqui.** Para o **pagamento online** (PIX automático +
+> cartão de crédito/débito), basta colar o **Access Token de produção** do Mercado Pago em
+> **Configurações → Integrações → Pagamento online** (ou pedir para a Forminha colar na Central). A Central instala as
+> funções, guarda a chave como segredo e liga tudo sozinha. O passo a passo abaixo é para quem monta tudo à mão.
 
 Este guia explica, **clique por clique**, como ligar duas coisas que o sistema já traz prontas, mas que só funcionam depois de você criar
 contas em serviços de terceiros:

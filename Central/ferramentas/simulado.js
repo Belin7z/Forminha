@@ -91,6 +91,22 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
       ]);
     }
     if (metodo === "PATCH" && resto === "/config/auth") { Object.assign(p.auth, corpo); return json(200, p.auth); }
+    // funções do servidor: como o Supabase, recebe um formulário com os dados e o arquivo
+    if (metodo === "POST" && resto === "/functions/deploy") {
+      const slug = busca.get("slug");
+      if (!(corpo instanceof FormData) || !slug) return json(400, { message: "envie metadata e file" });
+      const metadata = JSON.parse(String(corpo.get("metadata")));
+      const arquivo = corpo.get("file");
+      if (metadata.entrypoint_path !== "index.ts" || !arquivo) return json(400, { message: "entrypoint_path inválido" });
+      p.funcoes ??= {};
+      p.funcoes[slug] = { codigo: await arquivo.text(), verify_jwt: metadata.verify_jwt };
+      return json(201, { id: `fn-${slug}`, slug, status: "ACTIVE" });
+    }
+    if (metodo === "POST" && resto === "/secrets") {
+      if (!Array.isArray(corpo) || corpo.some((x) => !x.name || typeof x.value !== "string")) return json(400, { message: "lista de segredos inválida" });
+      p.segredos = { ...(p.segredos ?? {}), ...Object.fromEntries(corpo.map((x) => [x.name, x.value])) };
+      return json(201, {});
+    }
     return json(404, { message: "rota desconhecida" });
   }
 
@@ -140,15 +156,25 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
     // a própria Central (continuação da criação da loja no modo de teste) é chamada de verdade
     if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return fetch(url, init);
     const metodo = (init.method ?? "GET").toUpperCase();
-    const corpo = init.body ? JSON.parse(init.body) : undefined;
+    const corpo = init.body instanceof FormData ? init.body : init.body ? JSON.parse(init.body) : undefined;
     estado.chamadas.push({ metodo, url: u.href });
     const cab = new Headers(init.headers);
     const token = cab.get("authorization");
     if (u.host === "api.supabase.com") return token === "Bearer token-supabase-simulado" ? supabase(metodo, u.pathname, corpo, u.searchParams) : json(401, { message: "Unauthorized" });
     if (u.host === "api.vercel.com") return token === "Bearer token-vercel-simulado" ? vercel(metodo, u.pathname, corpo) : json(401, { error: { message: "Unauthorized" } });
+    // a conta Mercado Pago de uma doceria (quando ela liga o pagamento online da loja dela)
+    if (u.host === "api.mercadopago.com" && u.pathname === "/users/me") {
+      return /^Bearer (APP_USR|TEST)-(?!recusada)/.test(token ?? "") ? json(200, { id: 123456, nickname: "DOCERIA_SIMULADA", site_id: "MLB" }) : json(401, { message: "invalid access token" });
+    }
     if (u.host === "api.mercadopago.com") return token === "Bearer mp-simulado" ? mercadoPago(metodo, u.pathname, corpo) : json(401, { message: "Unauthorized" });
     const doProjeto = /^([a-z]{20})\.supabase\.co$/.exec(u.host);
     if (doProjeto && u.pathname === "/rest/v1/rpc/loja_config") { estado.cutucadas.push(doProjeto[1]); return json(200, { loja: {} }); }
+    // o banco da loja confere se quem chama é administradora (nos testes: o token diz o papel)
+    if (doProjeto && u.pathname === "/rest/v1/rpc/admin_gateway") {
+      let carga = {};
+      try { carga = JSON.parse(Buffer.from(String(token).replace(/^Bearer /, "").split(".")[1], "base64url").toString()); } catch { /* token estranho */ }
+      return carga.papel === "admin" && carga.iss === `https://${doProjeto[1]}.supabase.co/auth/v1` ? json(200, { ativo: false }) : json(401, { message: "Faça login como administrador." });
+    }
     if (doProjeto && u.pathname === "/auth/v1/admin/generate_link" && metodo === "POST") {
       const p = estado.projetos.get(doProjeto[1]);
       if (!p || cab.get("apikey") !== segredoDe(p.ref)) return json(401, { msg: "Invalid API key" });
@@ -163,7 +189,10 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada" } = {}) {
   const pausar = (ref) => { const p = estado.projetos.get(ref); if (p) p.pausado = true; };
   const fechar = async () => { for (const p of estado.projetos.values()) await p.db.close().catch(() => {}); };
 
-  return { fetchFn, estado, pausar, aprovarMp, fechar, org, env: { SUPABASE_ACCESS_TOKEN: "token-supabase-simulado", VERCEL_TOKEN: "token-vercel-simulado", FORMINHA_ORG: org } };
+  /** Token de login de uma pessoa da loja (como o Supabase emite): diz de qual loja é e o papel. */
+  const tokenDaLoja = (ref, papel = "admin") => ["e30", Buffer.from(JSON.stringify({ iss: `https://${ref}.supabase.co/auth/v1`, sub: "u1", papel })).toString("base64url"), "assinatura"].join(".");
+
+  return { fetchFn, estado, pausar, aprovarMp, fechar, org, tokenDaLoja, env: { SUPABASE_ACCESS_TOKEN: "token-supabase-simulado", VERCEL_TOKEN: "token-vercel-simulado", FORMINHA_ORG: org } };
 }
 
 /** Banco da Central para testes e para o modo de teste (o mesmo SQL que roda no Neon). */

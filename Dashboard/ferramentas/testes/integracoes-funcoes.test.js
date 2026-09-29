@@ -15,7 +15,8 @@ import { criarApiPainel } from "../../src/scripts/base/api/painel.js";
 import { gerarHorarios, dataISO } from "../../../Loja/src/scripts/base/agendamento.js";
 import { cabecalhosCors, criarRpc } from "../../supabase/functions/_shared/comum.js";
 import { criarPix, validadeMercadoPago, valorDevido } from "../../supabase/functions/pix-criar/logica.js";
-import { assinaturaValida, receberWebhook } from "../../supabase/functions/pix-webhook/logica.js";
+import { assinaturaValida, formaDoPagamento, receberWebhook } from "../../supabase/functions/pix-webhook/logica.js";
+import { criarCheckoutCartao } from "../../supabase/functions/cartao-criar/logica.js";
 import { avisarWhatsapp, traduzirErroMeta } from "../../supabase/functions/whatsapp-avisar/logica.js";
 
 let emu, ext, painel, visitante, maria, joana, atendente, bolo, quando, segredo, deps, env;
@@ -70,7 +71,8 @@ before(async () => {
   quando = proximaData(await visitante.get("/config"));
   ({ segredo } = await painel.post("/gateway/segredo"));
   env = { SUPABASE_URL: emu.url, MP_ACCESS_TOKEN: "TEST-mp", SEGREDO_GATEWAY: segredo, MP_WEBHOOK_SECRET: "whsec-teste",
-          WHATSAPP_TOKEN: "wa-token", WHATSAPP_PHONE_ID: "1234567890", URL_LOJA: "https://loja.exemplo/" };
+          WHATSAPP_TOKEN: "wa-token", WHATSAPP_PHONE_ID: "1234567890", URL_LOJA: "https://loja.exemplo/",
+          ORIGENS_PERMITIDAS: "https://loja.exemplo,https://painel.exemplo" };
   deps = { env, fetchFn: ext.fetchFn, rpc: criarRpc({ url: emu.url, chaveAnon: emu.chaveAnon, fetchFn: fetch }) };
 });
 after(async () => { await emu?.fechar(); });
@@ -303,6 +305,72 @@ describe("whatsapp-avisar", () => {
     assert.match(traduzirErroMeta({ code: 190 }), /venceu/);
     ext.estado.falhas.meta = null;
     assert.equal((await chamar(await jwtDe(atendente), { pedido_id: outro.id, evento: "confirmado" })).corpo.enviado, true, "erro não impede tentar de novo");
+  });
+});
+
+describe("cartão online (checkout do Mercado Pago)", () => {
+  let pedido;
+  // outra cliente: a Maria já fez muitos pedidos nos testes acima (a loja freia excesso de pedidos)
+  const pedirJoana = () => joana.post("/pedidos", { itens: [{ produto_id: bolo.id, qtd: 1, opcoes: { g1: ["g1i1"] } }], tipo: "retirada", ...quando, pagamento: "pix" });
+  const abrir = async (corpo) => criarCheckoutCartao(requisicao("POST", { jwt: await jwtDe(joana), corpo }), deps);
+
+  it("desligado não abre o checkout; ligado, a vitrine avisa que aceita cartão", async () => {
+    pedido = (await pedirJoana()).pedido;
+    await painel.put("/gateway", { ativo: true, cartao: false });
+    assert.equal((await abrir({ codigo: pedido.codigo })).status, 409);
+    assert.equal((await visitante.get("/config")).pagamento.cartao_online, false);
+    const g = await painel.put("/gateway", { ativo: true, cartao: true });
+    assert.equal(g.cartao, true);
+    assert.equal((await visitante.get("/config")).pagamento.cartao_online, true);
+    assert.equal((await criarCheckoutCartao(requisicao("POST", { corpo: { codigo: pedido.codigo } }), deps)).status, 401, "sem login");
+  });
+
+  it("abre o checkout com o valor do BANCO e volta para a página do pedido (só na própria loja)", async () => {
+    const r = await abrir({ codigo: pedido.codigo, voltar: "https://loja.exemplo/#/carrinho", valor: 1 });
+    assert.equal(r.status, 200, JSON.stringify(r.corpo));
+    assert.match(r.corpo.url, /^https:\/\/mp\.exemplo\/checkout\//);
+    const pref = [...ext.estado.mpPreferencias.values()].at(-1);
+    assert.equal(pref.items[0].unit_price, pedido.total / 100);
+    assert.equal(pref.external_reference, pedido.codigo);
+    assert.equal(pref.back_urls.success, `https://loja.exemplo/#/pedido/${pedido.codigo}`);
+    assert.deepEqual(pref.payment_methods.excluded_payment_types.map((t) => t.id), ["ticket", "atm"], "sem boleto");
+    const intruso = await abrir({ codigo: pedido.codigo, voltar: "https://golpe.exemplo/" });
+    assert.equal([...ext.estado.mpPreferencias.values()].at(-1).back_urls, undefined, "endereço de fora não vira destino");
+    assert.equal(intruso.status, 200);
+  });
+
+  it("pagou com cartão: o aviso registra como Cartão (online), uma vez só", async () => {
+    const pag = ext.pagarNoCheckout(pedido.codigo, pedido.total / 100);
+    const r = await avisoMP(pag.id);
+    assert.equal(r.corpo.aplicado, pedido.total);
+    const visto = (await joana.get(`/pedidos/${pedido.codigo}`)).pedido;
+    assert.equal(visto.pagamento_situacao, "pago");
+    assert.equal(visto.pagamentos.at(-1).forma_texto, "Cartão (online)");
+    assert.equal((await avisoMP(pag.id)).corpo.duplicado, true);
+    const idPagamento = (await painel.get(`/pedidos/${pedido.id}`)).pedido.pagamentos.at(-1).id;
+    const e = await painel.delete(`/pagamentos/${idPagamento}`).then(() => null, (erro) => erro);
+    assert.equal(e?.status, 409, "pagamento do Mercado Pago não se apaga no painel (estorno é lá)");
+  });
+
+  it("boleto ou outro meio aprovado não conta aqui; pedido já pago não abre checkout", async () => {
+    assert.equal(formaDoPagamento({ payment_method_id: "bolbradesco", payment_type_id: "ticket" }), null);
+    assert.equal(formaDoPagamento({ payment_method_id: "master", payment_type_id: "debit_card" }), "cartao_online");
+    const outro = (await pedirJoana()).pedido;
+    const boleto = ext.pagarNoCheckout(outro.codigo, outro.total / 100, { tipo: "ticket", metodo: "bolbradesco" });
+    assert.equal((await avisoMP(boleto.id)).corpo.estado, "approved");
+    assert.equal((await painel.get(`/pedidos/${outro.id}`)).pedido.pago, 0);
+    assert.equal((await abrir({ codigo: pedido.codigo })).status, 409);
+  });
+
+  it("a Central liga tudo pela dona (hash da chave, PIX e cartão) — o navegador não consegue", async () => {
+    await emu.db.query("select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo: "x".repeat(40), conta: "DOCERIA_TESTE" })]);
+    const g = await painel.get("/gateway");
+    assert.equal(g.ativo, true);
+    assert.equal(g.cartao, true);
+    assert.equal(g.conta, "DOCERIA_TESTE");
+    const e = await painel.supabase.rpc("central_conectar_gateway", { p: { segredo: "y".repeat(40) } });
+    assert.ok(e.error, "função só para a Central");
+    await emu.db.query("select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo: segredo })]); // volta a chave dos outros testes
   });
 });
 

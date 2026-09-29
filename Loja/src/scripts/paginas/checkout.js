@@ -155,7 +155,9 @@ export async function checkout(ctx) {
   /* ---------- 3. Pagamento ---------- */
   function desenharPagamento() {
     const detalhes = {
-      pix: ["PIX", "Você recebe o código “copia e cola” logo após enviar o pedido.", "dinheiro"],
+      pix: cfg.pagamento.cartao_online
+        ? ["Pagar agora: PIX ou cartão", "Logo após enviar o pedido, você paga por PIX ou cartão de crédito/débito.", "cartao"]
+        : ["PIX", "Você recebe o código “copia e cola” logo após enviar o pedido.", "dinheiro"],
       dinheiro: ["Dinheiro", "Pague na entrega ou na retirada. Podemos levar troco.", "dinheiro"],
       cartao_entrega: [FORMAS_PAGAMENTO.cartao_entrega, "Levamos a maquininha até você.", "cartao"],
     };

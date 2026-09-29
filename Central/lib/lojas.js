@@ -1,13 +1,16 @@
 /* ==========================================================
    LOJAS — tudo o que a Central faz com a loja de uma cliente:
    criar o banco, preparar as tabelas, publicar os 2 sites, convite,
-   reativar, excluir, manter ativa e o link de redefinir senha.
+   reativar, excluir, manter ativa, o link de redefinir senha e ligar
+   o pagamento online (PIX automático + cartão pelo Mercado Pago).
    Usado pelo botão "Nova loja" e pela criação automática depois
    do pagamento (lib/clientes.js).
    SEGURANÇA: só mexe em projetos da organização FORMINHA_ORG com
    nome no padrão "<código> · <nome>" — nunca nos outros da conta.
    ========================================================== */
+import { randomBytes } from "node:crypto";
 import { ErroProvedor } from "./provedores.js";
+import { FUNCOES, montarFuncao, versaoDasFuncoes } from "./funcoes.js";
 import { gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleatoria, slug } from "./codigo.js";
 import { aplicarProxima, gerarConvite, gravarFicha, semear, situacao } from "./banco.js";
 import { EMAIL, ErroHttp } from "./erros.js";
@@ -33,7 +36,13 @@ function resumoDoBanco(s) {
   };
 }
 
-export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, fetchFn = fetch }) {
+/** Os endereços de uma loja (sites e domínios próprios): só eles podem chamar as funções dela pelo navegador. */
+export function origensDaLoja(ficha) {
+  const lista = [ficha?.loja?.url, ficha?.painel?.url, ...(ficha?.dominios ?? []).map((d) => `https://${d.nome ?? d}`)];
+  return [...new Set(lista.filter(Boolean).map((u) => String(u).replace(/\/+$/, "")))];
+}
+
+export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", fetchFn = fetch }) {
   /** Busca o projeto e confere que é MESMO uma loja da Forminha. */
   async function porRef(ref) {
     if (!REF.test(String(ref))) throw new ErroHttp(404, "Loja não encontrada.");
@@ -119,7 +128,8 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       await gravarFicha(sb, loja.ref, { loja: ficha.loja });
     }
     if (!ficha.painel?.id) {
-      const site = await criarSite({ nomeBase: `${nomeBase}-painel`, alternativo: `${nomeBase}-${sufixo}-painel`, repo: repoPainel, pasta: pastaPainel, variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave, URL_LOJA: ficha.loja.url } });
+      const site = await criarSite({ nomeBase: `${nomeBase}-painel`, alternativo: `${nomeBase}-${sufixo}-painel`, repo: repoPainel, pasta: pastaPainel,
+        variaveis: { SUPABASE_URL: supabaseUrl, SUPABASE_ANON_KEY: chave, URL_LOJA: ficha.loja.url, ...(urlCentral && { URL_CENTRAL: urlCentral }) } });
       await vc.publicar({ projetoId: site.id, nome: site.nome, repo: repoPainel });
       ficha.painel = { ...site, url: await enderecoDoSite(site) };
       await gravarFicha(sb, loja.ref, { painel: ficha.painel });
@@ -200,5 +210,64 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return resultado;
   }
 
-  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas };
+
+  /* ---------- pagamento online (Mercado Pago da dona) ---------- */
+
+  /** A chave é do Mercado Pago mesmo? Devolve o apelido da conta (para mostrar "conectado a …"). */
+  async function contaMercadoPago(token) {
+    let r;
+    try { r = await fetchFn("https://api.mercadopago.com/users/me", { headers: { Authorization: `Bearer ${token}` } }); }
+    catch (e) { throw new ErroProvedor("Mercado Pago", 0, `sem conexão (${e.message})`); }
+    if (r.status === 401 || r.status === 403) {
+      throw new ErroHttp(422, "O Mercado Pago não aceitou essa chave. Copie o Access Token de produção inteiro.", { token: "O Mercado Pago não aceitou essa chave." });
+    }
+    if (!r.ok) throw new ErroProvedor("Mercado Pago", r.status, "não consegui conferir a chave agora");
+    const d = await r.json().catch(() => ({}));
+    return String(d.nickname || d.email || d.id || "").slice(0, 120);
+  }
+
+  /**
+   * Liga o pagamento online da loja: confere a chave no Mercado Pago, deixa o banco em dia, instala as
+   * funções, guarda a chave como segredo (só as funções leem) e liga PIX automático e cartão.
+   * A chave nunca é gravada na Central nem devolvida.
+   */
+  async function conectarPagamento(loja, tokenMp) {
+    const token = String(tokenMp ?? "").trim();
+    if (!/^(APP_USR|TEST)-[\w-]{20,}$/.test(token)) {
+      throw new ErroHttp(422, "Cole o Access Token do Mercado Pago (começa com APP_USR-).", { token: "Cole o Access Token (começa com APP_USR-)." });
+    }
+    if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de ligar o pagamento online.");
+    let s = await situacao(sb, loja.ref);
+    if (!s.ficha?.loja?.url) throw new ErroHttp(409, "Publique a loja antes de ligar o pagamento online.");
+    const conta = await contaMercadoPago(token);
+    for (let i = 0; i < s.pendentes.length; i++) await aplicarProxima(sb, loja.ref); // o banco precisa das regras de pagamento mais novas
+    await atualizarFuncoes(loja);
+    const segredo = randomBytes(24).toString("hex");
+    s = await situacao(sb, loja.ref);
+    await sb.definirSegredos(loja.ref, { MP_ACCESS_TOKEN: token, SEGREDO_GATEWAY: segredo, ORIGENS_PERMITIDAS: origensDaLoja(s.ficha).join(",") });
+    await sb.sql(loja.ref, "select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo, conta, cartao: true })]);
+    await gravarFicha(sb, loja.ref, { pagamento_conectado_em: new Date().toISOString() });
+    return { conectado: true, conta, pix: true, cartao: true };
+  }
+
+  /** Instala (ou atualiza) as funções do servidor na loja e anota a versão. */
+  async function atualizarFuncoes(loja) {
+    for (const nome of FUNCOES) await sb.implantarFuncao(loja.ref, nome, montarFuncao(nome));
+    await gravarFicha(sb, loja.ref, { funcoes_versao: versaoDasFuncoes() });
+  }
+
+  /** Quem chama pelo painel da loja é administradora dela? (o próprio banco da loja responde, com o login da pessoa) */
+  async function conferirDona(loja, jwt) {
+    const chave = await sb.chavePublica(loja.ref);
+    let r;
+    try {
+      r = await fetchFn(`https://${loja.ref}.supabase.co/rest/v1/rpc/admin_gateway`, {
+        method: "POST", headers: { apikey: chave, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }, body: JSON.stringify({ p: {} }),
+      });
+    } catch (e) { throw new ErroProvedor("Supabase", 0, `sem conexão (${e.message})`); }
+    if (!r.ok) throw new ErroHttp(403, "Só a administradora da loja pode fazer isso. Entre de novo no painel.");
+  }
+
+  return { porRef, porCodigo, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas,
+    conectarPagamento, atualizarFuncoes, conferirDona };
 }

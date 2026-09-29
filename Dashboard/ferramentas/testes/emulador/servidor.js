@@ -17,6 +17,7 @@ import { cabecalhosCors, criarRpc } from "../../../supabase/functions/_shared/co
 import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
 import { receberWebhook } from "../../../supabase/functions/pix-webhook/logica.js";
 import { avisarWhatsapp } from "../../../supabase/functions/whatsapp-avisar/logica.js";
+import { criarCheckoutCartao } from "../../../supabase/functions/cartao-criar/logica.js";
 
 const b64 = (dados) => Buffer.from(dados).toString("base64url");
 
@@ -172,8 +173,9 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   // Rodam a MESMA lógica de supabase/functions, com o Mercado Pago e a Meta de mentira.
   const externos = criarExternos();
   const envFuncoes = { SUPABASE_URL: "", MP_ACCESS_TOKEN: "TEST-simulado", MP_WEBHOOK_SECRET: "", SEGREDO_GATEWAY: "",
-                       WHATSAPP_TOKEN: "wa-simulado", WHATSAPP_PHONE_ID: "0000000000", URL_LOJA: "http://localhost:3000" };
-  const FUNCOES = { "pix-criar": criarPix, "pix-webhook": receberWebhook, "whatsapp-avisar": avisarWhatsapp };
+                       WHATSAPP_TOKEN: "wa-simulado", WHATSAPP_PHONE_ID: "0000000000", URL_LOJA: "http://localhost:3000",
+                       ORIGENS_PERMITIDAS: "http://localhost:3000,http://localhost:3001" };
+  const FUNCOES = { "pix-criar": criarPix, "pix-webhook": receberWebhook, "whatsapp-avisar": avisarWhatsapp, "cartao-criar": criarCheckoutCartao };
   let rpcFuncoes = null;
   const lerTexto = async (req) => (await lerCorpo(req)).toString();
 
@@ -200,9 +202,31 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
         corpoTexto: JSON.stringify({ type: "payment", data: { id: String(pag.id) } }) }, { env: envFuncoes, fetchFn: externos.fetchFn, rpc: rpcFuncoes });
       return responder(res, r.status, r.corpo);
     }
+    if (caminho === "/mp/pagar-cartao") { // "o cliente pagou com cartão no checkout": cria o pagamento aprovado e dispara o aviso
+      const { pedido } = (await sql(db, "select row_to_json(p) as pedido from public.pedidos p where codigo = $1", [String(corpo.codigo)])).rows[0] ?? {};
+      if (!pedido) return responder(res, 404, { message: "Pedido não encontrado." });
+      const pag = externos.pagarNoCheckout(pedido.codigo, (pedido.total - pedido.pago) / 100);
+      const r = await receberWebhook({ metodo: "POST", url: `${envFuncoes.SUPABASE_URL}/functions/v1/pix-webhook?data.id=${pag.id}&type=payment`, cabecalhos: {},
+        corpoTexto: JSON.stringify({ type: "payment", data: { id: String(pag.id) } }) }, { env: envFuncoes, fetchFn: externos.fetchFn, rpc: rpcFuncoes });
+      return responder(res, r.status, r.corpo);
+    }
     if (caminho === "/whatsapp") return responder(res, 200, { envios: externos.estado.metaEnvios });
     if (caminho === "/whatsapp/falha") { externos.estado.falhas.meta = corpo.erro ?? null; return responder(res, 200, { ok: true }); }
     return responder(res, 404, { message: "Controle inexistente" });
+  }
+
+  /* ---------- Central da Forminha (de mentira): ligar o pagamento online pelo painel ---------- */
+  async function rotaCentral(req, res, caminho) {
+    const corsCentral = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type", "access-control-allow-methods": "POST, OPTIONS" };
+    const enviar = (status, corpo) => { res.writeHead(status, { ...corsCentral, "content-type": "application/json" }); res.end(JSON.stringify(corpo)); };
+    if (caminho !== "/api/loja/pagamento" || req.method !== "POST") return enviar(404, { erro: "Caminho não encontrado." });
+    if (!(await ehAdmin(req))) return enviar(403, { erro: "Só a administradora da loja pode fazer isso. Entre de novo no painel." });
+    const { token } = await lerJson(req);
+    if (!/^(APP_USR|TEST)-[\w-]{20,}$/.test(String(token ?? ""))) return enviar(422, { erro: "Cole o Access Token do Mercado Pago (começa com APP_USR-).", campos: { token: "Cole o Access Token (começa com APP_USR-)." } });
+    const segredo = crypto.randomBytes(24).toString("hex");
+    await sql(db, "select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo, conta: "DOCERIA_SIMULADA", cartao: true })]);
+    Object.assign(envFuncoes, { MP_ACCESS_TOKEN: token, SEGREDO_GATEWAY: segredo });
+    return enviar(200, { conectado: true, conta: "DOCERIA_SIMULADA", pix: true, cartao: true });
   }
 
   /* ---------- Storage ---------- */
@@ -266,6 +290,7 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
       if (p.startsWith("/storage/v1")) return await rotaStorage(req, res, p.slice(11));
       if (p.startsWith("/functions/v1/")) return await rotaFuncao(req, res, p.slice(14));
       if (p.startsWith("/__teste/")) return await rotaTeste(req, res, p.slice(8));
+      if (p.startsWith("/central/")) return await rotaCentral(req, res, p.slice(8));
       return responder(res, 404, { message: "Rota não encontrada no emulador" });
     } catch (e) {
       console.error("[emulador]", e);

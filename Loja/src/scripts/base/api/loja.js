@@ -104,6 +104,8 @@ export const rotasLoja = [
   ["POST", "/conta/excluir", excluirConta],
   // PIX automático: a função do servidor gera o QR Code no Mercado Pago (o valor vem do pedido, no banco)
   ["POST", "/pix/gerar", ({ supabase, corpo }) => invocarFuncao(supabase, "pix-criar", { codigo: corpo.codigo })],
+  // cartão online: a função abre o checkout do Mercado Pago (valor do pedido, no banco) e devolve o endereço
+  ["POST", "/cartao/pagar", ({ supabase, corpo }) => invocarFuncao(supabase, "cartao-criar", { codigo: corpo.codigo, voltar: corpo.voltar })],
   ["PUT", "/conta/preferencias", ({ rpc, corpo }) => rpc("cliente_preferencias", corpo)],
   ["GET", "/enderecos", ({ rpc }) => rpc("cliente_enderecos")],
   ["POST", "/enderecos", ({ rpc, corpo }) => rpc("cliente_salvar_endereco", { ...corpo, id: undefined })],

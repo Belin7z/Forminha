@@ -25,6 +25,7 @@
 .pix__qr { display: block; margin: .8rem auto; border: 1px solid var(--detalhe); border-radius: var(--raio-sm); padding: .5rem; background: #fff; }
 .pix__aguardando { display: flex; align-items: center; gap: .4rem; justify-content: center; margin-top: .8rem; font-size: .85rem; }
 .pix__alternativo { margin-top: 1rem; font-size: .88rem; }
+.pix__cartao { display: grid; justify-items: start; gap: .35rem; margin-top: 1.1rem; padding-top: 1rem; border-top: 1px dashed var(--detalhe-claro); }
 .pix__alternativo summary { cursor: pointer; color: var(--escura); }
 .pix__codigo { display: block; margin: .9rem 0; padding: .8rem 1rem; background: #fff; border-radius: var(--raio-sm); border: 1px solid var(--borda); font-family: ui-monospace, Consolas, monospace; font-size: .76rem; word-break: break-all; max-height: 84px; overflow-y: auto; color: var(--texto); }
 

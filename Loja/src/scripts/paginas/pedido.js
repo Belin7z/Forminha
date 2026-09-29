@@ -82,13 +82,18 @@ export async function pedido(ctx) {
 
   function blocoPix() {
     const automatico = estado.config?.pagamento?.pix_automatico;
-    const titulo = p.pix.motivo === "sinal" ? "Pague o sinal para garantir sua data" : "Pague com PIX";
+    const cartao = estado.config?.pagamento?.cartao_online;
+    const titulo = p.pix.motivo === "sinal" ? "Pague o sinal para garantir sua data" : cartao ? "Pague com PIX ou cartão" : "Pague com PIX";
+    // cartão de crédito ou débito no ambiente do Mercado Pago (volta para esta página depois)
+    const opcaoCartao = cartao ? html`<div class="pix__cartao">
+      <button type="button" class="btn btn--contorno" data-acao="pagar-cartao">${icone("cartao", { tamanho: 17 })} Pagar com cartão</button>
+      <small class="texto-suave">Crédito ou débito, no ambiente seguro do Mercado Pago.</small></div>` : "";
     const resto = p.pix.motivo === "sinal" ? html` — o restante (<strong>${brl(p.total - p.sinal)}</strong>) você paga na ${p.tipo === "entrega" ? "entrega" : "retirada"}.` : ".";
     const codigoLoja = html`<code class="pix__codigo" id="pix-codigo">${gerarPix(p.pix)}</code>
       <button type="button" class="btn btn--primario" data-acao="copiar-pix">${icone("copiar", { tamanho: 17 })} Copiar código PIX</button>`;
     if (!automatico) {
       return html`<div class="pix"><h2>${icone("dinheiro", { tamanho: 20 })} ${titulo}</h2>
-        <p>Copie o código abaixo e cole no aplicativo do seu banco (<strong>PIX Copia e Cola</strong>). Valor: <strong>${brl(p.pix.valor)}</strong>${resto}</p>${codigoLoja}</div>`;
+        <p>Copie o código abaixo e cole no aplicativo do seu banco (<strong>PIX Copia e Cola</strong>). Valor: <strong>${brl(p.pix.valor)}</strong>${resto}</p>${codigoLoja}${opcaoCartao}</div>`;
     }
     return html`<div class="pix"><h2>${icone("dinheiro", { tamanho: 20 })} ${titulo}</h2>
       ${qrValido() ? html`
@@ -99,6 +104,7 @@ export async function pedido(ctx) {
         <p class="texto-suave pix__aguardando">${icone("atualizar", { tamanho: 14 })} Aguardando a confirmação do pagamento. Esta tela atualiza sozinha.</p>`
       : html`<p>Pague na hora, sem digitar nada: geramos um QR Code com o valor certo e o pedido é atualizado <strong>sozinho</strong> assim que o pagamento cair. Valor: <strong>${brl(p.pix.valor)}</strong>${resto}</p>
         <button type="button" class="btn btn--primario" data-acao="gerar-pix">${icone("dinheiro", { tamanho: 17 })} Gerar QR Code do PIX</button>`}
+      ${opcaoCartao}
       <details class="pix__alternativo"><summary>Prefiro usar o código de pagamento da loja</summary>
         <p class="texto-suave">Com este código o pagamento é conferido pela loja, pode levar mais tempo.</p>${codigoLoja}</details></div>`;
   }
@@ -225,6 +231,14 @@ export async function pedido(ctx) {
   delegar(ctx.raiz, {
     "copiar-pix": () => copiar(gerarPix(p.pix)),
     "copiar-pix-auto": () => copiar(qr.qr_code),
+    "pagar-cartao": async (el) => {
+      await ocupado(el, async () => {
+        try {
+          const { url } = await api.post("/cartao/pagar", { codigo, voltar: location.origin });
+          location.href = url; // checkout do Mercado Pago; depois volta para esta página
+        } catch (erro) { toast(`${erro.message}`, "erro", 6000); }
+      });
+    },
     "gerar-pix": async (el) => {
       await ocupado(el, async () => {
         try {

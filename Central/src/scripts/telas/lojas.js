@@ -31,6 +31,7 @@ function cartaoLoja(l, eu) {
       <footer class="loja__acoes">
         ${suporte && incompleta(l) && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="continuar">Continuar criação</button>`}
         ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="convite">${icone("email", { tamanho: 15 })} Convite da dona</button>`}
+        ${suporte && l.etapa === "pronta" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="pagamento">${icone("cartao", { tamanho: 15 })} Pagamento online</button>`}
         ${suporte && l.atualizar && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="atualizar">${icone("atualizar", { tamanho: 15 })} Atualizar banco</button>`}
         ${suporte && l.etapa === "pausada" && html`<button type="button" class="btn btn--suave btn--pequeno" data-acao="reativar">${icone("atualizar", { tamanho: 15 })} Reativar</button>`}
         ${pode(eu, "lojas.excluir") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="excluir">${icone("lixeira", { tamanho: 15 })} Excluir</button>`}
@@ -95,6 +96,7 @@ export async function telaLojas(conteiner, eu) {
     if (!loja) return;
     if (acao === "continuar") return acompanharCriacao(loja, "", carregar);
     if (acao === "convite") return novoConvite(loja);
+    if (acao === "pagamento") return pagamentoOnline(loja);
     if (acao === "atualizar") return atualizarBanco(loja, carregar);
     if (acao === "reativar") {
       await ocupado(alvo, async () => {
@@ -211,6 +213,32 @@ async function novoConvite(loja) {
     const convite = await api("POST", `lojas/${loja.ref}/convite`, {});
     montar(modal.corpo, html`<p class="texto-suave">Um link novo (os anteriores que não foram usados continuam valendo até vencer).</p>${painelConvite({ ...convite, loja: loja.nome, urlLoja: loja.loja, urlPainel: loja.painel })}`);
   } catch (erro) { montar(modal.corpo, aviso("perigo", erro.message)); }
+}
+
+/** Liga o PIX automático e o cartão da loja com o Access Token do Mercado Pago da doceria. */
+function pagamentoOnline(loja) {
+  const modal = abrirModal({
+    titulo: `Pagamento online — ${loja.nome}`, largura: 500,
+    corpo: html`
+      <form id="form-pagamento" class="form-empilhado" novalidate>
+        <div class="form-erro" data-erro-geral hidden></div>
+        ${campo({ nome: "token", rotulo: "Access Token do Mercado Pago da doceria", tipo: "password", obrigatorio: true, placeholder: "APP_USR-…", atributos: 'autocomplete="off" spellcheck="false" autofocus' })}
+        <p class="form-empilhado__dica">A Central instala o PIX automático e o cartão na loja. A chave fica só nos segredos da loja: não aparece de novo.</p>
+      </form>`,
+    rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-pagamento" class="btn btn--primario">Conectar</button>`,
+  });
+  const form = modal.el.querySelector("form");
+  ativarCampos(form);
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    await ocupado(modal.el.querySelector('[form="form-pagamento"]'), async () => {
+      try {
+        const r = await api("POST", `lojas/${loja.ref}/pagamento`, dadosDe(form));
+        modal.fechar();
+        toast(`Pagamento online ligado${r.conta ? ` (${r.conta})` : ""}.`);
+      } catch (erro) { mostrarErros(form, erro); }
+    });
+  });
 }
 
 async function atualizarBanco(loja, depois) {

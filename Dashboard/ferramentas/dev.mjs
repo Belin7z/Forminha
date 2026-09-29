@@ -112,7 +112,8 @@ const base = { supabaseUrl, supabaseAnonKey: supabaseChave };
 
 try {
   await servir("loja", PORTA_LOJA, { ...base, urlLoja: "" });
-  await servir("dashboard", PORTA_DASHBOARD, { ...base, urlLoja });
+  // com o simulador, o próprio simulador faz o papel da Central (ligar o pagamento online pelo painel)
+  await servir("dashboard", PORTA_DASHBOARD, { ...base, urlLoja, ...(emulador && { urlCentral: `${emulador.url}/central` }) });
 } catch (erro) {
   console.error(erro.code === "EADDRINUSE" ? `\n✖ A porta ${erro.port ?? ""} já está em uso. Feche o outro terminal do "npm run dev" e tente de novo.\n` : erro);
   await emulador?.fechar();

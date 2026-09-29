@@ -39,7 +39,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
   const lojas = sb && vc && org ? criarLojas({
     sb, vc, org, fetchFn,
     repoLoja: env.REPO_LOJA || "Belin7z/Forminha", repoPainel: env.REPO_PAINEL || "Belin7z/Forminha",
-    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard",
+    pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard", urlCentral: urlBase,
   }) : null;
 
   // banco e cofre da Central (clientes e equipe): sem eles, as lojas continuam funcionando
@@ -112,6 +112,25 @@ export function criarCentral(env = process.env, opcoes = {}) {
     await email.enviar({ para: env.SMTP_USUARIO, ...modelos.alertaChaves({ linhas, urlCentral: urlBase }) });
     return true;
   }
+
+  /**
+   * Chamada do painel de uma loja: a dona manda o login dela (o token do Supabase da loja). Daí sai a loja
+   * (o endereço do Supabase que emitiu o token) e o próprio banco da loja confirma que ela é administradora.
+   */
+  async function lojaDaDona(cabecalhos) {
+    exigirLojas();
+    const jwt = /^Bearer\s+(\S+)$/i.exec(cabecalhos.authorization ?? "")?.[1];
+    let ref = null;
+    try {
+      const carga = JSON.parse(Buffer.from(String(jwt).split(".")[1], "base64url").toString());
+      ref = /^https:\/\/([a-z]{20})\.supabase\.co\/auth\/v1$/.exec(String(carga.iss))?.[1] ?? null;
+    } catch { /* token estranho */ }
+    if (!ref) throw new ErroHttp(401, "Entre no painel da sua loja para continuar.");
+    const loja = await lojas.porRef(ref);
+    await lojas.conferirDona(loja, jwt);
+    return loja;
+  }
+  const registrarDaDona = (loja, acao) => equipe?.registrar({ quem: `loja:${loja.ref}`, usuario: "Dona da loja", acao, alvo: loja.nome }).catch(() => {});
 
   /* ----------------------------------------------------------
      rotas: [método, caminho, quem pode, função, atividade]
@@ -287,6 +306,20 @@ export function criarCentral(env = process.env, opcoes = {}) {
       await lojas.reativar(loja);
       return { corpo: { etapa: "reativando" }, alvo: loja.nome };
     }, "Reativou loja"],
+    // pagamento online: você cola o Access Token do Mercado Pago da doceria (ou ela mesma, pelo painel dela)
+    ["POST", /^lojas\/([a-z]+)\/pagamento$/, "lojas.suporte", async ({ m, corpo }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await lojas.conectarPagamento(loja, corpo.token), alvo: loja.nome };
+    }, "Ligou o pagamento online"],
+
+    /* ---------- chamadas do painel da loja (a dona, com o login dela; sem cookie da Central) ---------- */
+    ["POST", /^loja\/pagamento$/, false, async ({ cabecalhos, corpo }) => {
+      const loja = await lojaDaDona(cabecalhos);
+      const r = await lojas.conectarPagamento(loja, corpo.token);
+      registrarDaDona(loja, "Ligou o pagamento online");
+      return { corpo: r };
+    }],
     ["DELETE", /^lojas\/([a-z]+)$/, "lojas.excluir", async ({ m, corpo }) => {
       exigirLojas();
       const loja = await lojas.porRef(m[1]);
@@ -329,22 +362,33 @@ export function criarCentral(env = process.env, opcoes = {}) {
     return texto ? JSON.parse(texto) : {};
   }
 
-  function responder(res, status, corpo, cookie) {
+  function responder(res, status, corpo, cookie, extras = null) {
     res.statusCode = status;
-    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    for (const [k, v] of Object.entries(extras ?? {})) res.setHeader(k, v);
     res.setHeader("Cache-Control", "no-store");
+    if (status === 204) return res.end();
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
     if (cookie) res.setHeader("Set-Cookie", cookie);
     res.end(JSON.stringify(corpo));
   }
+  // o painel de cada loja mora em outro endereço: estas rotas aceitam chamadas de fora (a proteção é o login da dona, não cookie)
+  const CORS_DAS_LOJAS = {
+    "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS", "Access-Control-Max-Age": "600",
+  };
 
   async function tratar(req, res) {
     let quem = null;
+    let extras = null;
     try {
       const url = new URL(req.url, "http://central");
       const rota = (url.searchParams.get("rota") ?? url.pathname.replace(/^\/api\/?/, "")).replace(/^\/+|\/+$/g, "");
       const metodo = req.method;
       const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v[0] : v]));
       const seguro = cabecalhos["x-forwarded-proto"] === "https" || !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(cabecalhos.host ?? "");
+      const daLoja = rota.startsWith("loja/");
+      if (daLoja) extras = CORS_DAS_LOJAS;
+      if (daLoja && metodo === "OPTIONS") return responder(res, 204, null, null, extras);
       quem = await identificar(lerSessao(lerCookie(cabecalhos.cookie, NOME_COOKIE), env.SEGREDO_SESSAO));
 
       const achada = rotas.map(([met, re, pode, fn, atividade]) => met === metodo && re.exec(rota) && { m: re.exec(rota), pode, fn, atividade }).find(Boolean);
@@ -359,19 +403,19 @@ export function criarCentral(env = process.env, opcoes = {}) {
         // contra pedidos forjados por outros sites: só JSON e só da própria Central
         if (!String(cabecalhos["content-type"] ?? "").includes("application/json")) throw new ErroHttp(415, "Envie os dados em JSON.");
         const origem = cabecalhos.origin;
-        if (origem && new URL(origem).host !== cabecalhos.host) throw new ErroHttp(403, "Origem não permitida.");
+        if (!daLoja && origem && new URL(origem).host !== cabecalhos.host) throw new ErroHttp(403, "Origem não permitida.");
       }
       const corpo = metodo === "GET" ? {} : await lerCorpo(req).catch((e) => { throw e instanceof ErroHttp ? e : new ErroHttp(400, "Dados inválidos."); });
       const ip = String(cabecalhos["x-forwarded-for"] ?? req.socket?.remoteAddress ?? "").split(",").pop().trim();
       // o histórico da cliente registra quem fez (ex.: "FMV-0427 · Ana")
       const r = await comAutor(quem ? rotulo(quem) : null, () => achada.fn({ m: achada.m, url, corpo, cabecalhos, ip, seguro, quem, logado: Boolean(quem) }));
       if (achada.atividade && quem) await registrarAtividade(quem, achada.atividade, { m: achada.m, corpo, r, rota }).catch((e) => console.error("[atividade]", e.message));
-      responder(res, 200, r.corpo, r.cookie);
+      responder(res, 200, r.corpo, r.cookie, extras);
     } catch (erro) {
-      if (erro instanceof ErroHttp) return responder(res, erro.status, { erro: erro.message, campos: erro.campos });
+      if (erro instanceof ErroHttp) return responder(res, erro.status, { erro: erro.message, campos: erro.campos }, null, extras);
       // chave vencida ou sem permissão: para você, diz o que fazer; para visitantes, nada muda
       if (erro instanceof ErroProvedor) console.error("[provedor]", erro.status, erro.message); // aparece nos registros da Vercel (sem chaves)
-      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status, erro.message) : erro.message });
+      if (erro instanceof ErroProvedor) return responder(res, 502, { erro: quem && chaveRecusada(erro) ? mensagemDeChaveRecusada(erro.quem, erro.status, erro.message) : erro.message }, null, extras);
       if (erro instanceof ErroCofre) { console.error("[cofre]", erro.message); return responder(res, 500, { erro: "Não foi possível abrir os dados protegidos (confira a CHAVE_CRIPTOGRAFIA)." }); }
       console.error(erro);
       responder(res, 500, { erro: "Erro inesperado na Central. Tente de novo." });

@@ -219,6 +219,15 @@
 .integ-linha { display: flex; align-items: flex-end; gap: .7rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .integ-linha .campo { flex: 1; min-width: 240px; margin: 0; }
 .integ-acoes { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.integ-conectar { display: grid; gap: .2rem; max-width: 520px; }
+.integ-conectar .btn { justify-self: start; }
+.integ-dica { font-size: .85rem; }
+.integ-conta { display: flex; flex-wrap: wrap; gap: 1.6rem; margin: 0 0 1rem; }
+.integ-conta dt { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--texto-suave); }
+.integ-conta dd { margin: .2rem 0 0; font-weight: 500; }
+.integ-opcoes { display: grid; gap: .3rem; margin-bottom: .8rem; }
+.integ-trocar { margin: .4rem 0 1rem; }
+.integ-trocar summary { cursor: pointer; color: var(--escura); font-size: .9rem; margin-bottom: .8rem; }
 .integ-avisos { display: grid; gap: .6rem; margin: 1rem 0 .6rem; }
 .integ-avisos__linha { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.2fr); gap: .8rem; align-items: center; }
 .integ-modelos { margin: 1rem 0; padding: .8rem 1rem; border: 1px dashed var(--borda); border-radius: var(--raio-sm); }

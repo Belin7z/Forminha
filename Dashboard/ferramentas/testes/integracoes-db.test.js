@@ -51,7 +51,7 @@ after(async () => { await emu?.fechar(); });
 
 describe("chave de integração do PIX automático", () => {
   it("nasce desligado; não liga sem chave; a chave aparece uma vez e o banco guarda só o hash", async () => {
-    assert.deepEqual(await painel.get("/gateway"), { provedor: "mercadopago", ativo: false, tem_chave: false });
+    assert.deepEqual(await painel.get("/gateway"), { provedor: "mercadopago", ativo: false, cartao: false, tem_chave: false, conectado_em: null, conta: "" });
     assert.equal((await falha(painel.put("/gateway", { ativo: true }))).status, 422);
 
     ({ segredo } = await painel.post("/gateway/segredo"));

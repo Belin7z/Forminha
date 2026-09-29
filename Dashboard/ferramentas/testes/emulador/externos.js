@@ -6,7 +6,7 @@ const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPh
 
 export function criarExternos() {
   const estado = {
-    mpPagamentos: new Map(), mpChamadas: [], metaEnvios: [], proximoId: 5000,
+    mpPagamentos: new Map(), mpPreferencias: new Map(), mpChamadas: [], metaEnvios: [], proximoId: 5000,
     falhas: { mpCriar: false, mpConsultar: false, semQr: false, meta: null }, // meta: objeto de erro da Meta, ex.: { code: 132001 }
   };
   const resp = (status, json) => new Response(JSON.stringify(json), { status, headers: { "content-type": "application/json" } });
@@ -32,6 +32,18 @@ export function criarExternos() {
         estado.mpPagamentos.set(String(id), pag);
         return resp(201, pag);
       }
+      // checkout de cartão: devolve o endereço onde o cliente paga
+      if (u.pathname === "/checkout/preferences" && metodo === "POST") {
+        if (estado.falhas.mpCriar) return resp(500, { message: "erro interno" });
+        const id = `pref-${estado.proximoId++}`;
+        const pref = { id, init_point: `https://mp.exemplo/checkout/${id}`, ...corpo };
+        estado.mpPreferencias.set(id, pref);
+        return resp(201, pref);
+      }
+      if (u.pathname === "/users/me" && metodo === "GET") {
+        const token = String(opcoes.headers?.Authorization ?? "").replace(/^Bearer\s+/, "");
+        return /^(APP_USR|TEST)-/.test(token) ? resp(200, { id: 123456, nickname: "DOCERIA_TESTE", email: "doceria@exemplo.com", site_id: "MLB" }) : resp(401, { message: "invalid access token" });
+      }
       const m = /^\/v1\/payments\/(.+)$/.exec(u.pathname);
       if (m && metodo === "GET") {
         if (estado.falhas.mpConsultar) return resp(503, { message: "indisponível" });
@@ -52,6 +64,13 @@ export function criarExternos() {
     estado, fetchFn,
     /** Marca um pagamento como aprovado (como se o cliente tivesse pago no app do banco). */
     aprovar(id) { const p = estado.mpPagamentos.get(String(id)); if (!p) throw new Error("pagamento inexistente"); p.status = "approved"; return p; },
+    /** O cliente pagou no checkout (cartão, boleto…): cria o pagamento aprovado que o aviso vai consultar. */
+    pagarNoCheckout(codigo, reais, { tipo = "credit_card", metodo = "visa" } = {}) {
+      const id = estado.proximoId++;
+      const pag = { id, status: "approved", payment_method_id: metodo, payment_type_id: tipo, transaction_amount: reais, external_reference: codigo };
+      estado.mpPagamentos.set(String(id), pag);
+      return pag;
+    },
     /** Acha o pagamento pendente de um pedido. */
     pagamentoDoPedido(codigo) { return [...estado.mpPagamentos.values()].reverse().find((p) => p.external_reference === codigo); },
   };

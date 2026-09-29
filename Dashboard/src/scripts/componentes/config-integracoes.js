@@ -1,14 +1,17 @@
 /* ==========================================================
    COMPONENTE — configurações › Integrações.
-   PIX automático (Mercado Pago) e avisos por WhatsApp (Meta).
-   As chaves dos serviços NUNCA passam por aqui: ficam nos
-   "Secrets" das funções do Supabase (veja docs/INTEGRACOES.md).
+   Pagamento online (PIX automático + cartão, Mercado Pago) e avisos
+   por WhatsApp (Meta). A dona cola o Access Token do Mercado Pago e a
+   Central instala e liga tudo: a chave vai direto para os segredos das
+   funções da loja e nunca fica no navegador nem no banco.
    ========================================================== */
 import { html } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
-import { abrirModal, confirmar, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
-import { ativarCampos, dadosDe, interruptor, mostrarErros } from "/src/scripts/base/formularios.js";
+import { ocupado, toast } from "/src/scripts/base/ui.js";
+import { ativarCampos, campo, dadosDe, interruptor, mostrarErros } from "/src/scripts/base/formularios.js";
+import { dataBR } from "/src/scripts/base/formatacao.js";
 import { api } from "../nucleo/api.js";
+import { chamarCentral, temCentral } from "../nucleo/central.js";
 
 const EVENTOS = [
   ["confirmado", "Pedido confirmado"], ["em_preparo", "Em preparo"], ["pronto", "Pronto (ou pronto para retirada)"],
@@ -25,29 +28,37 @@ export const MODELOS_SUGERIDOS = {
   cancelado: "Olá, {{1}}. Infelizmente o pedido {{2}}, previsto para {{3}}, foi cancelado. Veja os detalhes: {{4}} Se precisar, é só responder esta mensagem.",
 };
 
-const urlWebhook = () => `${String(window.CONFIG_APP?.supabaseUrl ?? "").replace(/\/+$/, "")}/functions/v1/pix-webhook`;
+const LINK_CREDENCIAIS = "https://www.mercadopago.com.br/developers/panel/app";
+
+/** Colar o Access Token e conectar (a Central instala as funções e liga PIX e cartão). */
+const formConectar = () => html`
+  <form id="f-conectar" class="integ-conectar" novalidate>
+    <div class="form-erro" data-erro-geral hidden></div>
+    ${campo({ nome: "token", rotulo: "Access Token do Mercado Pago", tipo: "password", obrigatorio: true, placeholder: "APP_USR-…", atributos: 'autocomplete="off" spellcheck="false"' })}
+    <p class="texto-suave integ-dica">No Mercado Pago: <a class="link" href="${LINK_CREDENCIAIS}" target="_blank" rel="noopener">Suas integrações</a> → sua aplicação → <strong>Credenciais de produção</strong> → Access Token.</p>
+    <button type="submit" class="btn btn--primario">Conectar</button>
+  </form>`;
 
 export function paginaIntegracoes({ gateway, avisos }) {
-  const situacao = gateway.ativo ? ["badge--sucesso", "Ligado"] : gateway.tem_chave ? ["badge--neutro", "Desligado"] : ["badge--aviso", "Falta gerar a chave"];
+  const conectado = gateway.tem_chave;
   return html`
-    <section class="cartao" id="integ-pix">
-      <div class="cartao__cab"><div><h2>PIX automático <small class="texto-suave">— Mercado Pago</small></h2>
-        <small class="texto-suave">O cliente paga lendo um QR Code e o pedido muda para “pago” sozinho, sem você conferir o extrato.</small></div>
-        <span class="badge ${situacao[0]}">${situacao[1]}</span></div>
-      <ol class="integ-passos">
-        <li>Crie a conta no <strong>Mercado Pago</strong> e uma aplicação de pagamentos; copie o <strong>Access Token</strong>.</li>
-        <li>No <strong>Supabase → Edge Functions → Secrets</strong>, cadastre <code>MP_ACCESS_TOKEN</code> (o token) e <code>SEGREDO_GATEWAY</code> (a chave gerada abaixo).</li>
-        <li>No <strong>Mercado Pago → Webhooks</strong>, informe o endereço abaixo e marque o evento <em>Pagamentos</em>.</li>
-        <li>Volte aqui, ligue o PIX automático e faça um pedido de teste de valor baixo.</li>
-      </ol>
-      <div class="integ-linha"><div class="campo"><label>Endereço do webhook (cole no Mercado Pago)</label>
-        <input class="entrada" readonly value="${urlWebhook()}" aria-label="Endereço do webhook"></div>
-        <button type="button" class="btn btn--suave btn--pequeno" data-copiar-webhook>${icone("copiar", { tamanho: 15 })} Copiar</button></div>
-      <div class="integ-acoes">
-        <button type="button" class="btn btn--contorno" data-gerar-chave>${icone("cadeado", { tamanho: 16 })} ${gateway.tem_chave ? "Gerar nova chave de integração" : "Gerar chave de integração"}</button>
-        <form id="f-gateway" novalidate>${interruptor({ nome: "ativo", rotulo: "Ligar o PIX automático", marcado: gateway.ativo, ajuda: gateway.tem_chave ? "Antes de ligar, cadastre as chaves nos Secrets do Supabase." : "Gere a chave de integração primeiro." })}</form>
-      </div>
-      <p class="texto-suave">Mantenha também a chave PIX da loja em <em>Pagamento</em>: ela serve de alternativa se o Mercado Pago estiver fora do ar. Guia completo: <code>docs/INTEGRACOES.md</code>.</p>
+    <section class="cartao" id="integ-pagamento">
+      <div class="cartao__cab"><div><h2>Pagamento online <small class="texto-suave">— Mercado Pago</small></h2>
+        <small class="texto-suave">PIX automático e cartão de crédito ou débito. O pedido fica “pago” sozinho.</small></div>
+        <span class="badge ${conectado ? "badge--sucesso" : "badge--aviso"}">${conectado ? "Conectado" : "Não conectado"}</span></div>
+      ${conectado ? html`
+        <dl class="integ-conta">
+          <div><dt>Conta</dt><dd>${gateway.conta || "Mercado Pago"}</dd></div>
+          ${gateway.conectado_em && html`<div><dt>Desde</dt><dd>${dataBR(String(gateway.conectado_em).slice(0, 10))}</dd></div>`}
+        </dl>
+        <form id="f-gateway" class="integ-opcoes" novalidate>
+          ${interruptor({ nome: "ativo", rotulo: "PIX automático", marcado: gateway.ativo })}
+          ${interruptor({ nome: "cartao", rotulo: "Cartão de crédito e débito", marcado: gateway.cartao })}
+        </form>
+        ${temCentral() && html`<details class="integ-trocar"><summary>Trocar a conta do Mercado Pago</summary>${formConectar()}</details>`}`
+      : temCentral() ? formConectar()
+      : html`<p class="texto-suave">Peça à Forminha para ligar o pagamento online da sua loja.</p>`}
+      <p class="texto-suave integ-dica">A chave PIX da loja (em <em>Pagamento</em>) continua como alternativa se o Mercado Pago estiver fora do ar.</p>
     </section>
 
     <form class="cartao" id="f-avisos" novalidate>
@@ -73,35 +84,28 @@ export function paginaIntegracoes({ gateway, avisos }) {
 export function ligarIntegracoes(ctx, dados) {
   const recarregar = () => ctx.ir("/configuracoes/integracoes");
 
-  ctx.raiz.querySelector("[data-copiar-webhook]")?.addEventListener("click", () => copiar(urlWebhook()));
-
-  ctx.raiz.querySelector("[data-gerar-chave]")?.addEventListener("click", async (ev) => {
-    if (dados.gateway.tem_chave && !(await confirmar({
-      titulo: "Gerar nova chave", rotulo: "Gerar nova chave", perigo: true,
-      mensagem: "A chave atual deixa de valer e o PIX automático é desligado até você atualizar o Secret SEGREDO_GATEWAY no Supabase e ligar de novo. Continuar?",
-    }))) return;
-    await ocupado(ev.currentTarget, async () => {
-      try {
-        const { segredo } = await api.post("/gateway/segredo");
-        const m = abrirModal({
-          titulo: "Sua chave de integração", largura: 520, aoFechar: recarregar,
-          corpo: html`<p class="texto-suave">Copie agora e cole no Supabase, em <strong>Edge Functions → Secrets</strong>, com o nome <code>SEGREDO_GATEWAY</code>.
-            <strong>Ela não será mostrada de novo</strong> (o sistema guarda só uma impressão digital, não a chave).</p>
-            <code class="pix__codigo" id="chave-gerada">${segredo}</code>`,
-          rodape: html`<button type="button" class="btn btn--primario" data-copiar-chave>${icone("copiar", { tamanho: 16 })} Copiar chave</button>
-            <button type="button" class="btn btn--suave" data-fechar>Já copiei</button>`,
-        });
-        m.el.querySelector("[data-copiar-chave]").addEventListener("click", () => copiar(segredo));
-      } catch (erro) { toast(erro.message, "erro"); }
+  // conectar (ou trocar) a conta do Mercado Pago: quem instala e guarda a chave é a Central
+  const formConectar = ctx.raiz.querySelector("#f-conectar");
+  if (formConectar) {
+    ativarCampos(formConectar);
+    formConectar.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      await ocupado(formConectar.querySelector("[type=submit]"), async () => {
+        try {
+          const r = await chamarCentral("POST", "pagamento", { token: dadosDe(formConectar).token });
+          toast(`Pagamento online ligado${r.conta ? ` (${r.conta})` : ""}! PIX automático e cartão já aparecem na loja.`);
+          recarregar();
+        } catch (erro) { mostrarErros(formConectar, erro, (msg) => toast(msg, "erro")); }
+      });
     });
-  });
+  }
 
-  const interruptorGateway = ctx.raiz.querySelector('#f-gateway [name="ativo"]');
-  interruptorGateway?.addEventListener("change", async (ev) => {
+  const formGateway = ctx.raiz.querySelector("#f-gateway");
+  formGateway?.addEventListener("change", async (ev) => {
+    const d = dadosDe(formGateway);
     try {
-      await api.put("/gateway", { ativo: ev.target.checked });
-      toast(ev.target.checked ? "PIX automático ligado." : "PIX automático desligado.", "info");
-      recarregar();
+      await api.put("/gateway", { ativo: d.ativo, cartao: d.cartao });
+      toast(ev.target.name === "cartao" ? (d.cartao ? "Cartão ligado." : "Cartão desligado.") : (d.ativo ? "PIX automático ligado." : "PIX automático desligado."), "info");
     } catch (erro) { ev.target.checked = !ev.target.checked; toast(erro.message, "erro"); }
   });
 

@@ -15,11 +15,12 @@ export class ErroProvedor extends Error {
 
 async function chamar(fetchFn, quem, url, token, metodo, corpo) {
   let r;
+  const formulario = typeof FormData !== "undefined" && corpo instanceof FormData; // envio de arquivo (funções)
   try {
     r = await fetchFn(url, {
       method: metodo,
-      headers: { Authorization: `Bearer ${token}`, ...(corpo === undefined ? {} : { "Content-Type": "application/json" }) },
-      body: corpo === undefined ? undefined : JSON.stringify(corpo),
+      headers: { Authorization: `Bearer ${token}`, ...(corpo === undefined || formulario ? {} : { "Content-Type": "application/json" }) },
+      body: corpo === undefined ? undefined : formulario ? corpo : JSON.stringify(corpo),
     });
   } catch (erro) {
     throw new ErroProvedor(quem, 0, `sem conexão (${erro.message})`);
@@ -71,6 +72,16 @@ export function criarSupabase({ token, base = "https://api.supabase.com", fetchF
       return escolhida.api_key;
     },
     configurarLogin: (ref, dados) => api("PATCH", `/v1/projects/${encodeURIComponent(ref)}/config/auth`, dados),
+    /** Instala (ou atualiza) uma função do servidor na loja: um arquivo só, sem exigir login do Supabase (a função confere). */
+    implantarFuncao(ref, nome, codigo) {
+      const form = new FormData();
+      form.append("metadata", JSON.stringify({ name: nome, entrypoint_path: "index.ts", verify_jwt: false }));
+      form.append("file", new Blob([codigo], { type: "application/typescript" }), "index.ts");
+      return api("POST", `/v1/projects/${encodeURIComponent(ref)}/functions/deploy?slug=${encodeURIComponent(nome)}`, form);
+    },
+    /** Grava segredos que só as funções da loja leem (ex.: a chave do Mercado Pago). Nunca voltam para a tela. */
+    definirSegredos: (ref, segredos) => api("POST", `/v1/projects/${encodeURIComponent(ref)}/secrets`,
+      Object.entries(segredos).map(([name, value]) => ({ name, value: String(value) }))),
   };
 }
 
