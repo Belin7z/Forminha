@@ -1,0 +1,55 @@
+# Testes automáticos a cada envio (push) e a cada pedido de mudança (pull request).
+# Se algum teste falhar, o GitHub avisa por e-mail e mostra um X vermelho no envio.
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  painel-e-loja:
+    name: Painel e loja
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Dashboard/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  central:
+    name: Central
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Central
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Central/package-lock.json
+      - run: npm ci
+      - name: Copiar as migrações do painel (a Central aplica nas lojas)
+        run: node ferramentas/copiar-sql.mjs
+      - name: Conferir que a cópia das migrações está em dia
+        run: git diff --exit-code -- sql
+      - run: npm test
