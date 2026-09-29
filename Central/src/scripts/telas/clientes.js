@@ -7,7 +7,7 @@
 import { html, montar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, confirmar, ocupado, toast } from "/src/scripts/base/ui.js";
-import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
+import { ativarCampos, campo, dadosDe, interruptor, mostrarErros } from "/src/scripts/base/formularios.js";
 import { paraCentavos, emReais } from "/src/scripts/base/formatacao.js";
 import { api, aviso, baixarPlanilha, dia, documentoBonito, linkWhats, pode, quando, reais, telefoneBonito, valorPlanilha } from "../nucleo.js";
 
@@ -18,6 +18,7 @@ const ETAPAS_LOJA = [
 ];
 export function situacaoDe(c) {
   if (c.situacao === "cancelado") return ["Cancelado", "neutro"];
+  if (c.situacao === "interessada") return ["Interessada", "info"];
   if (c.situacao === "aguardando_pagamento") return ["Aguardando pagamento", "aviso"];
   if (c.etapa === "pronta") return ["Loja pronta", "sucesso"];
   if (c.parada) return ["Parou — ver", "perigo"];
@@ -27,8 +28,9 @@ const selo = (c) => { const [t, tom] = situacaoDe(c); return html`<span class="s
 const ponto = (c) => { const [t, tom] = situacaoDe(c); return html`<span class="ponto ponto--${tom}">${t}</span>`; };
 
 // filtros da lista: em que pé está cada cliente
-const FILTROS = [["", "Todas"], ["aguardando", "Aguardando"], ["criando", "Criando"], ["prontas", "Prontas"], ["canceladas", "Canceladas"]];
-const grupoDe = (c) => (c.situacao === "cancelado" ? "canceladas" : c.situacao === "aguardando_pagamento" ? "aguardando" : c.etapa === "pronta" ? "prontas" : "criando");
+const FILTROS = [["", "Todas"], ["interessadas", "Interessadas"], ["aguardando", "Aguardando"], ["criando", "Criando"], ["prontas", "Prontas"], ["canceladas", "Canceladas"]];
+const grupoDe = (c) => (c.situacao === "cancelado" ? "canceladas" : c.situacao === "interessada" ? "interessadas" : c.situacao === "aguardando_pagamento" ? "aguardando"
+  : c.etapa === "pronta" ? "prontas" : "criando");
 
 /* ---------- lista ---------- */
 export async function telaClientes(conteiner, eu) {
@@ -124,12 +126,15 @@ export async function novaCliente(depois, eu) {
           ${campo({ nome: "valor", rotulo: "Valor (R$)", mascara: "moeda", valor: padrao ? emReais(padrao) : "", obrigatorio: true })}
         </div>
         ${campo({ nome: "observacoes", rotulo: "Observações", tipo: "textarea", linhas: 2, atributos: 'maxlength="1000"', ajuda: "Só a equipe da Forminha vê. Fica guardado criptografado." })}
+        ${interruptor({ nome: "so_interesse", rotulo: "Só registrar o interesse", ajuda: "Ela ainda está pensando: a cobrança vai depois, pela ficha (Enviar proposta). Entra no funil de vendas." })}
         <p class="nota-seguranca">${icone("cadeado", { tamanho: 14 })} Nome, e-mail, WhatsApp, CPF/CNPJ e observações são guardados criptografados.</p>
       </form>`,
     rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-cliente" class="btn btn--primario">Cadastrar e gerar PIX</button>`,
   });
   const form = modal.el.querySelector("form");
   ativarCampos(form);
+  const botaoEnviar = modal.el.querySelector('[form="form-cliente"]');
+  form.so_interesse.addEventListener("change", () => { botaoEnviar.textContent = form.so_interesse.checked ? "Registrar interesse" : "Cadastrar e gerar PIX"; });
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const dados = dadosDe(form);
@@ -139,7 +144,9 @@ export async function novaCliente(depois, eu) {
       try {
         const r = await api("POST", "clientes", corpo);
         const c = r.cliente;
-        montar(modal.corpo, html`
+        montar(modal.corpo, r.so_interesse
+          ? aviso("sucesso", html`Interesse de <strong>${c.nome}</strong> registrado (${reais(c.valor_centavos)}). Quando ela decidir, abra a ficha e use <strong>Enviar proposta</strong>.`)
+          : html`
           ${aviso("sucesso", html`<strong>${c.nome}</strong> cadastrada. Cobrança de <strong>${reais(c.valor_centavos)}</strong> criada.`)}
           ${painelCobranca({ link: r.link_pagamento, cliente: c, emailEnviado: r.email_enviado })}`);
         montar(modal.rodape, html`<button type="button" class="btn btn--suave" data-fechar>Fechar</button><button type="button" class="btn btn--primario" data-ficha>Abrir ficha</button>`);
@@ -183,6 +190,12 @@ export function abrirFicha(id, depois, eu) {
         <h3>${icone("dinheiro", { tamanho: 17 })} Pagamento <span class="ficha__valor">${reais(c.valor_centavos)}</span></h3>
         ${aprovado && html`<p class="ficha__ok">${icone("checkCirculo", { tamanho: 16 })} Pago em ${quando(aprovado.confirmado_em)} · ${aprovado.confirmado_por === "mercado_pago" ? "confirmado pelo Mercado Pago" : !aprovado.confirmado_por || aprovado.confirmado_por === "admin" ? "confirmado manualmente" : `confirmado por ${aprovado.confirmado_por}`}</p>`}
         ${c.situacao === "cancelado" && html`<p class="texto-suave">Cadastro cancelado.</p>`}
+        ${c.situacao === "interessada" && html`
+          <p class="texto-suave">Só o interesse, ainda sem cobrança. Quando ela decidir, envie a proposta: a Central gera o PIX e o link de pagamento.</p>
+          <div class="ficha__acoes">
+            ${p("pagamentos.cobrar") && html`<button type="button" class="btn btn--primario btn--pequeno" data-acao="cobrar">${icone("dinheiro", { tamanho: 15 })} Enviar proposta</button>`}
+            ${p("pagamentos.cancelar") && html`<button type="button" class="btn btn--perigo-suave btn--pequeno" data-acao="cancelar">Não fechou</button>`}
+          </div>`}
         ${pendente && html`
           ${painelCobranca({ link: pendente.link, cliente: c })}
           <details class="ficha__pix"><summary>PIX copia e cola (com a sua chave)</summary><div class="convite-pronto__link"><code>${pendente.pix_copia_cola}</code></div>
@@ -259,6 +272,7 @@ export function abrirFicha(id, depois, eu) {
             ${c.documento && html` · ${documentoBonito(c.documento)}`}
           </p>
           ${c.observacoes && html`<p class="ficha__obs">${c.observacoes}</p>`}
+          <p class="ficha__por">Entrou em ${dia(c.criado_em)}${c.cadastrado_por ? ` · cadastrada por ${c.cadastrado_por}` : ""}</p>
         </div>
         ${selo(c)}
       </div>
@@ -306,7 +320,10 @@ export function abrirFicha(id, depois, eu) {
     }
     if (acao === "reenviar-cobranca") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/reenviar`, { tipo: "cobranca" }); desenhar(); toast("E-mail reenviado."); });
     if (acao === "reenviar-convite") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/reenviar`, { tipo: "convite" }); desenhar(); toast("Convite reenviado."); });
-    if (acao === "cobrar") return agir(alvo, async () => { d = await api("POST", `clientes/${id}/cobrar`, {}); desenhar(); toast("Nova cobrança criada (a anterior foi cancelada)."); });
+    if (acao === "cobrar") {
+      const primeira = d.cliente.situacao === "interessada";
+      return agir(alvo, async () => { d = await api("POST", `clientes/${id}/cobrar`, {}); desenhar(); toast(primeira ? "Proposta enviada: o link de pagamento está na ficha." : "Nova cobrança criada (a anterior foi cancelada)."); });
+    }
     if (acao === "cancelar") {
       const ok = await confirmar({ titulo: "Cancelar cadastro?", mensagem: "A cobrança deixa de valer. Os dados continuam guardados para consulta.", rotulo: "Cancelar cadastro", perigo: true });
       if (ok) return agir(alvo, async () => { d = await api("POST", `clientes/${id}/cancelar`, {}); desenhar(); });

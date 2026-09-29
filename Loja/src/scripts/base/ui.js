@@ -26,6 +26,15 @@ export function toast(mensagem, tipo = "sucesso", duracao = 3600) {
 const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 const abertos = [];
 
+// Esc fecha a janela de cima mesmo quando o foco se perdeu (ex.: o conteúdo dela foi redesenhado);
+// com o foco dentro da janela, quem fecha é o ouvinte da própria janela
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "Escape" || !abertos.length) return;
+  const ativo = document.activeElement;
+  if (ativo && ativo !== document.body && ativo !== document.documentElement) return;
+  abertos[abertos.length - 1].fechar();
+});
+
 function travarRolagem(travar) {
   document.body.style.overflow = travar ? "hidden" : "";
 }

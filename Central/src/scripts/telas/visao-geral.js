@@ -130,7 +130,7 @@ export async function telaVisaoGeral(conteiner, eu) {
     montar(painel, html`
       <section class="numeros">
         ${f && numero({ rotulo: "Faturamento do mês", valor: reais(f.mes), nota: variacao(f.mes, f.mes_anterior), ic: "dinheiro" })}
-        ${numero({ rotulo: "Clientes", valor: n.clientes, nota: `+${n.novas_no_mes} neste mês`, ic: "usuarios" })}
+        ${numero({ rotulo: "Clientes", valor: n.clientes, nota: `+${n.novas_no_mes} neste mês${n.interessadas ? ` · ${n.interessadas} ${n.interessadas === 1 ? "interessada" : "interessadas"}` : ""}`, ic: "usuarios" })}
         ${numero({ rotulo: "Lojas no ar", valor: n.lojas_prontas, nota: n.criando ? `${n.criando} sendo ${n.criando === 1 ? "criada" : "criadas"}` : "", ic: "home" })}
         ${numero({ rotulo: "Aguardando pagamento", valor: n.aguardando, nota: f?.pendente ? reais(f.pendente) : "", ic: "relogio" })}
       </section>

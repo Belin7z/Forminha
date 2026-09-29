@@ -165,22 +165,25 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return { id, link };
   }
 
+  /** `so_interesse`: só registra o interesse (etapa "interessada" do funil), sem cobrança; a proposta vai depois. */
   async function cadastrar(corpo) {
     const cfg = await lerConfig();
     const d = validarCliente({ ...corpo, valor_centavos: corpo.valor_centavos ?? cfg.valor_padrao_centavos });
-    if (!cfg.pix.chave) throw new ErroHttp(409, "Antes de cadastrar, informe a sua chave PIX em Configurações.");
+    const soInteresse = corpo.so_interesse === true;
+    if (!soInteresse && !cfg.pix.chave) throw new ErroHttp(409, "Antes de cadastrar, informe a sua chave PIX em Configurações.");
     const id = randomUUID();
     const pessoa = { nome: d.nome, email: d.email, telefone: d.telefone ?? "", documento: d.documento ?? "", observacoes: d.observacoes ?? "" };
     try {
-      await sql(`insert into clientes (id, dados, email_indice, nome_loja, valor_centavos) values ($1, $2, $3, $4, $5)`,
-        [id, cofre.cifrar(pessoa, ctx(id)), cofre.indice(d.email), d.nome_loja, d.valor_centavos]);
+      await sql(`insert into clientes (id, dados, email_indice, nome_loja, valor_centavos, situacao, cadastrado_por) values ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, cofre.cifrar(pessoa, ctx(id)), cofre.indice(d.email), d.nome_loja, d.valor_centavos, soInteresse ? "interessada" : "aguardando_pagamento", autorAtual() ?? null]);
     } catch (e) {
       if (String(e.code) === "23505" || /duplicate|unique/i.test(e.message)) throw new ErroHttp(409, "Já existe uma cliente com esse e-mail.", { email: "Já existe uma cliente com esse e-mail." });
       throw e;
     }
-    await anotarHistorico(id, "cadastro", "Cliente cadastrada.");
+    await anotarHistorico(id, "cadastro", soInteresse ? "Interesse registrado (ainda sem cobrança)." : "Cliente cadastrada.");
     const autor = autorAtual();
     if (autor && autor !== "Dono") aviso({ tipo: "cadastro", titulo: `Cliente nova: ${d.nome_loja}`, texto: `Cadastrada por ${autor} · ${brl(d.valor_centavos)}`, cliente_id: id, permissao: "dono" });
+    if (soInteresse) return { ...(await detalhe(id)), link_pagamento: null, email_enviado: false, so_interesse: true };
     const c = await linha(id);
     const cobranca = await novaCobranca(c);
     const enviado = await mandar(c, "cobranca", { valorCentavos: c.valor_centavos, link: cobranca.link }).catch(async (e) => {
@@ -197,6 +200,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       etapa_erro: c.tentativas >= MAX_TENTATIVAS ? c.etapa_erro : null, parada: c.tentativas >= MAX_TENTATIVAS,
       loja_ref: c.loja_ref, loja_codigo: c.loja_codigo, loja_url: c.loja_url, painel_url: c.painel_url,
       convite: c.convite ? cofre.decifrar(c.convite, ctx(c.id)) : null, convite_em: c.convite_em, email_boas_vindas_em: c.email_boas_vindas_em,
+      cadastrado_por: c.cadastrado_por ?? null, pronta_em: c.pronta_em ?? null,
     };
   }
 
@@ -225,7 +229,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const pessoa = { ...abrir(c) };
     for (const k of ["nome", "email", "telefone", "documento", "observacoes"]) if (d[k] !== undefined) pessoa[k] = d[k];
     if (d.nome_loja !== undefined && c.loja_ref) throw new ErroHttp(409, "A loja já foi criada: o nome dela agora é trocado pela própria dona, no painel.");
-    if (d.valor_centavos !== undefined && c.situacao !== "aguardando_pagamento") throw new ErroHttp(409, "O pagamento já foi feito: o valor não muda mais.");
+    if (d.valor_centavos !== undefined && !["interessada", "aguardando_pagamento"].includes(c.situacao)) throw new ErroHttp(409, "O pagamento já foi feito: o valor não muda mais.");
     try {
       await sql(`update clientes set dados = $2, email_indice = $3, nome_loja = coalesce($4, nome_loja), valor_centavos = coalesce($5, valor_centavos), atualizado_em = now() where id = $1`,
         [id, cofre.cifrar(pessoa, ctx(id)), cofre.indice(pessoa.email), d.nome_loja ?? null, d.valor_centavos ?? null]);
@@ -234,7 +238,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
       throw e;
     }
     await anotarHistorico(id, "suporte", "Dados da cliente atualizados.");
-    if (d.valor_centavos !== undefined) await novaCobranca(await linha(id));
+    if (d.valor_centavos !== undefined && c.situacao === "aguardando_pagamento") await novaCobranca(await linha(id));
     return detalhe(id);
   }
 
@@ -362,7 +366,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
         await anotarHistorico(c.id, "loja", "Loja pronta.");
         aviso({ tipo: "loja_pronta", titulo: `Loja pronta: ${c.nome_loja}`, texto: enviado ? "O convite já foi por e-mail para a dona." : "Mande o link do convite para a dona (está na ficha).",
           cliente_id: c.id, permissao: "clientes.ver" });
-        return mudar({ etapa: "pronta", email_boas_vindas_em: enviado ? new Date().toISOString() : null });
+        return mudar({ etapa: "pronta", pronta_em: new Date().toISOString(), email_boas_vindas_em: enviado ? new Date().toISOString() : null });
       }
       default:
         return c;
@@ -457,9 +461,15 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     return { link, email_enviado: enviado };
   }
 
+  /** Cobrança nova (ou a primeira, para quem só tinha registrado interesse: vira "aguardando pagamento"). */
   async function cobrarDeNovo(id) {
-    const c = await linha(id);
-    if (c.situacao !== "aguardando_pagamento") throw new ErroHttp(409, "Esta cliente não está aguardando pagamento.");
+    let c = await linha(id);
+    if (!["interessada", "aguardando_pagamento"].includes(c.situacao)) throw new ErroHttp(409, "Esta cliente não está aguardando pagamento.");
+    if (c.situacao === "interessada") {
+      if (!(await lerConfig()).pix.chave) throw new ErroHttp(409, "Antes de cobrar, informe a sua chave PIX em Configurações.");
+      [c] = await sql("update clientes set situacao = 'aguardando_pagamento', atualizado_em = now() where id = $1 returning *", [id]);
+      await anotarHistorico(id, "cadastro", "Proposta enviada: a cobrança foi gerada.");
+    }
     const r = await novaCobranca(c);
     const enviado = await mandar(c, "cobranca", { valorCentavos: c.valor_centavos, link: r.link }).catch(() => false);
     return { ...(await detalhe(id)), link_pagamento: r.link, email_enviado: enviado };
@@ -467,7 +477,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
 
   async function cancelar(id) {
     const c = await linha(id);
-    if (c.situacao !== "aguardando_pagamento") throw new ErroHttp(409, "Só dá para cancelar antes do pagamento. Depois, exclua a loja na aba Lojas.");
+    if (!["interessada", "aguardando_pagamento"].includes(c.situacao)) throw new ErroHttp(409, "Só dá para cancelar antes do pagamento. Depois, exclua a loja na aba Lojas.");
     await sql("update clientes set situacao = 'cancelado', atualizado_em = now() where id = $1", [id]);
     await sql("update pagamentos set situacao = 'cancelado' where cliente_id = $1 and situacao = 'pendente'", [id]);
     await anotarHistorico(id, "cadastro", "Cadastro cancelado.");
@@ -491,6 +501,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     const [n] = await sql(`select count(*)::int as clientes,
         count(*) filter (where criado_em ${LOCAL} >= ${INICIO_DO_MES})::int as novas_no_mes,
         count(*) filter (where situacao = 'aguardando_pagamento')::int as aguardando,
+        count(*) filter (where situacao = 'interessada')::int as interessadas,
         count(*) filter (where situacao = 'pago' and etapa = 'pronta')::int as lojas_prontas,
         count(*) filter (where situacao = 'pago' and etapa <> 'pronta')::int as criando
       from clientes`);
@@ -609,6 +620,53 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     };
   }
 
+  /**
+   * Funil de vendas das clientes que ENTRARAM no período (cadastro): interessadas -> receberam a cobrança -> pagaram ->
+   * loja no ar, com a conversão de cada passo, o tempo até pagar e o resultado de cada pessoa da equipe.
+   * `financeiro`: inclui os valores (só para quem vê dinheiro).
+   */
+  async function funil({ de, ate, financeiro = false } = {}) {
+    if (!DATA_ISO.test(String(de)) || !DATA_ISO.test(String(ate)) || !dataValida(de) || !dataValida(ate)) throw new ErroHttp(422, "Escolha as datas do período.");
+    if (de > ate) throw new ErroHttp(422, "A data inicial precisa ser antes da final.");
+    const linhas = await sql(`select c.situacao, c.etapa, c.cadastrado_por, c.criado_em, c.pronta_em,
+        exists (select 1 from pagamentos p where p.cliente_id = c.id) as proposta,
+        (select min(p.confirmado_em) from pagamentos p where p.cliente_id = c.id and p.situacao = 'aprovado') as pago_em,
+        (select coalesce(sum(p.valor_centavos), 0) from pagamentos p where p.cliente_id = c.id and p.situacao = 'aprovado')::bigint as valor
+      from clientes c where (c.criado_em ${LOCAL}) >= $1::date and (c.criado_em ${LOCAL}) < $2::date + 1`, [de, ate]);
+    const pagou = (l) => l.situacao === "pago";
+    const contagem = { entraram: linhas.length, proposta: linhas.filter((l) => l.proposta).length, pagaram: linhas.filter(pagou).length,
+      no_ar: linhas.filter((l) => l.etapa === "pronta").length };
+    const NOMES = [["entraram", "Entraram"], ["proposta", "Receberam a cobrança"], ["pagaram", "Pagaram"], ["no_ar", "Loja no ar"]];
+    const etapas = NOMES.map(([id, nome], i) => {
+      const n = contagem[id];
+      const anterior = i ? contagem[NOMES[i - 1][0]] : n;
+      return { id, nome, n, pct_do_inicio: contagem.entraram ? Math.round((n / contagem.entraram) * 100) : 0, pct_da_anterior: anterior ? Math.round((n / anterior) * 100) : 0 };
+    });
+    const horas = (a, b) => (new Date(b) - new Date(a)) / 3_600_000;
+    const tempos = linhas.filter((l) => l.pago_em).map((l) => horas(l.criado_em, l.pago_em));
+    const media = (xs) => (xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null);
+    const equipe = new Map();
+    for (const l of linhas) {
+      const quem = l.cadastrado_por || "Sem registro";
+      const e = equipe.get(quem) ?? { quem, entraram: 0, pagaram: 0, valor: 0 };
+      e.entraram += 1;
+      if (pagou(l)) { e.pagaram += 1; e.valor += Number(l.valor); }
+      equipe.set(quem, e);
+    }
+    const porPessoa = [...equipe.values()].map((e) => ({ quem: e.quem, entraram: e.entraram, pagaram: e.pagaram,
+      conversao: e.entraram ? Math.round((e.pagaram / e.entraram) * 100) : 0, ...(financeiro && { valor: e.valor }) }))
+      .sort((a, b) => b.pagaram - a.pagaram || b.entraram - a.entraram);
+    return {
+      de, ate, etapas,
+      em_aberto: { interessadas: linhas.filter((l) => l.situacao === "interessada").length, aguardando: linhas.filter((l) => l.situacao === "aguardando_pagamento").length },
+      canceladas: linhas.filter((l) => l.situacao === "cancelado").length,
+      horas_ate_pagar: media(tempos),
+      horas_ate_loja: media(linhas.filter((l) => l.pago_em && l.pronta_em).map((l) => horas(l.pago_em, l.pronta_em))),
+      por_pessoa: porPessoa,
+      ...(financeiro && { valor: linhas.filter(pagou).reduce((s, l) => s + Number(l.valor), 0) }),
+    };
+  }
+
   /** A loja passou a usar outro endereço (domínio próprio ligado ou tirado): a ficha da cliente acompanha. */
   async function atualizarEnderecos(lojaRef, { loja, painel }) {
     const mudadas = await sql(`update clientes set loja_url = $2, painel_url = $3, atualizado_em = now()
@@ -619,7 +677,7 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas,
+    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil,
   };
 }
 

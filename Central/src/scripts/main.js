@@ -19,6 +19,7 @@ import { telaVisaoGeral } from "./telas/visao-geral.js";
 import { telaClientes } from "./telas/clientes.js";
 import { telaPagamentos } from "./telas/pagamentos.js";
 import { telaVendas } from "./telas/vendas.js";
+import { telaFunil } from "./telas/funil.js";
 import { telaLojas } from "./telas/lojas.js";
 import { telaEquipe } from "./telas/equipe.js";
 import { telaAtividade } from "./telas/atividade.js";
@@ -34,7 +35,8 @@ import { pedidoLojas } from "./telas/lojas.js";
 const MENU = [
   { itens: [["visao-geral", "Visão geral", "grade", null, telaVisaoGeral]] },
   { grupo: "Vendas", itens: [
-    ["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["vendas", "Vendas", "grafico", "financeiro.ver", telaVendas],
+    ["clientes", "Clientes", "usuarios", "clientes.ver", telaClientes], ["funil", "Funil", "funil", "clientes.ver", telaFunil],
+    ["vendas", "Vendas", "grafico", "financeiro.ver", telaVendas],
     ["pagamentos", "Pagamentos", "dinheiro", "financeiro.ver", telaPagamentos],
   ] },
   { grupo: "Lojas", itens: [["lojas", "Lojas", "home", "lojas.ver", telaLojas]] },

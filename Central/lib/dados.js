@@ -96,6 +96,15 @@ export const ESQUEMA = [
     permissao text                              -- quem vê: uma permissão, 'dono' ou null (todos)
   )`,
   `create table if not exists avisos_vistos (quem text primary key, ate bigint not null default 0)`,
+  // funil de vendas: "interessada" (interesse registrado, ainda sem cobrança), quem cadastrou e quando a loja ficou pronta
+  `do $$ begin
+    if not exists (select 1 from pg_constraint where conname = 'clientes_situacao_check' and pg_get_constraintdef(oid) like '%interessada%') then
+      alter table clientes drop constraint if exists clientes_situacao_check;
+      alter table clientes add constraint clientes_situacao_check check (situacao in ('interessada', 'aguardando_pagamento', 'pago', 'cancelado'));
+    end if;
+  end $$`,
+  `alter table clientes add column if not exists cadastrado_por text`, // "Dono" ou "FMV-0427 · Ana"
+  `alter table clientes add column if not exists pronta_em timestamptz`,
 ];
 
 /** Cria as tabelas uma vez por instância (a primeira requisição paga o custo, as outras não). */

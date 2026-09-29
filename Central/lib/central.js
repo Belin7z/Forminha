@@ -258,6 +258,9 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["GET", /^avisos$/, true, async ({ quem }) => ({ corpo: avisos ? await avisos.listar(quem) : { avisos: [], nao_vistos: 0, ultimo: 0 } })],
     ["POST", /^avisos\/vistos$/, true, async ({ quem, corpo }) => ({ corpo: avisos ? await avisos.marcarVistos(quem, corpo.ate) : { ok: true } })],
     ["GET", /^metas$/, "financeiro.ver", async () => ({ corpo: await (await exigirClientes()).lerMetas() })],
+    ["GET", /^funil$/, "clientes.ver", async ({ url, quem }) => ({
+      corpo: await (await exigirClientes()).funil({ de: url.searchParams.get("de"), ate: url.searchParams.get("ate"), financeiro: quem.permissoes.includes("financeiro.ver") }),
+    })],
     ["PUT", /^metas$/, "configuracoes", async ({ corpo }) => ({ corpo: await (await exigirClientes()).salvarMetas(corpo) }), "Definiu as metas do mês"],
 
     // o valor padrão aparece no cadastro de quem vende; mudar é só com você

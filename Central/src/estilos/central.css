@@ -568,3 +568,26 @@ kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--bord
   .busca__dica { display: none; }
   .modal__caixa--busca { margin-top: 0; }
 }
+
+/* ---------- funil de vendas ---------- */
+.funil { list-style: none; margin: .4rem 0 0; padding: 0; display: grid; gap: .7rem; }
+.funil__etapa { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(12rem, 1fr); align-items: center; gap: 1.2rem; }
+.funil__barra { position: relative; height: 44px; }
+.funil__barra::before { content: ""; position: absolute; inset: 0 auto 0 50%; width: var(--largura); transform: translateX(-50%); border-radius: 10px; background: var(--escura); opacity: .9; transition: width .4s ease; }
+.funil__etapa:nth-child(2) .funil__barra::before { opacity: .75; }
+.funil__etapa:nth-child(3) .funil__barra::before { opacity: .6; }
+.funil__etapa:nth-child(4) .funil__barra::before { background: var(--sucesso); opacity: .9; }
+.funil__barra span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fundo); font-weight: 600; font-variant-numeric: tabular-nums; mix-blend-mode: normal; }
+.funil__texto { display: grid; gap: .1rem; }
+.funil__texto small { color: var(--texto-suave); font-size: .8rem; }
+.funil__mini { display: inline-block; width: 48px; height: 6px; margin-right: .35rem; border-radius: 99px; background: var(--marca-100); overflow: hidden; vertical-align: middle; }
+.funil__mini i { display: block; height: 100%; background: var(--escura); }
+.tabela--funil { --colunas: minmax(0, 1.6fr) 6rem 6rem 8rem; }
+.tabela--funil-valor { --colunas: minmax(0, 1.6fr) 6rem 6rem 8rem 8rem; }
+.ficha__por { margin: .3rem 0 0; font-size: .8rem; color: var(--texto-suave); }
+@media (max-width: 720px) {
+  .funil__etapa { grid-template-columns: 1fr; gap: .3rem; }
+  .tabela--funil .tabela__linha, .tabela--funil-valor .tabela__linha { grid-template-columns: minmax(0, 1fr) 4rem 4rem; }
+  .tabela--funil .tabela__linha > :nth-child(n+4), .tabela--funil-valor .tabela__linha > :nth-child(n+4) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .funil__barra::before { transition: none; } }

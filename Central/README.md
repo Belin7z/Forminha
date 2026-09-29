@@ -11,7 +11,8 @@ com o nome `<código> · <nome da loja>`, ex.: `7XT-Tna-dRe · Doce da Ana`) e *
 Menu lateral com **Visão geral** (faturamento do mês, clientes, lojas no ar, cobranças esperando,
 **meta do mês** — faturamento e lojas vendidas, com a projeção de onde o mês fecha no ritmo atual; só o
 dono define —, vendas do mês dia a dia ou dos 12 meses, o que precisa de atenção, últimas clientes e atividade),
-**Clientes** (filtros por situação e planilha), **Vendas** (Hoje, 7 dias, 30 dias, Este mês, 12 meses,
+**Clientes** (filtros por situação e planilha; dá para **só registrar o interesse** e enviar a proposta depois),
+**Funil** (das clientes que entraram no período: quantas receberam a cobrança, pagaram e estão com a loja no ar, a conversão de cada passo, o tempo até pagar e o resultado de cada pessoa da equipe), **Vendas** (Hoje, 7 dias, 30 dias, Este mês, 12 meses,
 Por ano ou de um dia até outro: faturamento, vendas e ticket médio comparados com o período anterior,
 gráfico por hora/dia/mês/ano e cada venda, com planilha), **Pagamentos** (tudo o que foi cobrado, com
 total recebido e pendente), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
