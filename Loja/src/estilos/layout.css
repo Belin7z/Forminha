@@ -113,3 +113,8 @@ main { flex: 1; outline: 0; }
 .item-carrinho__obs { font-style: italic; }
 .item-carrinho__linha { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .45rem; }
 .item-carrinho__total { color: var(--escura) !important; font-weight: 500; }
+
+/* "Instalar o app da loja" no rodapé: botão com a cara dos links */
+.rodape__instalar { display: inline-flex; align-items: center; gap: .4rem; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; transition: color .2s; }
+.rodape__instalar:hover, .rodape__instalar:focus-visible { color: #fff; }
+.instalar-passos { display: grid; gap: .55rem; margin: 0 0 1rem; padding-left: 1.3rem; line-height: 1.5; }

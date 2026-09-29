@@ -4,6 +4,9 @@ import { icone } from "/src/scripts/base/icones.js";
 import { DIAS_SEMANA } from "/src/scripts/base/dominio.js";
 import { telefone } from "/src/scripts/base/formatacao.js";
 import { estado } from "../nucleo/estado.js";
+import { aoMudarInstalacao, instalar, podeInstalar } from "/src/scripts/base/instalar.js";
+
+let ligado = false;
 
 export const linkWhats = (texto = "Olá! Vim pelo site e gostaria de fazer um pedido.") => {
   const numero = estado.config.loja.whatsapp;
@@ -48,8 +51,14 @@ export function desenharRodape() {
           <li><a href="#/contato">Onde estamos</a></li>
           <li><a href="#/privacidade">Privacidade</a></li>
           <li><a href="#/termos">Termos de uso</a></li>
+          ${podeInstalar() && html`<li><button type="button" class="rodape__instalar" data-instalar>${icone("baixar", { tamanho: 16 })} Instalar o app da loja</button></li>`}
         </ul>
       </div>
     </div>
     <div class="container rodape__copy"><span>© ${new Date().getFullYear()} ${loja.nome}. Todos os direitos reservados.</span><span><a href="#/privacidade">Privacidade</a> · <a href="#/termos">Termos de uso</a></span></div>`);
+  if (!ligado) {
+    ligado = true;
+    document.getElementById("rodape").addEventListener("click", (ev) => { if (ev.target.closest("[data-instalar]")) instalar("a loja"); });
+    aoMudarInstalacao(desenharRodape); // o navegador liberou (ou o app foi instalado): mostra ou tira o botão
+  }
 }

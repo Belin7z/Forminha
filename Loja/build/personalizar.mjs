@@ -70,6 +70,13 @@ export function manifestoDaLoja(manifesto, dados) {
   return { ...manifesto, name: t.nome, short_name: curto, description: t.descricao.slice(0, 120), background_color: tokens["--fundo"], theme_color: tokens["--escura"] };
 }
 
+/** Aplicativo instalável do PAINEL: "Painel — <loja>", com as cores da loja (os atalhos e ícones continuam). */
+export function manifestoDoPainel(manifesto, dados) {
+  const t = textosDaLoja(dados);
+  const tokens = gerarTokens(dados.aparencia);
+  return { ...manifesto, name: `Painel — ${t.nome}`, short_name: "Painel", background_color: tokens["--fundo"], theme_color: tokens["--escura"] };
+}
+
 /** Iniciais para o ícone (2 letras): "Doce da Ana" -> "DA". */
 export function iniciaisDaLoja(nome) {
   const partes = String(nome ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/)

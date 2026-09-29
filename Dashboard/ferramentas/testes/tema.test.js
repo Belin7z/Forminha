@@ -11,7 +11,7 @@ import {
   FONTES, TEMAS, TEMA_PADRAO, contraste, gerarPaleta, gerarTokens, hexParaOklch, normalizarAparencia, oklchParaHex, pacoteDoTema,
 } from "../../src/scripts/base/tema.js";
 import {
-  faviconDaLoja, iniciaisDaLoja, manifestoDaLoja, personalizarHtmlLoja, personalizarHtmlPainel, textosDaLoja,
+  faviconDaLoja, iniciaisDaLoja, manifestoDaLoja, manifestoDoPainel, personalizarHtmlLoja, personalizarHtmlPainel, textosDaLoja,
 } from "../../build/personalizar.mjs";
 import { readFileSync } from "node:fs";
 
@@ -140,6 +140,17 @@ describe("build personalizado", () => {
     assert.ok(m.short_name.length <= 12);
     assert.deepEqual(m.icons, [1], "mantém os ícones");
     assert.equal(m.theme_color, gerarTokens({ tema: "pistache" })["--escura"]);
+  });
+
+  it("o painel também vira aplicativo: nome da loja, cores do tema, atalhos e ícones mantidos", () => {
+    const base = JSON.parse(readFileSync(new URL("../../manifest.webmanifest", import.meta.url), "utf8"));
+    const m = manifestoDoPainel(base, dados);
+    assert.equal(m.name, "Painel — Doce da Ana");
+    assert.equal(m.short_name, "Painel");
+    assert.equal(m.theme_color, gerarTokens(dados.aparencia)["--escura"]);
+    assert.deepEqual(m.shortcuts.map((s) => s.url), ["/#/pedidos", "/#/agenda"]);
+    assert.ok(m.icons.some((i) => i.sizes === "512x512" && i.purpose === "maskable"), "ícone que se adapta ao formato do celular");
+    assert.equal(m.display, "standalone");
   });
 
   it("ícone da aba com as iniciais da loja", () => {

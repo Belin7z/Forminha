@@ -13,6 +13,7 @@ import { estado, ouvir } from "../nucleo/estado.js";
 import { nomeDaLoja, seloDaLoja } from "./marca.js";
 import { podeAcessar } from "../nucleo/permissoes.js";
 import { alternarSom, pararNotificacoes, somAtivo } from "../nucleo/notificacoes.js";
+import { aoMudarInstalacao, instalar, podeInstalar } from "/src/scripts/base/instalar.js";
 
 const MENU = [
   { grupo: "Vendas", itens: [["/", "Visão geral", "grafico"], ["/pedidos", "Pedidos", "pacote", "pedidos"], ["/agenda", "Agenda", "calendario"], ["/producao", "Produção", "lista"]] },
@@ -73,6 +74,7 @@ export function montarEstrutura({ aoSair }) {
             </a>`)}`)}
       </nav>
       <div class="lateral__rodape">
+        ${podeInstalar() && html`<button type="button" class="lateral__link lateral__link--botao" data-acao="instalar">${icone("baixar", { tamanho: 19 })}<span>Instalar o app</span></button>`}
         <a href="${URL_LOJA || "/"}" target="_blank" rel="noopener" class="lateral__link">${icone("home", { tamanho: 19 })}<span>Ver a loja</span></a>
         <div class="lateral__usuario">
           <a href="#/conta" class="lateral__perfil" aria-label="Minha conta">
@@ -104,10 +106,12 @@ export function montarEstrutura({ aoSair }) {
     "fechar-menu": () => alternarMenu(false),
     som: () => { alternarSom(); toast(`Som de novo pedido ${somAtivo() ? "ligado" : "desligado"}.`, "info", 2000); desenharTopo(); },
     sair: async () => { pararNotificacoes(); await api.post("/auth/sair").catch(() => {}); aoSair(); },
+    instalar: () => instalar("o painel"),
   });
   lateral.addEventListener("click", (ev) => { if (ev.target.closest(".lateral__link")) alternarMenu(false); });
 
   ouvir("contagem", desenharTudo);
+  aoMudarInstalacao(desenharLateral);
   desenharTudo();
 
   return {

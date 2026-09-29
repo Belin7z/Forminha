@@ -1,0 +1,42 @@
+{
+  "name": "Painel da loja",
+  "short_name": "Painel",
+  "description": "Pedidos, agenda, produtos e estoque da sua doceria.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#fcfbfa",
+  "theme_color": "#2f2925",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/src/imagens/icone-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/src/imagens/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/src/imagens/icone-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Pedidos",
+      "url": "/#/pedidos",
+      "icons": [{ "src": "/src/imagens/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Agenda",
+      "url": "/#/agenda",
+      "icons": [{ "src": "/src/imagens/icone-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

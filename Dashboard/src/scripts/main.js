@@ -33,6 +33,7 @@ import { equipe } from "./paginas/equipe.js";
 import { conta } from "./paginas/conta.js";
 import { atividade } from "./paginas/atividade.js";
 import { primeirosPassos } from "./paginas/primeiros-passos.js";
+import { registrarServico } from "/src/scripts/base/instalar.js";
 
 const naoEncontrada = (ctx) => {
   ctx.raiz.innerHTML = String(html`<div class="vazio"><span class="vazio__ico">${icone("busca", { tamanho: 38 })}</span><h3>Página não encontrada</h3>
@@ -122,4 +123,5 @@ async function iniciar() {
   }
 }
 
+registrarServico(); // o painel pode ser instalado no celular como um aplicativo
 iniciar();

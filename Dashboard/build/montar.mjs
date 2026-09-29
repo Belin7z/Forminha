@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { carregarAmbiente, configDoApp, textoDoConfig } from "./ambiente.mjs";
-import { buscarLoja, faviconDaLoja, manifestoDaLoja, pacoteDoTema, personalizarHtmlLoja, personalizarHtmlPainel } from "./personalizar.mjs";
+import { buscarLoja, faviconDaLoja, manifestoDaLoja, manifestoDoPainel, pacoteDoTema, personalizarHtmlLoja, personalizarHtmlPainel } from "./personalizar.mjs";
 
 const pasta = join(dirname(fileURLToPath(import.meta.url)), "..");
 const site = process.argv[2];
@@ -49,9 +49,10 @@ if (process.env.VERCEL || process.env.BUSCAR_LOJA === "1") {
     const html = await readFile(join(saida, "index.html"), "utf8");
     await writeFile(join(saida, "index.html"), site === "loja" ? personalizarHtmlLoja(html, dados) : personalizarHtmlPainel(html, dados));
     await writeFile(join(saida, "src", "imagens", "favicon.svg"), faviconDaLoja(dados));
-    if (site === "loja") {
+    if (existsSync(join(saida, "manifest.webmanifest"))) {
       const manifesto = JSON.parse(await readFile(join(saida, "manifest.webmanifest"), "utf8"));
-      await writeFile(join(saida, "manifest.webmanifest"), JSON.stringify(manifestoDaLoja(manifesto, dados), null, 2));
+      const personalizado = site === "loja" ? manifestoDaLoja(manifesto, dados) : manifestoDoPainel(manifesto, dados);
+      await writeFile(join(saida, "manifest.webmanifest"), JSON.stringify(personalizado, null, 2));
     }
     console.log(`✔ personalizado para "${dados.loja.nome}"`);
   } catch (e) {

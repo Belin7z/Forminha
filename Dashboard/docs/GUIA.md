@@ -98,6 +98,8 @@ Na **Visão geral** aparece a lista **“Primeiros passos”**: ela mostra o que
 - **Integrações** (*Configurações → Integrações*): **pagamento online** pelo Mercado Pago — PIX automático e cartão de crédito/débito, o pedido muda para “pago”
   sozinho (em loja criada pela Central, basta colar o Access Token) — e **avisos automáticos por WhatsApp** oficial
   (Meta) a cada mudança de situação, com histórico e botão “Reenviar aviso” em cada pedido. Ficam desligados até você criar as contas: siga [INTEGRACOES.md](INTEGRACOES.md).
+- **Aplicativo**: o painel e a loja podem ser instalados no celular ou no computador, com o nome e as cores da loja. Quando o navegador permite, aparece
+  **Instalar o app** (no menu do painel e no rodapé da loja); no iPhone o botão mostra o passo a passo do Safari (Compartilhar → Adicionar à Tela de Início).
 - **Domínio** (*Configurações → Domínio*, em loja criada pela Central): um endereço só seu, como `suadoceria.com.br` (e, se quiser, `painel.suadoceria.com.br`).
   Digite o domínio, crie os registros de DNS que aparecem na tela no site onde ele foi comprado e pronto: quando o DNS fica certo, a loja passa a usar o domínio sozinha.
 

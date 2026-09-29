@@ -76,3 +76,7 @@
 .convite__aba--ativa { background: #fff; color: var(--escura); box-shadow: var(--sombra-sm); }
 .convite__aba:focus-visible { outline: 2px solid var(--marca-destaque); outline-offset: 2px; }
 .convite .aviso { text-align: left; margin-top: 1.2rem; }
+
+/* "Instalar o app" no menu: botão com a mesma cara dos links */
+.lateral__link--botao { width: 100%; border: 0; background: none; font: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
+.instalar-passos { display: grid; gap: .55rem; margin: 0 0 1rem; padding-left: 1.3rem; line-height: 1.5; }
