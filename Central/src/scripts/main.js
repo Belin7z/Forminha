@@ -25,8 +25,10 @@ import { telaAtividade } from "./telas/atividade.js";
 import { telaConfiguracoes } from "./telas/configuracoes.js";
 import { telaPagar } from "./telas/pagar.js";
 import { telaPrimeiraSenha, trocarMinhaSenha } from "./telas/minha-senha.js";
-import { abrirFicha } from "./telas/clientes.js";
+import { abrirFicha, novaCliente } from "./telas/clientes.js";
 import { ligarSino } from "./sino.js";
+import { abrirBusca } from "./busca.js";
+import { pedidoLojas } from "./telas/lojas.js";
 
 // [endereço, nome, ícone, permissão (null = todos), tela]
 const MENU = [
@@ -97,6 +99,8 @@ async function rotear() {
           <button type="button" class="btn-icone topo__menu" data-acao="abrir-menu" aria-label="Abrir menu">${icone("menu", { tamanho: 20 })}</button>
           <p class="topo__secao">${TELAS[atual].nome}</p>
           <span class="espaco"></span>
+          <button type="button" class="busca-atalho" data-acao="buscar" aria-label="Buscar (Ctrl+K)" title="Buscar (Ctrl+K)">
+            ${icone("busca", { tamanho: 17 })}<span>Buscar</span><kbd>Ctrl K</kbd></button>
           ${eu.recursos?.trocar_senha && html`<div class="sino" data-sino-conteiner></div>`}
           ${botaoTema()}
           ${perfil(eu)}
@@ -108,10 +112,31 @@ async function rotear() {
         </main>
       </div>
     </div>`);
+  euAtual = eu;
   const sino = raiz.querySelector("[data-sino-conteiner]");
   if (sino) ligarSino(sino, { aoAbrirCliente: (id) => (pode(eu, "clientes.ver") ? abrirFicha(id, rotear, eu) : null) });
   await TELAS[atual].tela(raiz.querySelector("[data-conteudo]"), eu);
   if (eu.quem.tipo === "dono" && !eu.quem.nome && eu.recursos?.trocar_senha) pedirNome();
+}
+
+/* ---------- busca rápida (Ctrl+K ou "/") ---------- */
+let euAtual = null;
+function buscar() {
+  const eu = euAtual;
+  if (!eu || !raiz.querySelector(".app") || document.querySelector(".modal__caixa--busca")) return;
+  const telas = MENU.flatMap((g) => g.itens).filter(([, , , p]) => !p || pode(eu, p)).map(([id, nome, ic]) => ({ id, nome, icone: ic }));
+  if (pode(eu, "configuracoes")) telas.push({ id: "configuracoes", nome: "Configurações", icone: "ajustes" });
+  const irParaLojas = () => (location.hash.startsWith("#/lojas") ? rotear() : (location.hash = "#/lojas"));
+  const acoes = [
+    pode(eu, "clientes.cadastrar") && eu.recursos?.clientes && { nome: "Nova cliente", icone: "mais", palavras: "cadastrar cobrar vender", fazer: () => novaCliente(rotear, eu) },
+    pode(eu, "lojas.criar") && { nome: "Loja sem cobrança", icone: "home", palavras: "criar teste cortesia", fazer: () => { pedidoLojas.nova = true; irParaLojas(); } },
+    !pode(eu, "configuracoes") && eu.quem.tipo !== "dono" && { nome: "Trocar minha senha", icone: "cadeado", palavras: "senha", fazer: () => trocarMinhaSenha() },
+  ].filter(Boolean);
+  abrirBusca(eu, {
+    telas, acoes,
+    abrirCliente: (id) => abrirFicha(id, rotear, eu),
+    abrirLoja: (ref) => { pedidoLojas.destacar = ref; irParaLojas(); },
+  });
 }
 
 /** Sem nome ainda: pergunta uma vez (por visita) como a pessoa quer aparecer no topo. */
@@ -160,6 +185,7 @@ raiz.addEventListener("click", async (ev) => {
   if (acao === "abrir-menu") raiz.querySelector(".app")?.classList.add("app--menu");
   if (acao === "fechar-menu") raiz.querySelector(".app")?.classList.remove("app--menu");
   if (acao === "minha-senha") return trocarMinhaSenha();
+  if (acao === "buscar") return buscar();
   if (acao === "sair") {
     await api("POST", "sair", {}).catch(() => {});
     history.replaceState(null, "", "#/");
@@ -167,6 +193,13 @@ raiz.addEventListener("click", async (ev) => {
   }
 });
 document.addEventListener("keydown", (ev) => {
+  // Ctrl+K (⌘K no Mac) ou "/" fora de um campo: busca rápida
+  const digitando = ev.target.closest?.("input, textarea, select, [contenteditable='true']");
+  if (((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") || (ev.key === "/" && !digitando && !document.querySelector(".modal"))) {
+    if (!raiz.querySelector(".app")) return;
+    ev.preventDefault();
+    return buscar();
+  }
   if (ev.key !== "Escape") return;
   fecharPerfil();
   raiz.querySelector(".app")?.classList.remove("app--menu");

@@ -15,7 +15,7 @@ dono define —, vendas do mês dia a dia ou dos 12 meses, o que precisa de aten
 Por ano ou de um dia até outro: faturamento, vendas e ticket médio comparados com o período anterior,
 gráfico por hora/dia/mês/ano e cada venda, com planilha), **Pagamentos** (tudo o que foi cobrado, com
 total recebido e pendente), **Lojas**, **Equipe** e **Atividade**. Cada item só aparece para quem pode ver (faturamento e pagamentos: dono, gerente e
-financeiro). No topo, o **sino** (avisos na hora: pagamento recebido, loja pronta, criação parada e, para o
+financeiro). No topo, a **busca rápida** (Ctrl+K ou "/": clientes, lojas, telas e ações, sem acento e pelo teclado), o **sino** (avisos na hora: pagamento recebido, loja pronta, criação parada e, para o
 dono, cliente cadastrada pela equipe; também no computador, se você deixar) e o **perfil**: ao clicar,
 Configurações (dono) ou Trocar minha senha (equipe) e Sair. No celular, o menu abre pelo botão ☰.
 

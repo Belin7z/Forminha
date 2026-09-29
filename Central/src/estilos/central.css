@@ -533,3 +533,38 @@
 .meta__ok { display: inline-flex; align-items: center; gap: .25rem; color: var(--sucesso); font-weight: 600; }
 .meta__falta { color: var(--aviso, #b26a00); }
 @media (prefers-reduced-motion: reduce) { .meta__barra span { transition: none; } }
+
+/* ---------- busca rápida (Ctrl+K) ---------- */
+.busca-atalho { display: inline-flex; align-items: center; gap: .5rem; height: 38px; padding: 0 .55rem 0 .8rem; border: 1px solid var(--borda); border-radius: 999px;
+  background: var(--superficie); color: var(--texto-suave); font: inherit; font-size: .86rem; cursor: pointer; transition: border-color .15s, color .15s; }
+.busca-atalho:hover, .busca-atalho:focus-visible { border-color: var(--borda-forte); color: var(--texto); }
+kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--borda-forte); border-bottom-width: 2px; border-radius: 6px; background: var(--marca-25);
+  color: var(--texto-suave); font: 500 .7rem/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.busca-atalho kbd { margin-left: .6rem; }
+.modal__caixa--busca { align-self: flex-start; margin-top: min(12vh, 90px); }
+.modal__caixa--busca .modal__cab { display: none; }
+.busca { display: grid; gap: .6rem; }
+.busca__campo { display: flex; align-items: center; gap: .6rem; padding: .2rem .2rem .7rem; border-bottom: 1px solid var(--borda); color: var(--texto-suave); }
+.busca__entrada { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--texto); font: inherit; font-size: 1.05rem; padding: .35rem 0; }
+.busca__entrada::-webkit-search-cancel-button { display: none; }
+.busca__resultados { max-height: min(55vh, 440px); overflow: auto; }
+.busca__grupo { margin: .6rem .4rem .3rem; font-size: .68rem; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--texto-suave); }
+.busca__item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .7rem; width: 100%; padding: .55rem .6rem; border: 0; border-radius: 10px;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.busca__item--ativo { background: var(--marca-50); }
+.busca__ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--neutro-bg); color: var(--texto-suave); }
+.busca__item--ativo .busca__ico { background: var(--escura); color: var(--fundo); }
+.busca__texto { display: grid; min-width: 0; }
+.busca__texto strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busca__texto small { font-size: .78rem; color: var(--texto-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.busca__enter { color: var(--texto-suave); }
+.busca__vazio { margin: 0; padding: 1.2rem .4rem; color: var(--texto-suave); font-size: .9rem; }
+.busca__dica { margin: 0; padding-top: .6rem; border-top: 1px solid var(--borda); font-size: .74rem; color: var(--texto-suave); }
+.busca__dica kbd { margin-right: .15rem; }
+.loja--destaque { box-shadow: 0 0 0 3px var(--detalhe), var(--sombra); transition: box-shadow .3s; }
+@media (max-width: 720px) {
+  .busca-atalho { width: 38px; padding: 0; justify-content: center; }
+  .busca-atalho span, .busca-atalho kbd { display: none; }
+  .busca__dica { display: none; }
+  .modal__caixa--busca { margin-top: 0; }
+}

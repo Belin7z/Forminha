@@ -59,6 +59,9 @@ export function painelConvite({ link, email, loja, urlLoja, urlPainel, vale_dias
     </div>`;
 }
 
+/** Pedidos de fora da tela (busca rápida): destacar uma loja ou já abrir "Loja sem cobrança". */
+export const pedidoLojas = { destacar: null, nova: false };
+
 export async function telaLojas(conteiner, eu) {
   document.title = "Lojas — Forminha";
   let lojas = [];
@@ -111,6 +114,16 @@ export async function telaLojas(conteiner, eu) {
     if (acao === "excluir") return excluir(loja, carregar);
   });
   await carregar();
+  if (pedidoLojas.nova && pode(eu, "lojas.criar")) novaLoja(carregar);
+  if (pedidoLojas.destacar) {
+    const cartao = conteiner.querySelector(`[data-ref="${pedidoLojas.destacar}"]`);
+    if (cartao) {
+      cartao.scrollIntoView({ block: "center" });
+      cartao.classList.add("loja--destaque");
+      setTimeout(() => cartao.classList.remove("loja--destaque"), 2600);
+    }
+  }
+  Object.assign(pedidoLojas, { destacar: null, nova: false });
 }
 
 /* ---------- loja sem cobrança: formulário e passo a passo ---------- */
