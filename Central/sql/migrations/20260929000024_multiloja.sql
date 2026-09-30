@@ -16,7 +16,8 @@
 -- REGRAS PARA AS PRÓXIMAS MIGRAÇÕES (os testes conferem):
 --   • tabela nova: coluna loja_id (default public._loja_atual()), a
 --     política "so_da_loja" e chaves únicas com loja_id;
---   • função nova com "security definer": alter function … owner to forminha_app;
+--   • função nova com "security definer": alter function … owner to forminha_app (entre
+--     "grant create on schema public to forminha_app" e o "revoke" do mesmo);
 --   • dentro das funções: public._uid() no lugar de auth.uid(), e
 --     "on conflict (loja_id, chave)" nas tabelas da loja.
 -- ==========================================================
@@ -346,6 +347,8 @@ create policy "admin apaga imagens do site" on storage.objects for delete to aut
 -- Toda função "security definer" da API passa para forminha_app (sujeito às políticas da loja).
 -- Ficam com o dono do banco só as que precisam ver além de uma loja: achar a loja, numerar pedidos,
 -- criar o perfil no cadastro, apagar o login e conferir a pasta das imagens.
+-- (O Postgres só passa uma função para um papel que pode criar no esquema: a permissão vale só aqui e sai logo depois.)
+grant create on schema public to forminha_app;
 do $$
 declare f record;
 begin
@@ -358,6 +361,7 @@ begin
     execute format('alter function %s owner to forminha_app', f.assinatura);
   end loop;
 end $$;
+revoke create on schema public from forminha_app;
 revoke execute on function public._loja(), public._loja_de(text), public._loja_atual(), public._codigo_pedido(),
   public._apagar_login_sem_lojas(uuid), public._garantir_perfil() from public, anon, authenticated;
 grant execute on function public._loja(), public._loja_de(text), public._loja_atual(), public._codigo_pedido(),

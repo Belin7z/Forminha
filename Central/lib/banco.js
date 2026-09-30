@@ -25,7 +25,10 @@ export function migracoes() {
 
 const lerSql = (caminho) => readFileSync(new URL(caminho, PASTA_SQL), "utf8");
 
-const CONTROLE = `create schema if not exists supabase_migrations;
+// o esquema só é criado se ainda não existir (criar esquema pede permissão no banco inteiro; conferir antes não pede)
+const CONTROLE = `do $$ begin
+  if to_regnamespace('supabase_migrations') is null then create schema supabase_migrations; end if;
+end $$;
 create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);`;
 
 /** Loja com projeto próprio no Supabase: tudo roda no banco dela. */

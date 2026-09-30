@@ -29,6 +29,17 @@ const BASE_SUPABASE = `
   alter table storage.objects enable row level security;
   grant usage on schema public, auth, storage to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+  -- o "postgres" do Supabase (quem a API usa) NÃO é superusuário: o SQL da Central roda com os limites de lá
+  create role dono_do_banco nosuperuser createrole nologin inherit;
+  alter schema public owner to dono_do_banco;
+  grant usage on schema auth, storage to dono_do_banco;
+  grant select, insert, update, delete, references, trigger on auth.users to dono_do_banco;
+  grant execute on function auth.uid() to dono_do_banco;
+  alter table storage.buckets owner to dono_do_banco;
+  alter table storage.objects owner to dono_do_banco;
+  grant anon, authenticated, service_role to dono_do_banco with admin option;
+  -- o controle das migrações (o Supabase costuma já ter; aqui o dono do banco é quem cuida dele)
+  create schema supabase_migrations authorization dono_do_banco;
 `;
 
 const letras = (n) => Array.from(randomBytes(n), (b) => "abcdefghijklmnopqrstuvwxyz"[b % 26]).join("");
@@ -91,12 +102,15 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     if (metodo === "POST" && resto === "/database/query") {
       return naFila(p.db, async () => {
         try {
+          await p.db.exec("set role dono_do_banco;"); // como a API do Supabase: o "postgres" de lá, sem superpoderes
           if (corpo.parameters?.length) return json(201, (await p.db.query(corpo.query, corpo.parameters)).rows);
           const resultados = await p.db.exec(corpo.query);
           return json(201, resultados.at(-1)?.rows ?? []);
         } catch (erro) {
           await p.db.exec("rollback").catch(() => {});
           return json(400, { message: `Failed to run sql query: ${erro.message}` });
+        } finally {
+          await p.db.exec("reset role;").catch(() => {}); // os testes olham o banco como superusuário
         }
       });
     }

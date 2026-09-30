@@ -43,7 +43,21 @@ export const BASE_SUPABASE = `
 
   grant usage on schema public, auth, storage to anon, authenticated;
   grant execute on function auth.uid() to anon, authenticated;
+
+  -- o "postgres" do Supabase NÃO é superusuário: as migrações rodam com os mesmos limites de lá
+  -- (dono do esquema public, pode criar papéis, mexe em auth.users e nas tabelas do storage)
+  create role dono_do_banco nosuperuser createrole nologin inherit;
+  alter schema public owner to dono_do_banco;
+  grant usage on schema auth, storage to dono_do_banco;
+  grant select, insert, update, delete, references, trigger on auth.users to dono_do_banco;
+  grant execute on function auth.uid() to dono_do_banco;
+  alter table storage.buckets owner to dono_do_banco;
+  alter table storage.objects owner to dono_do_banco;
+  grant anon, authenticated, service_role to dono_do_banco with admin option;
 `;
+
+/** Como o SQL Editor / a API do Supabase: comandos como o dono do banco (não superusuário). */
+export const COMO_DONO = "set role dono_do_banco;";
 
 const ler = (arquivo) => fs.readFileSync(arquivo, "utf8");
 
@@ -51,6 +65,7 @@ const ler = (arquivo) => fs.readFileSync(arquivo, "utf8");
 export async function criarBanco({ semear = true, exemplo = true } = {}) {
   const db = new PGlite();
   await db.exec(BASE_SUPABASE);
+  await db.exec(COMO_DONO);
   const migracoes = fs.readdirSync(path.join(PASTA_SQL, "migrations")).filter((f) => f.endsWith(".sql")).sort();
   for (const arquivo of migracoes) {
     try {
@@ -61,6 +76,7 @@ export async function criarBanco({ semear = true, exemplo = true } = {}) {
   }
   if (semear) await db.exec(ler(path.join(PASTA_SQL, "seed.sql")));
   if (semear && exemplo) await db.exec(ler(path.join(PASTA_SQL, "seed-exemplo.sql")));
+  await db.exec("reset role;"); // os testes preparam cenários como superusuário
   return db;
 }
 

@@ -65,4 +65,6 @@ declare adm public.perfis := public._admin();
 begin
   return public._avisos_cfg() || jsonb_build_object('conexao', public._cfg() -> 'whatsapp');
 end $$;
+grant create on schema public to forminha_app; -- (só para passar a função; sai logo abaixo)
 alter function public.admin_avisos(jsonb) owner to forminha_app;
+revoke create on schema public from forminha_app;

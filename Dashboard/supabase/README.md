@@ -39,7 +39,9 @@ supabase/
   de `forminha.loja` (a Central) ou, num banco de uma loja só, da única loja. Nas migrações novas:
   - tabela nova: `loja_id uuid not null default public._loja_atual() references public.lojas (id) on delete cascade`,
     a política `so_da_loja` (copie da 0024) e chaves únicas **com** `loja_id`;
-  - função nova com `security definer`: `alter function … owner to forminha_app` (o papel que só vê a loja da vez);
+  - função nova com `security definer`: `alter function … owner to forminha_app` (o papel que só vê a loja da vez),
+    entre `grant create on schema public to forminha_app;` e `revoke create on schema public from forminha_app;`
+    (o Postgres exige; no Supabase quem roda as migrações não é superusuário — os testes rodam do mesmo jeito);
   - dentro das funções: `public._uid()` no lugar de `auth.uid()` e `on conflict (loja_id, chave)`.
   O teste `multiloja.test.js` confere tudo isso e tenta ver dados de uma loja pela outra.
 - Os testes (`npm test`) aplicam essas mesmas migrações num Postgres local e conferem as regras.
