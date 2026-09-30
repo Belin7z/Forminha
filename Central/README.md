@@ -68,6 +68,25 @@ fica pronto, cada loja nova já nasce com `nomedaloja.forminha.com.br` (e o pain
 O domínio próprio da doceria, quando ligado, vale mais que o endereço na Forminha. Com `URL_CENTRAL`
 definida na Vercel, a Central continua usando ela nos links.
 
+## Banco único das lojas (Configurações — só o dono)
+
+Sem ele, cada loja ganha um projeto próprio no Supabase (o plano grátis deixa só 2) e dois sites na Vercel.
+Com ele, **todas as lojas novas moram no mesmo banco e nos mesmos 2 sites** (`forminha-lojas` e
+`forminha-paineis`): a loja fica pronta em segundos e o custo não cresce loja a loja.
+
+1. Em **Configurações → Banco único das lojas**, clique em **Preparar o banco único** (uns 3 minutos): a Central
+   cria o projeto "Forminha · Lojas", as tabelas, os 2 sites (com `MULTILOJA=1`), o login e as funções do servidor.
+2. Pronto: as lojas novas (pela cliente que paga ou por **Loja sem cobrança**) já nascem nele, com os endereços
+   `nomedaloja.vercel.app` e `nomedaloja-painel.vercel.app` — ou `nomedaloja.seudominio` com o domínio da Forminha.
+3. Quando vierem migrações ou funções novas, o cartão mostra **Atualizar** (vale para todas as lojas de uma vez).
+
+Como cada loja fica protegida: toda tabela tem a coluna da loja e as funções do banco rodam num papel que só
+enxerga a loja da vez (a trava está no próprio banco, não no código). O site diz a loja pelo endereço aberto.
+As chaves de cada loja (Mercado Pago, WhatsApp) ficam **cifradas** no banco e só as funções do servidor abrem.
+Os clientes das lojas usam um login só em todas as docerias do sistema. As lojas antigas (projeto próprio)
+continuam funcionando como estão. Cada loja ocupa 2 endereços (ou mais, com domínio) nos 2 sites: com muitas
+lojas, confira os limites do seu plano na Vercel (e lembre que o Hobby é para uso não comercial).
+
 ## Mensalidade (assinatura)
 
 Em **Configurações → Mensalidade**: valor por mês (0 = sem mensalidade), em quantos dias vence a primeira (contando da
