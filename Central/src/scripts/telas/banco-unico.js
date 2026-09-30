@@ -13,6 +13,7 @@ const PASSO = {
   tabelas: "Criando as tabelas…",
   sites: "Criando os 2 sites de todas as lojas na Vercel…",
   login: "Ajustando o login das clientes…",
+  funcoes: "Instalando as funções de pagamento e de avisos…",
 };
 const semHttps = (u) => String(u ?? "").replace(/^https?:\/\//, "");
 
@@ -46,7 +47,8 @@ function vista(e) {
       <dl class="dados-empilhados">
         <div><dt>Site das lojas</dt><dd><a class="link" href="${e.loja}" target="_blank" rel="noopener">${semHttps(e.loja)}</a></dd></div>
         <div><dt>Site dos painéis</dt><dd><a class="link" href="${e.painel}" target="_blank" rel="noopener">${semHttps(e.painel)}</a></dd></div>
-        ${e.total && html`<div><dt>Tabelas</dt><dd>${e.feitas} de ${e.total}${e.atualizar ? " — tem atualização" : " — em dia"}</dd></div>`}
+        ${e.total && html`<div><dt>Tabelas</dt><dd>${e.feitas} de ${e.total}${e.feitas < e.total ? " — tem atualização" : " — em dia"}</dd></div>`}
+        <div><dt>Funções (pagamento e avisos)</dt><dd>${e.funcoes_atualizar ? "tem atualização" : "em dia"}</dd></div>
       </dl>
       ${e.atualizar && html`<div><button type="button" class="btn btn--primario btn--pequeno" data-acao-bu="preparar">${icone("atualizar", { tamanho: 15 })} Atualizar as tabelas</button></div>`}
       <p class="banco-unico__progresso" data-progresso hidden></p>
@@ -70,7 +72,7 @@ export async function cartaoBancoUnico(conteiner) {
           const r = await api("POST", "banco-unico/preparar", {});
           atual = r;
           if (r.etapa === "pronto" && !r.aplicada) break;
-          progresso.textContent = r.aplicada ? `Tabelas: ${r.feitas} de ${r.total}…` : PASSO[r.etapa] ?? "Preparando…";
+          progresso.textContent = r.aplicada ? `Tabelas: ${r.feitas} de ${r.total}…` : PASSO[r.passo ?? r.etapa] ?? "Preparando…";
           if (r.etapa === "aguardar") await dorme(5000);
         }
         toast(atual.etapa === "pronto" ? "Banco único pronto." : "Ainda não terminou. Clique em Continuar.", atual.etapa === "pronto" ? "sucesso" : "info");

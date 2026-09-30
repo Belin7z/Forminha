@@ -225,10 +225,10 @@ describe("imagens e estrutura", () => {
   });
 
   it("toda tabela tem loja e a trava de loja", async () => {
-    const semLoja = await q(`select t.tablename from pg_tables t where t.schemaname = 'public' and t.tablename not in ('lojas', 'loja_enderecos')
+    const semLoja = await q(`select t.tablename from pg_tables t where t.schemaname = 'public' and t.tablename not in ('lojas', 'loja_enderecos', 'forminha_servidor')
       and not exists (select 1 from information_schema.columns c where c.table_schema = 'public' and c.table_name = t.tablename and c.column_name = 'loja_id' and c.is_nullable = 'NO')`);
     assert.deepEqual(semLoja, [], "tabela sem loja_id");
-    const semTrava = await q(`select t.tablename from pg_tables t where t.schemaname = 'public' and t.tablename not in ('lojas', 'loja_enderecos')
+    const semTrava = await q(`select t.tablename from pg_tables t where t.schemaname = 'public' and t.tablename not in ('lojas', 'loja_enderecos', 'forminha_servidor')
       and not exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = t.tablename and p.policyname = 'so_da_loja')`);
     assert.deepEqual(semTrava, [], "tabela sem a política so_da_loja");
   });
@@ -236,7 +236,7 @@ describe("imagens e estrutura", () => {
   it("toda função da API roda no papel que só vê a loja da vez", async () => {
     const fora = await q(`select p.proname from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prosecdef
       and pg_get_userbyid(p.proowner) <> 'forminha_app'
-      and p.proname not in ('_loja', '_loja_de', '_loja_atual', '_codigo_pedido', 'novo_usuario', '_apagar_login_sem_lojas', 'e_admin_do_arquivo') order by 1`);
+      and p.proname not in ('_loja', '_loja_de', '_loja_atual', '_codigo_pedido', 'novo_usuario', '_apagar_login_sem_lojas', 'e_admin_do_arquivo', 'servidor_segredos') order by 1`);
     assert.deepEqual(fora.map((f) => f.proname), [], "função 'security definer' fora do papel forminha_app");
     const comAuth = await q(`select proname from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%auth.uid()%'`);
     assert.deepEqual(comAuth, [], "use public._uid() no lugar de auth.uid()");

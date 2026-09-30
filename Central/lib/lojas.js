@@ -566,6 +566,8 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
       await unico.sqlBanco(`with fora as (delete from public.loja_enderecos where loja_id = $1 and host <> all (select jsonb_array_elements_text($2::jsonb)) returning 1)
         insert into public.loja_enderecos (host, loja_id) select h, $1::uuid from jsonb_array_elements_text($2::jsonb) h
         on conflict (host) do nothing`, [loja.id, JSON.stringify(hosts)]);
+      // o endereço principal: o link de acompanhamento nos avisos por WhatsApp
+      await unico.sqlBanco("update public.lojas set endereco = $2 where id = $1", [loja.id, enderecoLoja(ficha)]);
       await atualizarLoginDoBancoUnico();
       return;
     }
@@ -829,12 +831,65 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     await sb.configurarLogin(c.ref, { site_url: c.loja.url, uri_allow_list: linhas.map((l) => `https://${l.host}/**`).join(",") });
   }
 
-  /** Pagamento online no banco único: as funções são de todas as lojas; a chave de cada loja fica guardada (e cifrada) no banco. */
+  /**
+   * Pagamento online no banco único: as funções são de todas as lojas; a chave do Mercado Pago da loja (e a chave de
+   * integração que o aviso de pagamento usa) ficam guardadas CIFRADAS no banco — só as funções abrem.
+   */
   async function conectarPagamentoNoBancoUnico(loja, token) {
-    throw new ErroHttp(409, "O pagamento online das lojas do banco único chega na próxima atualização. Por enquanto, o PIX fica manual.");
+    const s = await situacao(bd(loja));
+    if (!s.ficha?.loja?.url) throw new ErroHttp(409, "Publique a loja antes de ligar o pagamento online.");
+    const conta = await contaMercadoPago(token);
+    const segredo = randomBytes(24).toString("hex");
+    await unico.guardarSegredos(loja.id, { mp_token: token, segredo_gateway: segredo });
+    await bd(loja).sql("select public.central_conectar_gateway($1::jsonb)", [JSON.stringify({ segredo, conta, cartao: true })]);
+    await gravarFicha(bd(loja), { pagamento_conectado_em: new Date().toISOString() });
+    return { conectado: true, conta, pix: true, cartao: true };
+  }
+
+  /* ---------- avisos por WhatsApp (Meta) ---------- */
+
+  /** A chave e o número são da Meta mesmo? Devolve o número e o nome que aparecem para o cliente. */
+  async function contaWhatsapp(token, telefoneId) {
+    let r;
+    try {
+      r = await fetchFn(`https://graph.facebook.com/v21.0/${encodeURIComponent(telefoneId)}?fields=display_phone_number,verified_name`, { headers: { Authorization: `Bearer ${token}` } });
+    } catch (e) { throw new ErroProvedor("Meta", 0, `sem conexão (${e.message})`); }
+    const d = await r.json().catch(() => ({}));
+    if ([400, 401, 403, 404].includes(r.status)) {
+      throw new ErroHttp(422, "A Meta não aceitou essa chave com esse número. Confira o token e o ID do número de telefone.", { token: "A Meta não aceitou essa chave." });
+    }
+    if (!r.ok) throw new ErroProvedor("Meta", r.status, "não consegui conferir agora");
+    return { numero: String(d.display_phone_number ?? "").slice(0, 40), nome: String(d.verified_name ?? "").slice(0, 120) };
+  }
+
+  /**
+   * Liga os avisos por WhatsApp da loja: confere na Meta e guarda a chave onde as funções leem (segredos do projeto
+   * da loja, ou cifrada no banco único). A chave nunca volta para a tela.
+   */
+  async function conectarWhatsapp(loja, dados) {
+    const token = String(dados?.token ?? "").trim();
+    const telefoneId = String(dados?.telefone_id ?? "").replace(/[^0-9]/g, "");
+    const campos = {};
+    if (token.length < 20 || /[^A-Za-z0-9_.|-]/.test(token)) campos.token = "Cole o token de acesso da Meta (permanente, do usuário do sistema).";
+    if (telefoneId.length < 5 || telefoneId.length > 25) campos.telefone_id = "Cole o ID do número de telefone (só números).";
+    if (Object.keys(campos).length) throw new ErroHttp(422, Object.values(campos)[0], campos);
+    if (loja.status !== "ACTIVE_HEALTHY") throw new ErroHttp(409, "A loja está pausada. Reative antes de ligar o WhatsApp.");
+    const s = await situacao(bd(loja));
+    if (!s.ficha?.loja?.url) throw new ErroHttp(409, "Publique a loja antes de ligar o WhatsApp.");
+    const conta = await contaWhatsapp(token, telefoneId);
+    if (doUnico(loja)) await unico.guardarSegredos(loja.id, { whatsapp_token: token, whatsapp_phone_id: telefoneId });
+    else {
+      if (s.ficha.funcoes_versao !== versaoDasFuncoes()) await atualizarFuncoes(loja);
+      await sb.definirSegredos(loja.ref, { WHATSAPP_TOKEN: token, WHATSAPP_PHONE_ID: telefoneId, URL_LOJA: enderecoLoja(s.ficha) });
+    }
+    // o painel mostra "conectado" (a chave não: só o número)
+    const info = { ...conta, conectado_em: new Date().toISOString() };
+    await bd(loja).sql(`with atualizada as (update public.configuracoes set valor = $1::jsonb where chave = 'whatsapp' returning 1)
+      insert into public.configuracoes (chave, valor) select 'whatsapp', $1::jsonb where not exists (select 1 from atualizada)`, [JSON.stringify(info)]);
+    return { conectado: true, ...conta };
   }
 
   return { porRef, porCodigo, porEndereco, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
     conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio,
-    subdominio, definirSubdominio, conferirSubdominio, removerSubdominio };
+    subdominio, definirSubdominio, conferirSubdominio, removerSubdominio, conectarWhatsapp };
 }

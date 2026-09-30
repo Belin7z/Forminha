@@ -4,7 +4,7 @@
    O valor NUNCA vem da tela: é lido do próprio pedido, no banco.
    Segredos: MP_ACCESS_TOKEN.
    ========================================================== */
-import { bearer, erroDoBanco, resposta, valorDevido } from "../_shared/comum.js";
+import { CODIGO_DO_PEDIDO, bearer, enderecoDoAviso, envDaLoja, erroDoBanco, resposta, valorDevido } from "../_shared/comum.js";
 
 export { valorDevido };
 
@@ -14,17 +14,19 @@ export function validadeMercadoPago(data) {
 }
 
 
-export async function criarPix(req, { env, fetchFn, rpc }) {
+export async function criarPix(req, { env: ambiente, fetchFn, rpc, loja }) {
   if (req.metodo === "OPTIONS") return resposta(204);
   if (req.metodo !== "POST") return resposta(405, { erro: "Método não permitido." });
   const jwt = bearer(req.cabecalhos);
   if (!jwt) return resposta(401, { erro: "Faça login para continuar." });
+  let env;
+  try { env = await envDaLoja({ env: ambiente, rpc, loja }); } catch (e) { return erroDoBanco(e); } // banco único: as chaves DESTA loja
   if (!env.MP_ACCESS_TOKEN) return resposta(503, { erro: "O PIX automático ainda não foi configurado." });
 
   let corpo = {};
   try { corpo = JSON.parse(req.corpoTexto || "{}"); } catch { return resposta(400, { erro: "Pedido inválido." }); }
   const codigo = String(corpo.codigo ?? "");
-  if (!/^LA\d{1,12}$/.test(codigo)) return resposta(422, { erro: "Código do pedido inválido." });
+  if (!CODIGO_DO_PEDIDO.test(codigo)) return resposta(422, { erro: "Código do pedido inválido." });
 
   let pedido, eu, config;
   try {
@@ -49,7 +51,7 @@ export async function criarPix(req, { env, fetchFn, rpc }) {
     body: JSON.stringify({
       transaction_amount: devido / 100, description: `Pedido ${codigo}`, payment_method_id: "pix",
       payer: { email: eu.email }, external_reference: codigo,
-      notification_url: `${env.SUPABASE_URL}/functions/v1/pix-webhook`, date_of_expiration: validadeMercadoPago(expira),
+      notification_url: enderecoDoAviso(env), date_of_expiration: validadeMercadoPago(expira),
     }),
   });
   const dados = await r.json().catch(() => ({}));

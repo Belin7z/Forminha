@@ -20,6 +20,8 @@ import { novaChave } from "../../lib/cofre.js";
 import { PADRAO_CODIGO } from "../../lib/codigo.js";
 import { comParametros, prefixoDosPedidos } from "../../lib/banco-unico.js";
 import { bancoDeTeste, criarSimulado } from "../simulado.js";
+import { decifrarSegredo } from "../../sql/funcoes/_shared/comum.js";
+import { createHash } from "node:crypto";
 
 let sim, banco, servidor, base, cookie, unico, bia, bia2;
 
@@ -185,9 +187,47 @@ describe("lojas no banco único", () => {
     assert.match(outra.dados.erro, /outra loja/);
   });
 
-  it("pagamento online: avisa que chega na próxima atualização", async () => {
-    const r = await api("POST", `lojas/${bia.ref}/pagamento`, { token: `APP_USR-${"1".repeat(30)}` });
-    assert.equal(r.status, 409);
+  it("as funções do servidor ficam instaladas no banco único, com o segredo delas", async () => {
+    const p = sim.estado.projetos.get(unico);
+    assert.deepEqual(Object.keys(p.funcoes).sort(), ["cartao-criar", "pix-criar", "pix-webhook", "whatsapp-avisar"]);
+    assert.equal(p.segredos.MULTILOJA, "1");
+    assert.match(p.segredos.SEGREDO_SERVIDOR, /^[0-9a-f]{64}$/);
+    const [h] = await q("select segredo_hash from public.forminha_servidor");
+    assert.equal(h.segredo_hash, createHash("sha256").update(p.segredos.SEGREDO_SERVIDOR).digest("hex"));
+    assert.equal((await api("GET", "banco-unico")).dados.funcoes_atualizar, false);
+  });
+
+  it("pagamento online: a chave do Mercado Pago da loja fica cifrada no banco (só as funções abrem)", async () => {
+    const token = `APP_USR-${"1".repeat(30)}`;
+    const r = await api("POST", `lojas/${bia.ref}/pagamento`, { token });
+    assert.equal(r.status, 200, r.texto);
+    assert.equal(r.dados.conectado, true);
+    const [l] = await q("select id, endereco from public.lojas where codigo = $1", [bia.ref]);
+    assert.equal(l.endereco, "https://docedabia.com.br", "o endereço principal (aqui, o domínio próprio já ativo) fica no banco: links dos avisos");
+    const guardadas = await q("select chave, valor from public.loja_segredos where loja_id = $1 order by chave", [l.id]);
+    assert.deepEqual(guardadas.map((g) => g.chave), ["mp_token", "segredo_gateway"]);
+    assert.ok(guardadas.every((g) => !g.valor.includes("APP_USR")), "nada aberto no banco");
+    const segredo = sim.estado.projetos.get(unico).segredos.SEGREDO_SERVIDOR;
+    assert.equal(await decifrarSegredo(guardadas.find((g) => g.chave === "mp_token").valor, segredo), token, "as funções abrem com o segredo delas");
+    const [g] = await q("select valor from public.configuracoes where loja_id = $1 and chave = 'gateway'", [l.id]);
+    assert.equal(g.valor.ativo, true);
+    assert.equal(g.valor.segredo_hash, createHash("sha256").update(await decifrarSegredo(guardadas.find((x) => x.chave === "segredo_gateway").valor, segredo)).digest("hex"));
+  });
+
+  it("WhatsApp: a dona conecta pelo painel; a chave fica cifrada e o painel vê o número", async () => {
+    const token = sim.tokenDaLoja(unico, "admin", bia.ref);
+    const cab = { authorization: `Bearer ${token}`, "x-loja": "doce-da-bia-painel.vercel.app" };
+    const ruim = await api("POST", "loja/whatsapp", { token: "x".repeat(30), telefone_id: "123456789" }, { semCookie: true, cabecalhos: cab });
+    assert.equal(ruim.status, 422);
+    const r = await api("POST", "loja/whatsapp", { token: `EAA${"z".repeat(40)}`, telefone_id: "109876543210" }, { semCookie: true, cabecalhos: cab });
+    assert.equal(r.status, 200, r.texto);
+    assert.equal(r.dados.numero, "+55 11 90000-0000");
+    const [l] = await q("select id from public.lojas where codigo = $1", [bia.ref]);
+    assert.deepEqual((await q("select chave from public.loja_segredos where loja_id = $1 and chave like 'whatsapp%' order by chave", [l.id])).map((x) => x.chave),
+      ["whatsapp_phone_id", "whatsapp_token"]);
+    const [w] = await q("select valor from public.configuracoes where loja_id = $1 and chave = 'whatsapp'", [l.id]);
+    assert.equal(w.valor.numero, "+55 11 90000-0000");
+    assert.ok(!JSON.stringify(w.valor).includes("EAA"), "a chave não fica à vista");
   });
 
   it("o serviço diário mantém o banco único acordado", async () => {

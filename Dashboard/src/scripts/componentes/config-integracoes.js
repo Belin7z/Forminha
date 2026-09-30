@@ -1,15 +1,15 @@
 /* ==========================================================
    COMPONENTE — configurações › Integrações.
    Pagamento online (PIX automático + cartão, Mercado Pago) e avisos
-   por WhatsApp (Meta). A dona cola o Access Token do Mercado Pago e a
-   Central instala e liga tudo: a chave vai direto para os segredos das
-   funções da loja e nunca fica no navegador nem no banco.
+   por WhatsApp (Meta). A dona cola a chave (Access Token do Mercado
+   Pago; token e ID do número da Meta) e a Central confere, instala e
+   liga tudo: a chave vai para os segredos das funções da loja (ou,
+   no banco único, cifrada) e nunca volta para o navegador.
    ========================================================== */
 import { html } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, interruptor, mostrarErros } from "/src/scripts/base/formularios.js";
-import { dataBR } from "/src/scripts/base/formatacao.js";
 import { api } from "../nucleo/api.js";
 import { chamarCentral, temCentral } from "../nucleo/central.js";
 
@@ -29,6 +29,19 @@ export const MODELOS_SUGERIDOS = {
 };
 
 const LINK_CREDENCIAIS = "https://www.mercadopago.com.br/developers/panel/app";
+/** O dia no horário de Brasília (as datas chegam em UTC: de noite, o dia UTC já é o seguinte). */
+const diaLocal = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }); };
+const LINK_META = "https://developers.facebook.com/apps";
+
+/** Token e ID do número da Meta: a Central confere e guarda (a chave nunca volta para a tela). */
+const formWhatsapp = () => html`
+  <form id="f-whatsapp" class="integ-conectar" novalidate>
+    <div class="form-erro" data-erro-geral hidden></div>
+    ${campo({ nome: "token", rotulo: "Token de acesso da Meta", tipo: "password", obrigatorio: true, placeholder: "EAA…", atributos: 'autocomplete="off" spellcheck="false"' })}
+    ${campo({ nome: "telefone_id", rotulo: "ID do número de telefone", obrigatorio: true, placeholder: "Ex.: 109876543210", atributos: 'inputmode="numeric" autocomplete="off"' })}
+    <p class="texto-suave integ-dica">No <a class="link" href="${LINK_META}" target="_blank" rel="noopener">Meta for Developers</a>: seu app → WhatsApp → <strong>Configuração da API</strong> (o ID do número). Para o token não vencer, crie um <strong>usuário do sistema</strong> no Gerenciador de Negócios com a permissão <em>whatsapp_business_messaging</em>.</p>
+    <button type="submit" class="btn btn--primario">Conectar o WhatsApp</button>
+  </form>`;
 
 /** Colar o Access Token e conectar (a Central instala as funções e liga PIX e cartão). */
 const formConectar = () => html`
@@ -49,7 +62,7 @@ export function paginaIntegracoes({ gateway, avisos }) {
       ${conectado ? html`
         <dl class="integ-conta">
           <div><dt>Conta</dt><dd>${gateway.conta || "Mercado Pago"}</dd></div>
-          ${gateway.conectado_em && html`<div><dt>Desde</dt><dd>${dataBR(String(gateway.conectado_em).slice(0, 10))}</dd></div>`}
+          ${gateway.conectado_em && html`<div><dt>Desde</dt><dd>${diaLocal(gateway.conectado_em)}</dd></div>`}
         </dl>
         <form id="f-gateway" class="integ-opcoes" novalidate>
           ${interruptor({ nome: "ativo", rotulo: "PIX automático", marcado: gateway.ativo })}
@@ -61,11 +74,28 @@ export function paginaIntegracoes({ gateway, avisos }) {
       <p class="texto-suave integ-dica">A chave PIX da loja (em <em>Pagamento</em>) continua como alternativa se o Mercado Pago estiver fora do ar.</p>
     </section>
 
+    ${temCentral() && html`
+      <section class="cartao" id="integ-whatsapp">
+        <div class="cartao__cab"><div><h2>Conta do WhatsApp <small class="texto-suave">— Meta</small></h2>
+          <small class="texto-suave">O número de onde saem os avisos para os clientes.</small></div>
+          <span class="badge ${avisos.conexao ? "badge--sucesso" : "badge--aviso"}">${avisos.conexao ? "Conectado" : "Não conectado"}</span></div>
+        ${avisos.conexao ? html`
+          <dl class="integ-conta">
+            <div><dt>Número</dt><dd>${avisos.conexao.numero || "—"}</dd></div>
+            ${avisos.conexao.nome && html`<div><dt>Nome</dt><dd>${avisos.conexao.nome}</dd></div>`}
+            ${avisos.conexao.conectado_em && html`<div><dt>Desde</dt><dd>${diaLocal(avisos.conexao.conectado_em)}</dd></div>`}
+          </dl>
+          <details class="integ-trocar"><summary>Trocar a conta do WhatsApp</summary>${formWhatsapp()}</details>`
+        : formWhatsapp()}
+      </section>`}
+
     <form class="cartao" id="f-avisos" novalidate>
       <div class="cartao__cab"><div><h2>Avisos por WhatsApp <small class="texto-suave">— Meta (oficial)</small></h2>
         <small class="texto-suave">O cliente recebe uma mensagem quando o pedido muda de situação. Cada aviso usa um <strong>modelo aprovado pela Meta</strong>.</small></div></div>
       <div class="form-erro" data-erro-geral hidden></div>
-      ${interruptor({ nome: "whatsapp_ativo", rotulo: "Enviar avisos automáticos pelo WhatsApp", marcado: avisos.whatsapp_ativo, ajuda: "Precisa dos Secrets WHATSAPP_TOKEN, WHATSAPP_PHONE_ID e URL_LOJA no Supabase e dos modelos aprovados no Meta." })}
+      ${interruptor({ nome: "whatsapp_ativo", rotulo: "Enviar avisos automáticos pelo WhatsApp", marcado: avisos.whatsapp_ativo,
+        ajuda: temCentral() ? "Precisa da conta do WhatsApp conectada (acima) e dos modelos aprovados no Meta."
+          : "Precisa dos Secrets WHATSAPP_TOKEN, WHATSAPP_PHONE_ID e URL_LOJA no Supabase e dos modelos aprovados no Meta." })}
       <div class="integ-avisos">
         ${EVENTOS.map(([id, nome]) => html`<div class="integ-avisos__linha">
           <label class="opcao-mini"><input type="checkbox" name="ev_${id}" ${avisos.eventos[id] && "checked"}> <strong>${nome}</strong></label>
@@ -96,6 +126,22 @@ export function ligarIntegracoes(ctx, dados) {
           toast(`Pagamento online ligado${r.conta ? ` (${r.conta})` : ""}! PIX automático e cartão já aparecem na loja.`);
           recarregar();
         } catch (erro) { mostrarErros(formConectar, erro, (msg) => toast(msg, "erro")); }
+      });
+    });
+  }
+
+  // conectar (ou trocar) a conta do WhatsApp: quem confere na Meta e guarda a chave é a Central
+  const formZap = ctx.raiz.querySelector("#f-whatsapp");
+  if (formZap) {
+    ativarCampos(formZap);
+    formZap.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      await ocupado(formZap.querySelector("[type=submit]"), async () => {
+        try {
+          const r = await chamarCentral("POST", "whatsapp", dadosDe(formZap));
+          toast(`WhatsApp conectado${r.numero ? ` (${r.numero})` : ""}! Agora ligue os avisos e confira os modelos.`);
+          recarregar();
+        } catch (erro) { mostrarErros(formZap, erro, (msg) => toast(msg, "erro")); }
       });
     });
   }

@@ -7,7 +7,7 @@
    Segredos: WHATSAPP_TOKEN, WHATSAPP_PHONE_ID e URL_LOJA (endereço
    da loja, para o link de acompanhamento).
    ========================================================== */
-import { bearer, erroDoBanco, resposta } from "../_shared/comum.js";
+import { bearer, envDaLoja, erroDoBanco, resposta } from "../_shared/comum.js";
 
 /** Traduz os erros mais comuns da Meta para o que a pessoa da loja precisa saber. */
 export function traduzirErroMeta(erro = {}) {
@@ -53,7 +53,7 @@ async function avisarEstoque({ env, fetchFn, rpc, jwt }) {
   const registrar = (estado, detalhe) => rpc("admin_estoque_aviso_registrar", { estado, detalhe, resumo: dados.resumo, itens: dados.itens }, jwt)
     .catch((e) => console.error("[aviso-estoque] não registrou", e.message));
   if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) {
-    const erro = "O WhatsApp ainda não foi configurado (faltam as chaves nos Secrets do Supabase).";
+    const erro = "O WhatsApp ainda não foi conectado. Conecte em Configurações → Integrações.";
     await registrar("erro", erro);
     return resposta(503, { erro });
   }
@@ -62,11 +62,13 @@ async function avisarEstoque({ env, fetchFn, rpc, jwt }) {
   return resposta(200, r.ok ? { enviado: true } : { enviado: false, erro: r.erro });
 }
 
-export async function avisarWhatsapp(req, { env, fetchFn, rpc }) {
+export async function avisarWhatsapp(req, { env: ambiente, fetchFn, rpc, loja }) {
   if (req.metodo === "OPTIONS") return resposta(204);
   if (req.metodo !== "POST") return resposta(405, { erro: "Método não permitido." });
   const jwt = bearer(req.cabecalhos);
   if (!jwt) return resposta(401, { erro: "Faça login para continuar." });
+  let env;
+  try { env = await envDaLoja({ env: ambiente, rpc, loja }); } catch (e) { return erroDoBanco(e); } // banco único: as chaves DESTA loja
 
   let corpo = {};
   try { corpo = JSON.parse(req.corpoTexto || "{}"); } catch { return resposta(400, { erro: "Pedido inválido." }); }
@@ -79,7 +81,7 @@ export async function avisarWhatsapp(req, { env, fetchFn, rpc }) {
   catch (e) { return erroDoBanco(e); }
   if (!dados.enviar) return resposta(200, { enviado: false, motivo: dados.motivo });
   // só cobra as chaves quando há mesmo um aviso para mandar (quem não usa WhatsApp nunca vê erro)
-  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) return resposta(503, { erro: "O WhatsApp ainda não foi configurado (faltam as chaves nos Secrets do Supabase)." });
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID) return resposta(503, { erro: "O WhatsApp ainda não foi conectado. Conecte em Configurações → Integrações." });
 
   const base = String(env.URL_LOJA ?? "").replace(/\/+$/, "");
   const parametros = [...dados.variaveis, base ? `${base}/#/pedido/${dados.codigo}` : `pedido ${dados.codigo}`];

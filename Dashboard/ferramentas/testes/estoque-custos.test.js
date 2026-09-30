@@ -304,7 +304,7 @@ describe("aviso de estoque por WhatsApp", () => {
     await liberarAviso(", aviso_ultimo_em = now() - interval '2 days'");
     const r = await avisar(null, { ...deps, env: { ...env, WHATSAPP_TOKEN: "" } });
     assert.equal(r.status, 503);
-    assert.match((await configAviso()).avisos[0].detalhe, /ainda não foi configurado/);
+    assert.match((await configAviso()).avisos[0].detalhe, /ainda não foi conectado/);
     assert.equal((await avisar()).corpo.motivo, "aguardando");
   });
 

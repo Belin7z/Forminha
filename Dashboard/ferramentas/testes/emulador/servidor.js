@@ -13,7 +13,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import { comoUsuario, criarBanco, executarNaLoja, executarRpc, lerSeed, sql } from "./banco.js";
 import { criarExternos } from "./externos.js";
-import { cabecalhosCors, criarRpc } from "../../../supabase/functions/_shared/comum.js";
+import { cabecalhosCors, criarRpc, lojaDaChamada } from "../../../supabase/functions/_shared/comum.js";
 import { criarPix } from "../../../supabase/functions/pix-criar/logica.js";
 import { receberWebhook } from "../../../supabase/functions/pix-webhook/logica.js";
 import { avisarWhatsapp } from "../../../supabase/functions/whatsapp-avisar/logica.js";
@@ -187,8 +187,11 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
     const cabCors = cabecalhosCors(req.headers.origin, "");
     if (req.method === "OPTIONS") { res.writeHead(204, cabCors); return res.end(); }
     const cabecalhos = Object.fromEntries(Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), String(v)]));
-    const r = await tratar({ metodo: req.method, url: `${envFuncoes.SUPABASE_URL}${req.url}`, cabecalhos, corpoTexto: req.method === "POST" ? await lerTexto(req) : "" },
-      { env: envFuncoes, fetchFn: externos.fetchFn, rpc: rpcFuncoes });
+    const pedido = { metodo: req.method, url: `${envFuncoes.SUPABASE_URL}${req.url}`, cabecalhos, corpoTexto: req.method === "POST" ? await lerTexto(req) : "" };
+    // como no Supabase (comum.js/criarServidor): no banco único, a chamada ao banco leva a loja da chamada
+    const loja = envFuncoes.MULTILOJA === "1" ? lojaDaChamada(pedido) : "";
+    const rpc = loja ? criarRpc({ url: envFuncoes.SUPABASE_URL, chaveAnon, fetchFn: fetch, loja }) : rpcFuncoes;
+    const r = await tratar(pedido, { env: envFuncoes, fetchFn: externos.fetchFn, rpc, loja });
     res.writeHead(r.status, { ...cors, "content-type": "application/json" });
     res.end(r.status === 204 ? undefined : JSON.stringify(r.corpo ?? {}));
   }
@@ -297,9 +300,9 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   }
 
   async function rotaCentral(req, res, caminho) {
-    const corsCentral = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type", "access-control-allow-methods": "GET, POST, DELETE, OPTIONS" };
+    const corsCentral = { "access-control-allow-origin": "*", "access-control-allow-headers": "authorization, content-type, x-loja", "access-control-allow-methods": "GET, POST, DELETE, OPTIONS" };
     const enviar = (status, corpo) => { res.writeHead(status, { ...corsCentral, "content-type": "application/json" }); res.end(JSON.stringify(corpo)); };
-    const rotas = ["POST /api/loja/pagamento", "GET /api/loja/dominio", "POST /api/loja/dominio", "POST /api/loja/dominio/conferir", "DELETE /api/loja/dominio"];
+    const rotas = ["POST /api/loja/pagamento", "POST /api/loja/whatsapp", "GET /api/loja/dominio", "POST /api/loja/dominio", "POST /api/loja/dominio/conferir", "DELETE /api/loja/dominio"];
     if (!rotas.includes(`${req.method} ${caminho}`)) return enviar(404, { erro: "Caminho não encontrado." });
     if (!(await ehAdmin(req))) return enviar(403, { erro: "Só a administradora da loja pode fazer isso. Entre de novo no painel." });
     if (caminho.startsWith("/api/loja/dominio")) {
@@ -319,6 +322,18 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
       dominioFalso = { nome, painel: corpo.painel !== false, criado: mesmo ? dominioFalso.criado : Date.now(), avisado: mesmo && dominioFalso.avisado };
       return enviar(200, situacaoDoDominio(true));
     }
+    if (caminho === "/api/loja/whatsapp") {
+      // como a Central: confere o token (na Meta de mentira, começa com EAA) e guarda nos segredos das funções
+      const corpo = await lerJson(req);
+      const telefone = String(corpo.telefone_id ?? "").replace(/[^0-9]/g, "");
+      if (!/^EAA/.test(String(corpo.token ?? "")) || telefone.length < 5) {
+        return enviar(422, { erro: "A Meta não aceitou essa chave com esse número. Confira o token e o ID do número de telefone.", campos: { token: "A Meta não aceitou essa chave." } });
+      }
+      Object.assign(envFuncoes, { WHATSAPP_TOKEN: corpo.token, WHATSAPP_PHONE_ID: telefone });
+      const info = { numero: "+55 11 90000-0000", nome: "Doceria Simulada", conectado_em: new Date().toISOString() };
+      await sql(db, "insert into public.configuracoes (chave, valor) values ('whatsapp', $1::jsonb) on conflict (loja_id, chave) do update set valor = excluded.valor", [JSON.stringify(info)]);
+      return enviar(200, { conectado: true, numero: info.numero, nome: info.nome });
+    }
     const { token } = await lerJson(req);
     if (!/^(APP_USR|TEST)-[\w-]{20,}$/.test(String(token ?? ""))) return enviar(422, { erro: "Cole o Access Token do Mercado Pago (começa com APP_USR-).", campos: { token: "Cole o Access Token (começa com APP_USR-)." } });
     const segredo = crypto.randomBytes(24).toString("hex");
@@ -328,6 +343,14 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   }
 
   /* ---------- Storage ---------- */
+  /** Quem chama é administradora (da loja do cabeçalho x-loja, no banco com várias lojas)? */
+  async function ehAdmin(req) {
+    const claims = claimsDe(req);
+    if (claims?.role !== "authenticated") return false;
+    const cabecalhos = req.headers["x-loja"] ? { "x-loja": String(req.headers["x-loja"]) } : {};
+    try { return (await executarRpc(db, { papel: "authenticated", claims, cabecalhos }, "e_admin")) === true; } catch { return false; }
+  }
+
   /** A mesma regra das políticas do Storage (migração 24): administradora da loja dona da pasta do arquivo. */
   async function podeMexer(req, nome) {
     const claims = claimsDe(req);
@@ -405,6 +428,8 @@ export async function iniciarEmulador({ porta = 0, confirmarEmail = false, exemp
   return {
     url: `http://127.0.0.1:${servidor.address().port}`,
     chaveAnon, db, emails,
+    /** O ambiente das funções do servidor (os "Secrets" do Supabase) e os serviços externos de mentira. */
+    funcoes: envFuncoes, externos,
     /** Cria uma conta de administrador (cadastra e promove no banco, como o SQL Editor faria). */
     /** Administradora de uma loja (loja = código ou endereço; sem loja = a única loja do banco). */
     async criarAdmin(email = "admin@teste.local", senha = "Admin12345", { loja = null } = {}) {

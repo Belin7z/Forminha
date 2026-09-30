@@ -255,7 +255,7 @@ function pagamentoOnline(loja) {
       <form id="form-pagamento" class="form-empilhado" novalidate>
         <div class="form-erro" data-erro-geral hidden></div>
         ${campo({ nome: "token", rotulo: "Access Token do Mercado Pago da doceria", tipo: "password", obrigatorio: true, placeholder: "APP_USR-…", atributos: 'autocomplete="off" spellcheck="false" autofocus' })}
-        <p class="form-empilhado__dica">A Central instala o PIX automático e o cartão na loja. A chave fica só nos segredos da loja: não aparece de novo.</p>
+        <p class="form-empilhado__dica">A Central instala o PIX automático e o cartão na loja. A chave fica guardada só para as funções de pagamento (cifrada) e não aparece de novo.</p>
       </form>`,
     rodape: html`<button type="button" class="btn btn--suave" data-fechar>Cancelar</button><button type="submit" form="form-pagamento" class="btn btn--primario">Conectar</button>`,
   });

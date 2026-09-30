@@ -66,11 +66,11 @@ describe("vitrine pública e permissões", () => {
     assert.equal(bolo.opcoes.length, 2);
   });
 
-  it("visitante só executa 6 funções (vitrine, agenda, conferir convite e o registro do gateway, protegido por chave); usuário logado nunca executa as internas", async () => {
+  it("visitante só executa 7 funções (vitrine, agenda, conferir convite e, protegidos por chave, o registro do gateway e as chaves do servidor); usuário logado nunca executa as internas", async () => {
     const executaveis = async (papel) => (await sql(emu.db,
       `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and has_function_privilege('${papel}', p.oid, 'execute') order by 1`)).rows.map((r) => r.proname);
-    assert.deepEqual(await executaveis("anon"), ["convite_consultar", "gateway_registrar_pagamento", "loja_agenda", "loja_avaliacoes", "loja_catalogo", "loja_config"]);
+    assert.deepEqual(await executaveis("anon"), ["convite_consultar", "gateway_registrar_pagamento", "loja_agenda", "loja_avaliacoes", "loja_catalogo", "loja_config", "servidor_segredos"]);
     const logado = await executaveis("authenticated");
     assert.ok(!logado.some((n) => n.startsWith("_") || n === "novo_usuario"), "função interna exposta");
   });

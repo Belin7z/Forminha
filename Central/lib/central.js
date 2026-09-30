@@ -70,8 +70,8 @@ export function criarCentral(env = process.env, opcoes = {}) {
     pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard",
   };
   // banco único: todas as lojas num projeto Supabase só (preparado uma vez, em Configurações)
-  const bancoUnico = banco && sb && vc && org ? criarBancoUnico({
-    sb, vc, org, site: { ...sites, urlCentral: () => urlBase },
+  const bancoUnico = banco && cofre && sb && vc && org ? criarBancoUnico({
+    sb, vc, org, cofre, site: { ...sites, urlCentral: () => urlBase },
     lerConfig: async () => {
       await garantirEsquema();
       const [l] = await banco.consultar("select valor from configuracoes where chave = 'banco_unico'");
@@ -568,6 +568,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const loja = await lojas.porRef(m[1]);
       return { corpo: await lojas.conectarPagamento(loja, corpo.token), alvo: loja.nome };
     }, "Ligou o pagamento online"],
+    // avisos por WhatsApp (a chave da Meta da doceria; a dona também liga pelo painel dela)
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/whatsapp$/, "lojas.suporte", async ({ m, corpo }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await lojas.conectarWhatsapp(loja, corpo), alvo: loja.nome };
+    }, "Ligou os avisos por WhatsApp"],
     // domínio próprio (ex.: suadoceria.com.br)
     ["GET", /^lojas\/([A-Za-z0-9-]+)\/dominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeDominio.ver(await lojas.porRef(m[1])) }; }],
     ["POST", /^lojas\/([A-Za-z0-9-]+)\/dominio$/, "lojas.suporte", async ({ m, corpo }) => {
@@ -618,6 +624,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
     ["DELETE", /^dominio$/, "dono", async () => ({ corpo: reler(await exigirDominioCentral().remover()) }), "Tirou o domínio da Forminha"],
 
     /* ---------- chamadas do painel da loja (a dona, com o login dela; sem cookie da Central) ---------- */
+    ["POST", /^loja\/whatsapp$/, false, async ({ cabecalhos, corpo }) => {
+      const loja = await lojaDaDona(cabecalhos);
+      const r = await lojas.conectarWhatsapp(loja, corpo);
+      registrarDaDona(loja, "Ligou os avisos por WhatsApp");
+      return { corpo: r };
+    }],
     ["POST", /^loja\/pagamento$/, false, async ({ cabecalhos, corpo }) => {
       const loja = await lojaDaDona(cabecalhos);
       const r = await lojas.conectarPagamento(loja, corpo.token);

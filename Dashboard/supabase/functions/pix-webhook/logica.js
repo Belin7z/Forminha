@@ -5,7 +5,7 @@
    Segredos: MP_ACCESS_TOKEN, SEGREDO_GATEWAY (a chave gerada no
    Dashboard) e, se quiser, MP_WEBHOOK_SECRET (assinatura do aviso).
    ========================================================== */
-import { resposta } from "../_shared/comum.js";
+import { envDaLoja, resposta } from "../_shared/comum.js";
 
 const codificar = (t) => new TextEncoder().encode(t);
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -31,8 +31,16 @@ export function formaDoPagamento(pag) {
   return null;
 }
 
-export async function receberWebhook(req, { env, fetchFn, rpc }) {
+export async function receberWebhook(req, { env: ambiente, fetchFn, rpc, loja }) {
   if (req.metodo !== "POST") return resposta(405, { erro: "Método não permitido." });
+  // banco único: o aviso diz a loja (?loja=, posto quando o pagamento foi criado) e as chaves são as DELA
+  let env;
+  try { env = await envDaLoja({ env: ambiente, rpc, loja }); }
+  catch (e) {
+    if (e.status === 404) return resposta(200, { ok: true, ignorado: true }); // loja que não existe mais: não adianta insistir
+    console.error("[pix-webhook] chaves da loja", e.status, e.message);
+    return resposta(500, { erro: "Não foi possível conferir agora." }); // o Mercado Pago tenta de novo
+  }
   if (!env.MP_ACCESS_TOKEN || !env.SEGREDO_GATEWAY) return resposta(503, { erro: "Integração ainda não configurada." });
 
   const url = new URL(req.url);

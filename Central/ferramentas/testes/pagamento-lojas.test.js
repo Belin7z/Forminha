@@ -132,3 +132,20 @@ describe("a dona liga pelo painel dela", () => {
     assert.equal((await api("POST", "loja/pagamento", { token: TOKEN_MP })).status, 401, "com cookie e sem login da loja: nada");
   });
 });
+
+describe("ligar os avisos por WhatsApp (loja com projeto próprio)", () => {
+  it("confere na Meta e guarda a chave nos segredos das funções da loja", async () => {
+    const ruim = await api("POST", `lojas/${loja.ref}/whatsapp`, { token: `XYZ${"q".repeat(30)}`, telefone_id: "109876543210" });
+    assert.equal(ruim.status, 422, "a Meta recusou");
+    const r = await api("POST", `lojas/${loja.ref}/whatsapp`, { token: `EAA${"w".repeat(40)}`, telefone_id: "10987 6543 210" });
+    assert.equal(r.status, 200, JSON.stringify(r.dados));
+    assert.equal(r.dados.numero, "+55 11 90000-0000");
+    const p = sim.estado.projetos.get(loja.ref);
+    assert.equal(p.segredos.WHATSAPP_TOKEN, `EAA${"w".repeat(40)}`);
+    assert.equal(p.segredos.WHATSAPP_PHONE_ID, "109876543210");
+    assert.ok(p.segredos.URL_LOJA.startsWith("https://"));
+    assert.ok(p.funcoes["whatsapp-avisar"], "a função está instalada");
+    const [w] = (await p.db.query("select valor from public.configuracoes where chave = 'whatsapp'")).rows;
+    assert.equal(w.valor.numero, "+55 11 90000-0000");
+  });
+});

@@ -11,9 +11,24 @@
      nada de outra loja aparece nem muda.
    Guardado na Central (configuracoes 'banco_unico').
    ========================================================== */
+import { createCipheriv, createHash, randomBytes } from "node:crypto";
 import { aplicarProxima, situacao } from "./banco.js";
 import { senhaAleatoria } from "./codigo.js";
 import { ErroHttp } from "./erros.js";
+import { FUNCOES, montarFuncao, versaoDasFuncoes } from "./funcoes.js";
+
+/**
+ * Cifra uma chave de loja para o banco único ("v1.<iv>.<cifrado>", AES-256-GCM). As funções do servidor abrem
+ * com o mesmo SEGREDO_SERVIDOR (decifrarSegredo, em functions/_shared/comum.js).
+ */
+export function cifrarSegredo(texto, segredoServidor) {
+  const chave = createHash("sha256").update(`forminha-segredos:${segredoServidor}`).digest();
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", chave, iv);
+  const cifrado = Buffer.concat([c.update(String(texto), "utf8"), c.final(), c.getAuthTag()]);
+  return `v1.${iv.toString("base64url")}.${cifrado.toString("base64url")}`;
+}
+const CONTEXTO_DO_SEGREDO = "banco_unico:servidor";
 
 export const NOME_DO_PROJETO = "Forminha · Lojas";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -51,7 +66,7 @@ export function prefixoDosPedidos(nome) {
  * lerConfig/gravarConfig: onde a Central guarda o estado (o banco dela).
  * site: { repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral() }.
  */
-export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site }) {
+export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, cofre }) {
   let cache = null;
   const ler = async () => { if (!cache || Date.now() - cache.lido > 15_000) cache = { valor: (await lerConfig()) ?? null, lido: Date.now() }; return cache.valor; };
   const gravar = async (v) => { await gravarConfig(v); cache = { valor: v, lido: Date.now() }; return v; };
@@ -87,7 +102,43 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site }) 
       try { const s = await situacao({ sql: sqlBanco, sqlBanco }); Object.assign(r, { feitas: s.feitas, total: s.total, atualizar: s.pendentes.length > 0 }); }
       catch { /* o banco pode estar pausado */ }
     }
+    if (c.etapa === "pronto") {
+      r.funcoes_atualizar = c.funcoes_versao !== versaoDasFuncoes();
+      r.atualizar = Boolean(r.atualizar || r.funcoes_atualizar);
+    }
     return r;
+  }
+
+  /* ---------- as funções do servidor (PIX automático, cartão, aviso de pagamento, WhatsApp) ---------- */
+  const segredoGuardado = (c) => (c?.segredo_servidor ? cofre.decifrar(c.segredo_servidor, CONTEXTO_DO_SEGREDO) : null);
+
+  /**
+   * Instala (ou atualiza) as funções no banco único. Elas servem todas as lojas: MULTILOJA=1 e um SEGREDO_SERVIDOR
+   * que só elas têm (o banco guarda o resumo; as chaves de cada loja só abrem com ele).
+   */
+  async function instalarFuncoes(c) {
+    let segredo = segredoGuardado(c);
+    if (!segredo) {
+      segredo = randomBytes(32).toString("hex");
+      c = await gravar({ ...c, segredo_servidor: cofre.cifrar(segredo, CONTEXTO_DO_SEGREDO) }); // guardado antes: repetir usa o mesmo
+    }
+    await sb.definirSegredos(c.ref, { MULTILOJA: "1", SEGREDO_SERVIDOR: segredo });
+    await sqlBanco(`insert into public.forminha_servidor (id, segredo_hash) values (1, $1)
+      on conflict (id) do update set segredo_hash = excluded.segredo_hash`, [createHash("sha256").update(segredo).digest("hex")]);
+    for (const nome of FUNCOES) await sb.implantarFuncao(c.ref, nome, montarFuncao(nome));
+    return gravar({ ...c, funcoes_versao: versaoDasFuncoes() });
+  }
+
+  /** Guarda chaves de uma loja (cifradas) — ex.: { mp_token, segredo_gateway } ou { whatsapp_token, whatsapp_phone_id }. */
+  async function guardarSegredos(id, mapa) {
+    const c = await pronto();
+    const segredo = segredoGuardado(c);
+    if (!segredo || !c.funcoes_versao) throw new ErroHttp(409, "Faltam as funções do banco único: em Configurações → Banco único, clique em Atualizar.");
+    const sql = naLoja(id);
+    for (const [chave, valor] of Object.entries(mapa)) {
+      await sql(`insert into public.loja_segredos (chave, valor) values ($1, $2)
+        on conflict (loja_id, chave) do update set valor = excluded.valor, atualizado_em = now()`, [chave, cifrarSegredo(valor, segredo)]);
+    }
   }
 
   async function criarSite({ nome, repo, pasta, variaveis }) {
@@ -122,7 +173,10 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site }) 
     if (c.etapa === "tabelas" || c.etapa === "pronto") {
       const r = await aplicarProxima({ sql: sqlBanco, sqlBanco });
       if (r.aplicada) return { ...(await estado()), aplicada: r.aplicada.nome };
-      if (c.etapa === "pronto") return estado();
+      if (c.etapa === "pronto") {
+        if (c.funcoes_versao !== versaoDasFuncoes()) await instalarFuncoes(c); // funções novas (ou nunca instaladas)
+        return estado();
+      }
       // o banco novo nasce com a loja "principal" (dos bancos de uma loja só): aqui ela não serve
       await sqlBanco("delete from public.lojas l where l.codigo = 'principal' and not exists (select 1 from public.perfis p where p.loja_id = l.id)");
       c = await gravar({ ...c, etapa: "sites" });
@@ -151,10 +205,15 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site }) 
         site_url: c.loja.url, uri_allow_list: "", external_email_enabled: true, mailer_autoconfirm: true,
         password_min_length: 8, password_required_characters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789",
       });
+      c = await gravar({ ...c, etapa: "funcoes" });
+      return { ...(await estado()), passo: "funcoes" };
+    }
+    if (c.etapa === "funcoes") {
+      c = await instalarFuncoes(c);
       c = await gravar({ ...c, etapa: "pronto", pronto_em: new Date().toISOString() });
     }
     return estado();
   }
 
-  return { ler, esquecer, pronto, estado, preparar, sqlBanco, naLoja };
+  return { ler, esquecer, pronto, estado, preparar, sqlBanco, naLoja, guardarSegredos };
 }

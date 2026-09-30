@@ -260,6 +260,12 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       if (!apontado(nome)) return json(200, { Status: 3, Answer: [] });
       return json(200, { Status: 0, Answer: [{ name: `${nome}.`, type: 5, TTL: 300, data: "cname.vercel-dns.com." }, { name: "cname.vercel-dns.com.", type: 1, TTL: 60, data: "76.76.21.21" }] });
     }
+    // a Meta (WhatsApp) confere o número com a chave da doceria: tokens de teste começam com EAA
+    if (u.host === "graph.facebook.com" && metodo === "GET") {
+      const numero = u.pathname.split("/").pop();
+      return /^Bearer EAA/.test(token ?? "") ? json(200, { id: numero, display_phone_number: "+55 11 90000-0000", verified_name: "Doceria Simulada" })
+        : json(401, { error: { message: "Invalid OAuth access token.", code: 190 } });
+    }
     // arquivos (fotos) de um projeto: a lista e o apagar (só para a Central limpar a pasta de uma loja)
     if (doProjeto && u.pathname.startsWith("/storage/v1/object/list/") && metodo === "POST") return json(200, estado.arquivos?.[corpo?.prefix] ?? []);
     if (doProjeto && /^[/]storage[/]v1[/]object[/][a-z]+$/.test(u.pathname) && metodo === "DELETE") { (estado.apagados ??= []).push(...(corpo?.prefixes ?? [])); return json(200, []); }
