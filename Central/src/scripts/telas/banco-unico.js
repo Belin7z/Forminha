@@ -49,8 +49,10 @@ function vista(e) {
         <div><dt>Site dos painéis</dt><dd><a class="link" href="${e.painel}" target="_blank" rel="noopener">${semHttps(e.painel)}</a></dd></div>
         ${e.total && html`<div><dt>Tabelas</dt><dd>${e.feitas} de ${e.total}${e.feitas < e.total ? " — tem atualização" : " — em dia"}</dd></div>`}
         <div><dt>Funções (pagamento e avisos)</dt><dd>${e.funcoes_atualizar ? "tem atualização" : "em dia"}</dd></div>
+        <div><dt>E-mails do login das lojas</dt><dd>${e.email_login === "proprio" ? "pelo seu e-mail profissional" : "pelo Supabase (poucos por hora)"}${e.emails_atualizar ? " — tem atualização" : ""}</dd></div>
       </dl>
-      ${e.atualizar && html`<div><button type="button" class="btn btn--primario btn--pequeno" data-acao-bu="preparar">${icone("atualizar", { tamanho: 15 })} Atualizar as tabelas</button></div>`}
+      ${e.email_login !== "proprio" && html`<p class="texto-suave">Para os e-mails de “esqueci a senha” das lojas saírem do seu domínio (sem o limite do Supabase), ligue o e-mail profissional: <code>npm run configurar</code>, opção 8, e clique em Atualizar aqui.</p>`}
+      ${e.atualizar && html`<div><button type="button" class="btn btn--primario btn--pequeno" data-acao-bu="preparar">${icone("atualizar", { tamanho: 15 })} Atualizar</button></div>`}
       <p class="banco-unico__progresso" data-progresso hidden></p>
     </div>`;
 }

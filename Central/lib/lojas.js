@@ -19,6 +19,7 @@ import { enderecosDoDominio, enderecosNaForminha, nomeNoDns, normalizarDominio, 
 import { PADRAO_CODIGO, gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleatoria, slug } from "./codigo.js";
 import { aplicarProxima, gerarConvite, gravarFicha, noProjeto, semear, situacao } from "./banco.js";
 import { prefixoDosPedidos } from "./banco-unico.js";
+import { configuracaoDosEmails } from "./emails-login.js";
 import { EMAIL, ErroHttp } from "./erros.js";
 
 const REF = /^[a-z]{20}$/;
@@ -77,7 +78,7 @@ const listaDeRetorno = (ficha) => origensDaLoja(ficha).map((o) => `${o}/**`).joi
  * `baseDasLojas`: função que devolve o domínio da Forminha ({ raiz, pronta }) ou null — com ele pronto, cada loja
  * ganha anadoces.<raiz> e anadoces-painel.<raiz>.
  */
-export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, unico = null, fetchFn = fetch }) {
+export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, unico = null, emailLogin = {}, fetchFn = fetch }) {
   const centralAgora = typeof urlCentral === "function" ? urlCentral : () => urlCentral;
   const doUnico = (loja) => loja?.tipo === "unico";
   /** Onde rodar o SQL da loja: o projeto dela, ou DENTRO dela no banco único (banco-unico.js). */
@@ -283,6 +284,7 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     await sb.configurarLogin(loja.ref, {
       site_url: enderecoLoja(ficha), uri_allow_list: listaDeRetorno(ficha),
       external_email_enabled: true, mailer_autoconfirm: true, password_min_length: 8, password_required_characters: SENHA_LETRAS_E_NUMEROS,
+      ...configuracaoDosEmails(emailLogin), // e-mails em português (e do seu domínio, com o e-mail profissional ligado)
     });
     return automatizarSub(loja, ficha);
   }

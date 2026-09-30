@@ -70,8 +70,10 @@ export function criarCentral(env = process.env, opcoes = {}) {
     pastaLoja: env.PASTA_LOJA || "Loja", pastaPainel: env.PASTA_PAINEL || "Dashboard",
   };
   // banco único: todas as lojas num projeto Supabase só (preparado uma vez, em Configurações)
+  // e-mails do login das lojas: pelo e-mail profissional (Resend), quando ligado
+  const emailLogin = { resend: env.RESEND_API_KEY, remetente: env.EMAIL_REMETENTE, nome: env.EMAIL_NOME || "Forminha" };
   const bancoUnico = banco && cofre && sb && vc && org ? criarBancoUnico({
-    sb, vc, org, cofre, site: { ...sites, urlCentral: () => urlBase },
+    sb, vc, org, cofre, emailLogin, site: { ...sites, urlCentral: () => urlBase },
     lerConfig: async () => {
       await garantirEsquema();
       const [l] = await banco.consultar("select valor from configuracoes where chave = 'banco_unico'");
@@ -81,7 +83,7 @@ export function criarCentral(env = process.env, opcoes = {}) {
       on conflict (chave) do update set valor = excluded.valor`, [JSON.stringify(v)]),
   }) : null;
   const lojas = sb && vc && org ? criarLojas({
-    sb, vc, org, fetchFn, ...sites, urlCentral: () => urlBase, unico: bancoUnico,
+    sb, vc, org, fetchFn, ...sites, urlCentral: () => urlBase, unico: bancoUnico, emailLogin,
     baseDasLojas: dominioCentral ? async () => {
       const cfg = await dominioCentral.ler();
       return cfg ? { raiz: cfg.raiz, pronta: Boolean(cfg.coringa_em) } : null;

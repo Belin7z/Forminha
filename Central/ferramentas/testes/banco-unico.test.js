@@ -19,11 +19,12 @@ import { resumirSenha } from "../../lib/sessao.js";
 import { novaChave } from "../../lib/cofre.js";
 import { PADRAO_CODIGO } from "../../lib/codigo.js";
 import { comParametros, prefixoDosPedidos } from "../../lib/banco-unico.js";
+import { envioDoLogin } from "../../lib/emails-login.js";
 import { bancoDeTeste, criarSimulado } from "../simulado.js";
 import { decifrarSegredo } from "../../sql/funcoes/_shared/comum.js";
 import { createHash } from "node:crypto";
 
-let sim, banco, servidor, base, cookie, unico, bia, bia2;
+let sim, banco, servidor, base, cookie, unico, bia, bia2, chaveDaCentral;
 
 async function api(metodo, caminho, corpo, { semCookie = false, cabecalhos = {} } = {}) {
   const r = await fetch(`${base}/api/${caminho}`, {
@@ -54,7 +55,7 @@ before(async () => {
   banco = await bancoDeTeste();
   const env = {
     ...sim.env, CENTRAL_SENHA_HASH: await resumirSenha("senha-do-dono"), SEGREDO_SESSAO: "s".repeat(48), CRON_SECRET: "cron",
-    CHAVE_CRIPTOGRAFIA: novaChave(), URL_CENTRAL: "https://forminha.vercel.app",
+    CHAVE_CRIPTOGRAFIA: (chaveDaCentral = novaChave()), URL_CENTRAL: "https://forminha.vercel.app",
   };
   const central = criarCentral(env, { fetchFn: sim.fetchFn, banco, email: null, mercadoPago: null, esperaBancoMs: 1, agendar: () => {} });
   servidor = createServer((req, res) => central.tratar(req, res));
@@ -66,6 +67,13 @@ before(async () => {
 after(async () => { servidor?.close(); await sim?.fechar(); await banco?.fechar(); });
 
 describe("peças", () => {
+  it("e-mails do login: pelo Resend só com a chave e o remetente", () => {
+    assert.deepEqual(envioDoLogin({}), {});
+    assert.deepEqual(envioDoLogin({ resend: "re_x" }), {});
+    const e = envioDoLogin({ resend: "re_abc", remetente: "contato@forminha.test", nome: "Forminha <Doces>" });
+    assert.deepEqual([e.smtp_host, e.smtp_port, e.smtp_user, e.smtp_pass, e.smtp_admin_email, e.smtp_sender_name],
+      ["smtp.resend.com", "465", "resend", "re_abc", "contato@forminha.test", "Forminha Doces"]);
+  });
   it("valores entram no SQL com as aspas certas (e $10 não vira $1)", () => {
     assert.equal(comParametros("select $1, $2, $10", ["it's", null, 5, 6, 7, 8, 9, 10, 11, true]), "select 'it''s', null, true");
     assert.equal(comParametros("select $1::jsonb", [JSON.stringify({ a: "b'c" })]), `select '{"a":"b''c"}'::jsonb`);
@@ -104,7 +112,12 @@ describe("preparar o banco único", () => {
     assert.equal(site("forminha-paineis").variaveis.URL_CENTRAL, "https://forminha.vercel.app");
     assert.equal(sim.estado.publicacoes.length, 2);
     assert.deepEqual(await q("select codigo from public.lojas"), [], "a loja 'principal' dos bancos antigos não fica");
-    assert.equal(sim.estado.projetos.get(unico).auth.mailer_autoconfirm, true);
+    const auth = sim.estado.projetos.get(unico).auth;
+    assert.equal(auth.mailer_autoconfirm, true);
+    assert.equal(auth.mailer_subjects_recovery, "Crie uma senha nova", "os e-mails do login em português");
+    assert.match(auth.mailer_templates_recovery_content, /\{\{ \.ConfirmationURL \}\}/);
+    assert.equal(auth.smtp_host, undefined, "sem o e-mail profissional, o Supabase envia");
+    assert.equal((await api("GET", "banco-unico")).dados.email_login, "supabase");
   });
 });
 
@@ -266,5 +279,30 @@ describe("criação automática depois do pagamento", () => {
     assert.match(c.loja_ref, PADRAO_CODIGO);
     assert.equal(c.loja_url, "https://doces-da-carla.vercel.app");
     assert.equal(sim.estado.projetos.size, 1, "continua um banco só");
+  });
+});
+
+describe("e-mail profissional ligado depois", () => {
+  it("a Central percebe e passa o login das lojas para o seu domínio", async () => {
+    const env = {
+      ...sim.env, CENTRAL_SENHA_HASH: await resumirSenha("senha-do-dono"), SEGREDO_SESSAO: "s".repeat(48), CRON_SECRET: "cron",
+      CHAVE_CRIPTOGRAFIA: chaveDaCentral, URL_CENTRAL: "https://forminha.vercel.app",
+      RESEND_API_KEY: "re_teste123456", EMAIL_REMETENTE: "contato@forminha.test", EMAIL_NOME: "Forminha",
+    };
+    const outra = criarCentral(env, { fetchFn: sim.fetchFn, banco, email: null, mercadoPago: null, esperaBancoMs: 1, agendar: () => {} });
+    const srv = createServer((req, res) => outra.tratar(req, res));
+    await new Promise((ok) => srv.listen(0, "127.0.0.1", ok));
+    const url = `http://127.0.0.1:${srv.address().port}`;
+    try {
+      const biscoito = (await fetch(`${url}/api/entrar`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ senha: "senha-do-dono" }) }))
+        .headers.get("set-cookie").split(";")[0];
+      const chamar = (m, c) => fetch(`${url}/api/${c}`, { method: m, headers: { cookie: biscoito, "content-type": "application/json" }, body: m === "GET" ? undefined : "{}" }).then((r) => r.json());
+      const antes = await chamar("GET", "banco-unico");
+      assert.deepEqual([antes.email_login, antes.emails_atualizar, antes.atualizar], ["proprio", true, true]);
+      await chamar("POST", "banco-unico/preparar");
+      const auth = sim.estado.projetos.get(unico).auth;
+      assert.deepEqual([auth.smtp_host, auth.smtp_admin_email, auth.smtp_pass], ["smtp.resend.com", "contato@forminha.test", "re_teste123456"]);
+      assert.equal((await chamar("GET", "banco-unico")).emails_atualizar, false);
+    } finally { srv.close(); }
   });
 });

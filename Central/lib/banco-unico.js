@@ -16,6 +16,7 @@ import { aplicarProxima, situacao } from "./banco.js";
 import { senhaAleatoria } from "./codigo.js";
 import { ErroHttp } from "./erros.js";
 import { FUNCOES, montarFuncao, versaoDasFuncoes } from "./funcoes.js";
+import { VERSAO_DOS_EMAILS, configuracaoDosEmails } from "./emails-login.js";
 
 /**
  * Cifra uma chave de loja para o banco único ("v1.<iv>.<cifrado>", AES-256-GCM). As funções do servidor abrem
@@ -66,7 +67,10 @@ export function prefixoDosPedidos(nome) {
  * lerConfig/gravarConfig: onde a Central guarda o estado (o banco dela).
  * site: { repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral() }.
  */
-export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, cofre }) {
+export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, cofre, emailLogin = {} }) {
+  // os e-mails do login (textos em português; com o Resend, do seu domínio): reaplicados quando algo muda
+  const envioProprio = Boolean(emailLogin.resend && emailLogin.remetente);
+  const versaoDosEmails = `${VERSAO_DOS_EMAILS}:${envioProprio ? `resend:${emailLogin.remetente}` : "supabase"}`;
   let cache = null;
   const ler = async () => { if (!cache || Date.now() - cache.lido > 15_000) cache = { valor: (await lerConfig()) ?? null, lido: Date.now() }; return cache.valor; };
   const gravar = async (v) => { await gravarConfig(v); cache = { valor: v, lido: Date.now() }; return v; };
@@ -104,8 +108,10 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, co
     }
     if (c.etapa === "pronto") {
       r.funcoes_atualizar = c.funcoes_versao !== versaoDasFuncoes();
-      r.atualizar = Boolean(r.atualizar || r.funcoes_atualizar);
+      r.emails_atualizar = c.emails_versao !== versaoDosEmails;
+      r.atualizar = Boolean(r.atualizar || r.funcoes_atualizar || r.emails_atualizar);
     }
+    r.email_login = envioProprio ? "proprio" : "supabase";
     return r;
   }
 
@@ -174,7 +180,11 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, co
       const r = await aplicarProxima({ sql: sqlBanco, sqlBanco });
       if (r.aplicada) return { ...(await estado()), aplicada: r.aplicada.nome };
       if (c.etapa === "pronto") {
-        if (c.funcoes_versao !== versaoDasFuncoes()) await instalarFuncoes(c); // funções novas (ou nunca instaladas)
+        if (c.funcoes_versao !== versaoDasFuncoes()) c = await instalarFuncoes(c); // funções novas (ou nunca instaladas)
+        if (c.emails_versao !== versaoDosEmails) { // textos novos, ou o e-mail profissional acabou de ser ligado
+          await sb.configurarLogin(c.ref, configuracaoDosEmails(emailLogin));
+          await gravar({ ...c, emails_versao: versaoDosEmails });
+        }
         return estado();
       }
       // o banco novo nasce com a loja "principal" (dos bancos de uma loja só): aqui ela não serve
@@ -204,8 +214,9 @@ export function criarBancoUnico({ sb, vc, org, lerConfig, gravarConfig, site, co
       await sb.configurarLogin(c.ref, {
         site_url: c.loja.url, uri_allow_list: "", external_email_enabled: true, mailer_autoconfirm: true,
         password_min_length: 8, password_required_characters: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ:0123456789",
+        ...configuracaoDosEmails(emailLogin),
       });
-      c = await gravar({ ...c, etapa: "funcoes" });
+      c = await gravar({ ...c, etapa: "funcoes", emails_versao: versaoDosEmails });
       return { ...(await estado()), passo: "funcoes" };
     }
     if (c.etapa === "funcoes") {
