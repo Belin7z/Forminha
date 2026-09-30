@@ -44,6 +44,8 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     dns: new Set(), dominiosDeOutraConta: new Set(),
     // endereços que já são de outra conta da Vercel (ex.: um nome.vercel.app que alguém já usa)
     tomados: new Set(),
+    // arquivos dos projetos: "ref/balde/caminho" -> { tipo, bytes }
+    arquivos: new Map(),
     // o projeto da própria Central na Vercel ("forminha"), que recebe o domínio da Forminha
     central: { id: "prj_central", nome: "forminha", variaveis: {}, dominios: new Map() } };
   /** Um site da Vercel pelo id ou pelo nome (como a API aceita); a Central também conta. */
@@ -226,7 +228,8 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
     // a própria Central (continuação da criação da loja no modo de teste) é chamada de verdade
     if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return fetch(url, init);
     const metodo = (init.method ?? "GET").toUpperCase();
-    const corpo = init.body instanceof FormData ? init.body : init.body ? JSON.parse(init.body) : undefined;
+    // corpo: formulário (funções), texto JSON, ou bytes (envio de arquivo)
+    const corpo = init.body instanceof FormData ? init.body : typeof init.body === "string" ? JSON.parse(init.body) : init.body;
     estado.chamadas.push({ metodo, url: u.href });
     const cab = new Headers(init.headers);
     const token = cab.get("authorization");
@@ -266,9 +269,30 @@ export function criarSimulado({ prontoEmMs = 0, org = "org-simulada", dnsEmMs = 
       return /^Bearer EAA/.test(token ?? "") ? json(200, { id: numero, display_phone_number: "+55 11 90000-0000", verified_name: "Doceria Simulada" })
         : json(401, { error: { message: "Invalid OAuth access token.", code: 190 } });
     }
-    // arquivos (fotos) de um projeto: a lista e o apagar (só para a Central limpar a pasta de uma loja)
-    if (doProjeto && u.pathname.startsWith("/storage/v1/object/list/") && metodo === "POST") return json(200, estado.arquivos?.[corpo?.prefix] ?? []);
-    if (doProjeto && /^[/]storage[/]v1[/]object[/][a-z]+$/.test(u.pathname) && metodo === "DELETE") { (estado.apagados ??= []).push(...(corpo?.prefixes ?? [])); return json(200, []); }
+    // arquivos (fotos) de cada projeto: ler (público), enviar e apagar (com a chave secreta) e listar uma pasta
+    if (doProjeto && u.pathname.startsWith("/storage/v1/object/")) {
+      const p = estado.projetos.get(doProjeto[1]);
+      const chave = (balde, nome) => `${doProjeto[1]}/${balde}/${nome}`;
+      const secreta = p && cab.get("apikey") === segredoDe(p.ref);
+      let m;
+      if (metodo === "GET" && (m = /^[/]storage[/]v1[/]object[/]public[/]([a-z]+)[/](.+)$/.exec(u.pathname))) {
+        const a = estado.arquivos.get(chave(m[1], decodeURIComponent(m[2])));
+        return a ? new Response(a.bytes, { status: 200, headers: { "content-type": a.tipo } }) : json(404, { message: "Object not found" });
+      }
+      if (metodo === "POST" && (m = /^[/]storage[/]v1[/]object[/]list[/]([a-z]+)$/.exec(u.pathname))) {
+        const prefixo = chave(m[1], String(corpo?.prefix ?? ""));
+        return json(200, [...estado.arquivos.keys()].filter((k) => k.startsWith(prefixo)).map((k) => ({ name: k.slice(prefixo.length) })));
+      }
+      if (!secreta) return json(403, { message: "new row violates row-level security policy" });
+      if (metodo === "POST" && (m = /^[/]storage[/]v1[/]object[/]([a-z]+)[/](.+)$/.exec(u.pathname))) {
+        estado.arquivos.set(chave(m[1], decodeURIComponent(m[2])), { tipo: cab.get("content-type") ?? "application/octet-stream", bytes: Buffer.from(corpo ?? []) });
+        return json(200, { Key: `${m[1]}/${m[2]}` });
+      }
+      if (metodo === "DELETE" && (m = /^[/]storage[/]v1[/]object[/]([a-z]+)$/.exec(u.pathname))) {
+        for (const n of corpo?.prefixes ?? []) { estado.arquivos.delete(chave(m[1], n)); (estado.apagados ??= []).push(n); }
+        return json(200, []);
+      }
+    }
     throw new Error(`o simulado não conhece ${u.href}`);
   }
 

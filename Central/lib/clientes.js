@@ -993,10 +993,16 @@ export function criarClientes({ banco, cofre, lojas, email = null, mp = null, ur
     for (const { id } of mudadas) await anotarHistorico(id, "loja", `Endereço da loja: ${loja}`);
   }
 
+  /** A loja mudou para o banco único: o cadastro passa a apontar para ela (o "ref" dela agora é o código). */
+  async function trocarLoja(refAntigo, refNovo) {
+    const mudadas = await sql("update clientes set loja_ref = $2, atualizado_em = now() where loja_ref = $1 returning id", [refAntigo, refNovo]);
+    for (const { id } of mudadas) await anotarHistorico(id, "loja", "A loja mudou para o banco único (os dados foram junto).");
+  }
+
   return {
     lerConfig, salvarConfig, cadastrar, listar, detalhe, atualizar, anotar, confirmarManual, receberAvisoMercadoPago,
     avancar, retomar, paginaDePagamento, reenviar, novoConvite, redefinirSenha, cobrarDeNovo, cancelar, retomarParadas,
-    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, lerMetas, salvarMetas, funil, indicacao,
+    visaoGeral, listarPagamentos, vendas, atualizarEnderecos, trocarLoja, lerMetas, salvarMetas, funil, indicacao,
     lerAssinatura, salvarAssinatura, cobrarMensalidades, ajustarAssinatura, cobrarMensalidadeAgora, suspenderAgora,
     registrarNota, lerEmpresa, salvarEmpresa,
   };

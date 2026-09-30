@@ -84,7 +84,15 @@ Como cada loja fica protegida: toda tabela tem a coluna da loja e as funções d
 enxerga a loja da vez (a trava está no próprio banco, não no código). O site diz a loja pelo endereço aberto.
 As chaves de cada loja (Mercado Pago, WhatsApp) ficam **cifradas** no banco e só as funções do servidor abrem.
 Os clientes das lojas usam um login só em todas as docerias do sistema. As lojas antigas (projeto próprio)
-continuam funcionando como estão. Cada loja ocupa 2 endereços (ou mais, com domínio) nos 2 sites: com muitas
+continuam funcionando como estão — e podem **mudar para o banco único** quando você quiser: em **Lojas**, botão
+**Mudar para o banco único** (só o dono; pede o código da loja). Vem tudo (pedidos, clientes, cardápio, estoque,
+logins com as mesmas senhas, fotos) e os endereços continuam os mesmos; durante a mudança (alguns minutos) a loja
+mostra "Estamos atualizando a loja". Os 2 sites antigos são apagados; o banco antigo fica guardado até você clicar em
+**Excluir o banco antigo**. Pagamento online e WhatsApp precisam ser conectados de novo.
+
+Os sites de todas as lojas se ajustam a cada endereço (título, prévia do link no WhatsApp, cores, ícone e
+aplicativo instalável) pelo `middleware.js` de cada site. Os e-mails do login das lojas ("esqueci a senha") saem em
+português e, com o e-mail profissional ligado, do seu domínio — clique em **Atualizar** no cartão depois de ligar. Cada loja ocupa 2 endereços (ou mais, com domínio) nos 2 sites: com muitas
 lojas, confira os limites do seu plano na Vercel (e lembre que o Hobby é para uso não comercial).
 
 ## Mensalidade (assinatura)

@@ -84,6 +84,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
   }) : null;
   const lojas = sb && vc && org ? criarLojas({
     sb, vc, org, fetchFn, ...sites, urlCentral: () => urlBase, unico: bancoUnico, emailLogin,
+    // loja que mudou para o banco único: o cadastro da cliente acompanha (o ref vira o código; os endereços podem mudar)
+    aoMudarDeBanco: async (refAntigo, loja, enderecos) => {
+      if (!clientes) return;
+      await clientes.trocarLoja(refAntigo, loja.ref);
+      await clientes.atualizarEnderecos(loja.ref, enderecos);
+    },
     baseDasLojas: dominioCentral ? async () => {
       const cfg = await dominioCentral.ler();
       return cfg ? { raiz: cfg.raiz, pronta: Boolean(cfg.coringa_em) } : null;
@@ -590,6 +596,12 @@ export function criarCentral(env = process.env, opcoes = {}) {
       const loja = await lojas.porRef(m[1]);
       return { corpo: await acoesDeDominio.tirar(loja), alvo: loja.nome };
     }, "Tirou o domínio próprio"],
+    // loja de projeto próprio muda para o banco único (um passo por chamada; começar exige o código digitado)
+    ["POST", /^lojas\/([A-Za-z0-9-]+)\/mudar$/, "dono", async ({ m, corpo }) => {
+      exigirLojas();
+      const loja = await lojas.porRef(m[1]);
+      return { corpo: await lojas.mudarParaBancoUnico(loja, corpo), alvo: loja.nome };
+    }, (({ r }) => [r.corpo?.etapa === "pronta" ? "Mudou a loja para o banco único" : "Mudando a loja para o banco único"])],
     // endereço na Forminha (anadoces.forminha.com.br)
     ["GET", /^lojas\/([A-Za-z0-9-]+)\/subdominio$/, "lojas.ver", async ({ m }) => { exigirLojas(); return { corpo: await acoesDeSub.ver(await lojas.porRef(m[1])) }; }],
     ["POST", /^lojas\/([A-Za-z0-9-]+)\/subdominio$/, "lojas.suporte", async ({ m, corpo }) => {

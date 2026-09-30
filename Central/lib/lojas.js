@@ -20,6 +20,7 @@ import { PADRAO_CODIGO, gerarCodigo, lerNomeDoProjeto, nomeDoProjeto, senhaAleat
 import { aplicarProxima, gerarConvite, gravarFicha, noProjeto, semear, situacao } from "./banco.js";
 import { prefixoDosPedidos } from "./banco-unico.js";
 import { configuracaoDosEmails } from "./emails-login.js";
+import { criarMudanca } from "./mudanca.js";
 import { EMAIL, ErroHttp } from "./erros.js";
 
 const REF = /^[a-z]{20}$/;
@@ -36,7 +37,9 @@ export function etapaDoStatus(status) {
 
 function resumoDoBanco(s) {
   // sem seed = ainda preparando; sem os 2 sites = falta publicar. Migração nova numa loja pronta = "atualizar".
-  const etapa = !s.semeada ? "tabelas" : !s.ficha?.loja?.url || !s.ficha?.painel?.url ? "sites" : "pronta";
+  const mudanca = s.ficha?.migracao?.etapa; // loja de projeto próprio que foi (ou está indo) para o banco único
+  const etapa = mudanca === "pronta" ? "migrada" : mudanca ? "mudando"
+    : !s.semeada ? "tabelas" : !s.ficha?.loja?.url || !s.ficha?.painel?.url ? "sites" : "pronta";
   return {
     etapa, feitas: s.feitas, total: s.total, atualizar: s.semeada && s.pendentes.length > 0,
     email: s.ficha?.email ?? null, loja: enderecoLoja(s.ficha), painel: enderecoPainel(s.ficha),
@@ -78,7 +81,8 @@ const listaDeRetorno = (ficha) => origensDaLoja(ficha).map((o) => `${o}/**`).joi
  * `baseDasLojas`: função que devolve o domínio da Forminha ({ raiz, pronta }) ou null — com ele pronto, cada loja
  * ganha anadoces.<raiz> e anadoces-painel.<raiz>.
  */
-export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, unico = null, emailLogin = {}, fetchFn = fetch }) {
+export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pastaPainel, urlCentral = "", baseDasLojas = null, unico = null, emailLogin = {},
+  aoMudarDeBanco = async () => {}, fetchFn = fetch }) {
   const centralAgora = typeof urlCentral === "function" ? urlCentral : () => urlCentral;
   const doUnico = (loja) => loja?.tipo === "unico";
   /** Onde rodar o SQL da loja: o projeto dela, ou DENTRO dela no banco único (banco-unico.js). */
@@ -891,7 +895,16 @@ export function criarLojas({ sb, vc, org, repoLoja, repoPainel, pastaLoja, pasta
     return { conectado: true, ...conta };
   }
 
+  // mudar uma loja de projeto próprio para o banco único (mudanca.js)
+  const mudanca = unico ? criarMudanca({ sb, vc, unico, fetchFn, aoMudar: aoMudarDeBanco,
+    f: { bd, doBancoUnico, ligarEndereco, aplicarEnderecos, siteDoEndereco, semDominioNoSite, enderecoLoja, enderecoPainel } }) : null;
+  async function mudarParaBancoUnico(loja, corpo) {
+    if (!mudanca) throw new ErroHttp(409, "Prepare o banco único antes (Configurações → Banco único das lojas).");
+    return mudanca.passo(loja, corpo);
+  }
+
   return { porRef, porCodigo, porEndereco, estado, listar, criar, prepararPasso, publicar, convite, linkRedefinirSenha, reativar, excluir, manterAtivas, copiaDaLoja, escreverFicha,
+    mudarParaBancoUnico,
     conectarPagamento, atualizarFuncoes, conferirDona, dominio, definirDominio, conferirDominio, removerDominio,
     subdominio, definirSubdominio, conferirSubdominio, removerSubdominio, conectarWhatsapp };
 }

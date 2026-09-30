@@ -665,3 +665,7 @@ kbd { display: inline-block; padding: .05rem .4rem; border: 1px solid var(--bord
 .banco-unico__lista .icone { color: var(--sucesso); flex: none; }
 .banco-unico__ok { display: flex; align-items: center; gap: .45rem; color: var(--sucesso); font-weight: 500; }
 .banco-unico__progresso { font-size: .9rem; color: var(--texto-suave); }
+
+/* ---------- mudar para o banco único (Lojas) ---------- */
+.mudanca__lista { margin: .2rem 0 1rem; padding-left: 1.2rem; display: grid; gap: .35rem; font-size: .92rem; color: var(--texto-suave); }
+.mudanca__progresso { margin: .6rem 0; font-size: .95rem; }
