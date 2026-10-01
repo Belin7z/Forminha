@@ -21,6 +21,7 @@ const bloco = (campoNome, url, titulo, ajuda) => html`
       <div class="imagem-envio__acoes">
         <label class="btn btn--suave btn--pequeno">${icone("upload", { tamanho: 15 })} ${url ? "Trocar imagem" : "Enviar imagem"}
           <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-arquivo></label>
+        ${url && html`<button type="button" class="btn btn--suave btn--pequeno" data-ajustar>Ajustar</button>`}
         ${url && html`<button type="button" class="link" data-remover>Remover</button>`}
       </div>
     </div>
@@ -36,17 +37,18 @@ export function paginaImagens(cfg) {
         <li><strong>Fundo simples:</strong> uma mesa clara, papel ou pano liso. Tire da frente o que não for o doce.</li>
         <li><strong>Chegue perto:</strong> o doce deve ocupar bem o quadro. Foto de longe fica pequena no site.</li>
         <li><strong>Celular firme:</strong> apoie os cotovelos e toque na tela para focar no doce antes de tirar.</li>
-        <li><strong>Vertical ou horizontal:</strong> a foto de destaque e a da seção “Nossa história” são verticais (4:5); a galeria é quadrada; os produtos são na horizontal. O assistente já recorta na proporção certa.</li>
+        <li><strong>Formato:</strong> a foto de destaque e a galeria são quadradas, a da seção “Sobre nós” é vertical e os produtos são na horizontal. O assistente já recorta na proporção certa, e o botão “Ajustar” reenquadra, gira ou clareia uma foto que já está no site.</li>
         <li><strong>Primeiras fotos a tirar:</strong> o produto mais vendido, um bolo inteiro e cortado, os brigadeiros em fileira e uma foto sua trabalhando.</li>
       </ul>
     </details>
     ${bloco("logo", cfg.loja.logo, "Logo da loja", "Aparece no topo do site. Prefira PNG com fundo transparente, a partir de 300 px de largura. Sem logo, o site usa um monograma com o nome.")}
-    ${bloco("hero_imagem", cfg.textos.hero_imagem, "Foto de destaque", "A foto grande da página inicial (de preferência vertical). Sem foto, aparece uma ilustração.")}
-    ${bloco("sobre_imagem", cfg.textos.sobre_imagem, "Foto da seção Nossa história", "Aparece na seção “Nossa história” (você, a equipe ou a cozinha).")}
+    ${bloco("hero_imagem", cfg.textos.hero_imagem, "Foto de destaque", "A foto grande da página inicial (quadrada). Sem ela, aparecem as fotos dos produtos ou as iniciais da loja.")}
+    ${bloco("sobre_imagem", cfg.textos.sobre_imagem, "Foto da seção Sobre nós", "Aparece na seção “Sobre nós” (você, a equipe ou a cozinha), quando você escreve o texto dela.")}
     <section class="cartao">
       <div class="cartao__cab"><div><h2>Galeria</h2><small class="texto-suave">Até ${LIMITE_GALERIA} fotos dos seus doces, mostradas na página inicial.</small></div></div>
       <div class="galeria-editor">
         ${galeria.map((url, i) => html`<figure class="galeria-editor__foto"><img src="${url}" alt="Foto ${i + 1} da galeria">
+          <button type="button" class="btn-icone btn-icone--pequeno galeria-editor__ajustar" data-ajustar-galeria="${i}" aria-label="Ajustar a foto ${i + 1}" title="Ajustar">${icone("editar", { tamanho: 14 })}</button>
           <button type="button" class="btn-icone btn-icone--pequeno galeria-editor__x" data-remover-galeria="${i}" aria-label="Remover a foto ${i + 1}">${icone("x", { tamanho: 15 })}</button></figure>`)}
         ${galeria.length < LIMITE_GALERIA && html`<label class="galeria-editor__novo">${icone("mais", { tamanho: 24 })}<span>Adicionar foto</span>
           <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-arquivo-galeria></label>`}
@@ -91,8 +93,32 @@ export function ligarImagens(ctx, cfg) {
   ctx.raiz.addEventListener("click", async (ev) => {
     const remover = ev.target.closest("[data-remover]");
     const removerGaleria = ev.target.closest("[data-remover-galeria]");
+    const ajustar = ev.target.closest("[data-ajustar]");
+    const ajustarGaleria = ev.target.closest("[data-ajustar-galeria]");
     try {
-      if (remover) {
+      if (ajustar) {
+        // reenquadra a foto que já está no site: sobe a nova e apaga a antiga
+        const campoNome = ajustar.closest(".imagem-envio").dataset.campo;
+        const antiga = campoNome === "logo" ? cfg.loja.logo : cfg.textos[campoNome];
+        const dados = await escolherFoto(antiga, { logo: "logo", hero_imagem: "hero", sobre_imagem: "sobre" }[campoNome]);
+        if (!dados) return;
+        const { url } = await api.post("/site/imagem", { imagem: dados });
+        await salvarCampo(campoNome, url);
+        await apagar(antiga);
+        toast("Foto ajustada!");
+        recarregar();
+      } else if (ajustarGaleria) {
+        const itens = [...(cfg.galeria?.itens ?? [])];
+        const i = Number(ajustarGaleria.dataset.ajustarGaleria);
+        const dados = await escolherFoto(itens[i], "galeria");
+        if (!dados) return;
+        const antiga = itens[i];
+        itens[i] = (await api.post("/site/imagem", { imagem: dados })).url;
+        await api.put("/configuracoes/galeria", { itens });
+        await apagar(antiga);
+        toast("Foto ajustada!");
+        recarregar();
+      } else if (remover) {
         const campoNome = remover.closest(".imagem-envio").dataset.campo;
         const antiga = campoNome === "logo" ? cfg.loja.logo : cfg.textos[campoNome];
         await salvarCampo(campoNome, "");

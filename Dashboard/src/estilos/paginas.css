@@ -60,6 +60,7 @@
 .galeria-editor__foto { position: relative; margin: 0; aspect-ratio: 1; border-radius: var(--raio-sm); overflow: hidden; background: var(--marca-100); }
 .galeria-editor__foto img { width: 100%; height: 100%; object-fit: cover; }
 .galeria-editor__x { position: absolute; top: 6px; right: 6px; background: rgba(255, 255, 255, .92); color: var(--perigo); box-shadow: var(--sombra-sm); }
+.galeria-editor__ajustar { position: absolute; top: 6px; left: 6px; background: rgba(255, 255, 255, .92); color: var(--escura); box-shadow: var(--sombra-sm); }
 .galeria-editor__novo { display: grid; place-content: center; justify-items: center; gap: .3rem; aspect-ratio: 1; border-radius: var(--raio-sm); border: 1px dashed var(--detalhe); color: var(--detalhe); font-size: .8rem; cursor: pointer; transition: background .2s, color .2s; }
 .galeria-editor__novo:hover { background: var(--marca-50); color: var(--escura); }
 .faq-editor__item { border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: 1rem 1.1rem .4rem; margin-bottom: .9rem; background: var(--marca-25); }
@@ -203,6 +204,7 @@
 .recorte__quadro:focus-visible { outline: 2px solid var(--escura); outline-offset: 2px; }
 .recorte__quadro canvas { display: block; }
 .recorte__quadro--logo { cursor: default; }
+.recorte__botoes { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
 .recorte__zoom { display: flex; align-items: center; gap: .7rem; width: 100%; font-size: .85rem; color: var(--texto-suave); }
 .recorte__zoom input { flex: 1; accent-color: var(--escura); }
 .recorte__dica { margin: 0; text-align: center; }

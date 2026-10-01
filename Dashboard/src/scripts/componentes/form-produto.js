@@ -21,6 +21,7 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
     itens: g.itens.map((i) => ({ nome: i.nome, preco: emReais(i.preco) })),
   }));
   let imagemNova = null;
+  let arquivoFoto = null; // a foto original escolhida agora (reajustar parte dela, não do recorte)
   let removerImagem = false;
   const galeria = [...(p.galeria ?? [])]; // endereços já salvos ou fotos novas ("data:…"), até 4
 
@@ -35,6 +36,7 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
             <div class="foto-envio__previa" data-previa></div>
             <label class="btn btn--suave btn--pequeno">${icone("upload", { tamanho: 15 })} Escolher foto
               <input type="file" accept="image/png,image/jpeg,image/webp" hidden data-arquivo></label>
+            <button type="button" class="btn btn--suave btn--pequeno" data-ajustar-foto hidden>Ajustar</button>
             <button type="button" class="link" data-tirar-foto hidden>Remover foto</button>
             <small class="texto-suave">Sem foto, aparece o ícone da categoria.</small>
           </div>
@@ -93,21 +95,27 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
   ativarCampos(form);
   const previa = m.el.querySelector("[data-previa]");
   const botaoTirar = m.el.querySelector("[data-tirar-foto]");
+  const botaoAjustar = m.el.querySelector("[data-ajustar-foto]");
 
   function desenharPrevia() {
     const src = imagemNova ?? (removerImagem ? null : p.imagem);
-    previa.innerHTML = src ? `<img src="${escapar(src)}" alt="Prévia da foto">` : String(icone(categorias.find((c) => c.id === Number(form.elements.categoria_id.value))?.icone || "bolo", { tamanho: 44 }));
+    previa.innerHTML = src ? `<img src="${escapar(src)}" alt="Prévia da foto">` : String(icone(categorias.find((c) => c.id === Number(form.elements.categoria_id.value))?.icone || "sacola", { tamanho: 44 }));
     botaoTirar.hidden = !src;
+    botaoAjustar.hidden = !src;
   }
   form.elements.categoria_id.addEventListener("change", desenharPrevia);
   m.el.querySelector("[data-arquivo]").addEventListener("change", async (ev) => {
     const arquivo = ev.target.files[0];
     if (!arquivo) return;
-    try { const dados = await escolherFoto(arquivo, "produto"); if (dados) { imagemNova = dados; removerImagem = false; desenharPrevia(); } }
+    try { const dados = await escolherFoto(arquivo, "produto"); if (dados) { imagemNova = dados; arquivoFoto = arquivo; removerImagem = false; desenharPrevia(); } }
     catch (erro) { toast(erro.message, "erro"); }
     ev.target.value = "";
   });
-  botaoTirar.addEventListener("click", () => { imagemNova = null; removerImagem = true; desenharPrevia(); });
+  botaoAjustar.addEventListener("click", async () => {
+    try { const dados = await escolherFoto(arquivoFoto ?? p.imagem, "produto"); if (dados) { imagemNova = dados; desenharPrevia(); } }
+    catch (erro) { toast(erro.message, "erro"); }
+  });
+  botaoTirar.addEventListener("click", () => { imagemNova = null; arquivoFoto = null; removerImagem = true; desenharPrevia(); });
   desenharPrevia();
 
   /* ---------- Fotos extras ---------- */
