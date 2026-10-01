@@ -54,8 +54,12 @@ describe("loja nova", () => {
 describe("aparência", () => {
   it("administrador escolhe um tema pronto e a loja recebe na hora", async () => {
     const r = await painel.put("/configuracoes/aparencia", { tema: "pistache", fonte: "delicado" });
-    assert.deepEqual(r.configuracoes.aparencia, { tema: "pistache", fonte: "delicado" });
-    assert.deepEqual((await visitante.get("/config")).aparencia, { tema: "pistache", fonte: "delicado" });
+    assert.deepEqual(r.configuracoes.aparencia, { tema: "pistache", fonte: "delicado", modelo: "equilibrado" });
+    assert.deepEqual((await visitante.get("/config")).aparencia, { tema: "pistache", fonte: "delicado", modelo: "equilibrado" });
+    const v = await painel.put("/configuracoes/aparencia", { tema: "pistache", fonte: "delicado", modelo: "vitrine" });
+    assert.equal(v.configuracoes.aparencia.modelo, "vitrine", "o modelo da página inicial é guardado");
+    assert.equal((await falha(painel.put("/configuracoes/aparencia", { tema: "pistache", modelo: "revista" }))).status, 422);
+    await painel.put("/configuracoes/aparencia", { tema: "pistache", fonte: "delicado" });
     assert.equal((await painel.get("/checklist")).itens[0].feito, true);
   });
 

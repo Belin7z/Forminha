@@ -46,8 +46,8 @@ export async function salvarLogo(api, cfg, imagem) {
 /** Passo 3: tema escolhido. Tema novo leva a letra que combina com ele; o mesmo tema mantém a letra atual. */
 export function aparenciaEscolhida(atual, tema) {
   const a = normalizarAparencia(atual);
-  if (tema === "personalizado") return { tema, fonte: a.fonte, cores: a.cores };
-  return { tema, fonte: tema === a.tema ? a.fonte : (temaPorId(tema)?.fonte ?? a.fonte) };
+  if (tema === "personalizado") return { tema, fonte: a.fonte, cores: a.cores, modelo: a.modelo };
+  return { tema, fonte: tema === a.tema ? a.fonte : (temaPorId(tema)?.fonte ?? a.fonte), modelo: a.modelo };
 }
 
 export async function salvarCores(api, cfg, tema) {

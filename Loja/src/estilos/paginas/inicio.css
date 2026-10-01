@@ -152,3 +152,90 @@
   .hero__painel { aspect-ratio: 4 / 3; }
 }
 @media (max-width: 360px) { .como-funciona { grid-template-columns: 1fr; } }
+
+/* ==========================================================
+   MODELO VITRINE — foto grande no topo (ou mosaico dos produtos, ou as iniciais em marca-d'água)
+   ========================================================== */
+.hero--vitrine { display: grid; align-items: end; min-height: min(78vh, 640px); padding: 0; color: #fff;
+  background: radial-gradient(60% 80% at 85% 20%, var(--escura-brilho), transparent 70%), var(--profunda); }
+.vitrine__fundo { position: absolute; inset: 0; overflow: hidden; }
+.vitrine__fundo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(0 0 0 / .1) 0%, rgb(0 0 0 / .28) 45%, rgb(0 0 0 / .74) 100%); }
+.vitrine__foto { width: 100%; height: 100%; object-fit: cover; }
+.vitrine__mosaico { display: grid; height: 100%; gap: 4px; }
+.vitrine__mosaico img { width: 100%; height: 100%; min-height: 0; object-fit: cover; }
+.vitrine__mosaico--2 { grid-template-columns: 1fr 1fr; }
+.vitrine__mosaico--3 { grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; }
+.vitrine__mosaico--3 img:first-child, .vitrine__mosaico--4 img:first-child { grid-row: span 2; }
+.vitrine__mosaico--4 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.vitrine__mosaico--4 img:last-child { grid-column: span 2; }
+.vitrine__marca-dagua { position: absolute; right: -1rem; bottom: -5rem; font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-size: clamp(14rem, 32vw, 30rem); font-weight: 700; line-height: 1; letter-spacing: -.04em; color: rgb(255 255 255 / .07); user-select: none; }
+.vitrine__in { position: relative; z-index: 1; padding: 8rem 0 4rem; }
+.hero--vitrine .hero__txt { max-width: 640px; }
+.hero--vitrine h1 { color: #fff; }
+.hero--vitrine .hero__txt > p { color: rgb(255 255 255 / .86); }
+.hero--vitrine .rotulo { color: var(--detalhe-claro); }
+.hero--vitrine .btn--primario { background: #fff; color: var(--escura); box-shadow: none; }
+.hero--vitrine .btn--primario:hover { background: var(--marca-100); }
+.hero--vitrine .btn--contorno { color: #fff; border-color: rgb(255 255 255 / .45); background: transparent; }
+.hero--vitrine .btn--contorno:hover { border-color: #fff; background: rgb(255 255 255 / .08); }
+.hero--vitrine .hero__provas li { color: #fff; background: rgb(255 255 255 / .12); border-color: rgb(255 255 255 / .22); backdrop-filter: blur(6px); }
+.hero--vitrine .hero__provas .icone { color: var(--detalhe-claro); }
+
+/* categorias com a foto do primeiro produto como capa */
+.categoria--capa { position: relative; overflow: hidden; justify-content: flex-end; min-height: 200px; padding: 1.2rem; border: 0; color: #fff; }
+.categoria--capa::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, rgb(0 0 0 / .68)); }
+.categoria__capa { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
+.categoria--capa:hover .categoria__capa { transform: scale(1.05); }
+.categoria--capa strong, .categoria--capa small { position: relative; z-index: 1; color: #fff; }
+.categoria--capa small { color: rgb(255 255 255 / .82); }
+
+.como-funciona--vitrine, .como-funciona--minimalista { margin-top: 0; }
+
+/* ==========================================================
+   MODELO MINIMALISTA — texto centralizado e nada escuro
+   ========================================================== */
+.hero--minimalista { padding: 5.2rem 0 4.4rem; background: var(--fundo); border-bottom: 1px solid var(--borda); }
+.hero__centro { display: grid; justify-items: center; max-width: 780px; text-align: center; }
+.hero--minimalista h1 { font-size: clamp(2.8rem, 6.4vw, 5.2rem); }
+.hero__centro > p { max-width: 52ch; margin-bottom: 2rem; font-size: 1.12rem; color: var(--texto-suave); }
+.hero__centro .hero__botoes, .hero__centro .hero__provas { justify-content: center; }
+.minimal__marca { display: grid; place-items: center; width: 68px; height: 68px; margin-bottom: 1.6rem; overflow: hidden; border-radius: 50%; font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-size: 1.45rem; font-weight: 600; color: #fff; background: var(--escura); }
+.minimal__marca img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+
+.categorias-chips { display: flex; flex-wrap: wrap; gap: .6rem; }
+.chip-categoria { display: inline-flex; align-items: center; gap: .55rem; padding: .7rem 1.2rem; border: 1px solid var(--borda-forte); border-radius: 999px; background: #fff; font-weight: 500; color: var(--escura); transition: background .2s, color .2s, border-color .2s; }
+.chip-categoria small { font-weight: 400; color: var(--texto-suave); }
+.chip-categoria:hover { border-color: var(--escura); background: var(--escura); color: #fff; }
+.chip-categoria:hover small { color: rgb(255 255 255 / .7); }
+
+.como-funciona--minimalista { gap: 2rem; }
+.como-funciona--minimalista .como { padding: 1.2rem 0 0; background: none; border: 0; border-top: 1px solid var(--borda-forte); border-radius: 0; box-shadow: none; }
+.como-funciona--minimalista .como__ico { display: none; }
+.como-funciona--minimalista .como__num { position: static; display: block; margin-bottom: .5rem; font-size: 2rem; font-weight: 300; letter-spacing: 0; color: var(--detalhe); }
+
+.faixa-entrega--clara { border: 1px solid var(--borda); background: #fff; color: var(--texto); }
+.faixa-entrega--clara .rotulo { color: var(--detalhe); }
+.faixa-entrega--clara h2, .faixa-entrega--clara strong { color: var(--escura); }
+.faixa-entrega--clara p { color: var(--texto-suave); }
+.faixa-entrega--clara .btn--primario { background: var(--escura); color: #fff; }
+.faixa-entrega--clara .btn--primario:hover { background: var(--escura-hover); }
+.faixa-entrega--clara .faixa-entrega__ico { color: var(--escura); background: var(--marca-100); box-shadow: none; }
+
+.chamada-final--clara { border: 1px solid var(--borda); background: var(--marca-50); color: var(--texto); }
+.chamada-final--clara h2 { color: var(--escura); }
+.chamada-final--clara p { color: var(--texto-suave); }
+.chamada-final--clara .btn--primario { background: var(--escura); color: #fff; }
+.chamada-final--clara .btn--primario:hover { background: var(--escura-hover); }
+
+@media (max-width: 980px) {
+  .vitrine__in { padding: 7rem 0 3.4rem; }
+  .como-funciona--minimalista { gap: 1.4rem; }
+}
+@media (max-width: 560px) {
+  .hero--vitrine { min-height: 560px; }
+  .vitrine__mosaico { display: block; }
+  .vitrine__mosaico img:not(:first-child) { display: none; }
+  .hero--minimalista { padding: 3.6rem 0 3.2rem; }
+  .hero--minimalista h1 { font-size: 2.6rem; }
+  .categoria--capa { min-height: 150px; }
+}

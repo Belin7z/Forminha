@@ -74,8 +74,8 @@ describe("sugestões", () => {
   });
 
   it("tema novo leva a letra dele; o mesmo tema mantém a letra que ela escolheu", () => {
-    assert.deepEqual(aparenciaEscolhida({ tema: "neutro", fonte: "elegante" }, "menta"), { tema: "menta", fonte: "moderno" });
-    assert.deepEqual(aparenciaEscolhida({ tema: "menta", fonte: "classico" }, "menta"), { tema: "menta", fonte: "classico" });
+    assert.deepEqual(aparenciaEscolhida({ tema: "neutro", fonte: "elegante", modelo: "vitrine" }, "menta"), { tema: "menta", fonte: "moderno", modelo: "vitrine" }, "o modelo da página continua o mesmo");
+    assert.deepEqual(aparenciaEscolhida({ tema: "menta", fonte: "classico" }, "menta"), { tema: "menta", fonte: "classico", modelo: "equilibrado" });
     const minhas = aparenciaEscolhida({ tema: "personalizado", fonte: "delicado", cores: { marca: "#aabbcc", escura: "#112233", detalhe: "#c0874a" } }, "personalizado");
     assert.deepEqual(minhas.cores, { marca: "#aabbcc", escura: "#112233", detalhe: "#c0874a" });
   });
@@ -126,7 +126,7 @@ describe("loja nova pelo assistente", () => {
 
   it("passo 3: o tema escolhido vale na loja e marca o passo", async () => {
     cfg = await salvarCores(painel, cfg, "pistache");
-    assert.deepEqual((await visitante.get("/config")).aparencia, { tema: "pistache", fonte: "elegante" });
+    assert.deepEqual((await visitante.get("/config")).aparencia, { tema: "pistache", fonte: "elegante", modelo: "equilibrado" });
     assert.equal((await feitos()).cores, true);
   });
 

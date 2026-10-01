@@ -132,6 +132,15 @@ export const TEMAS = [
 export const TEMA_PADRAO = "neutro";
 export const temaPorId = (id) => TEMAS.find((t) => t.id === id);
 
+/* ---------- modelos da página inicial ---------- */
+// Mesma loja, mesmos dados: muda a arrumação do início (a lista também está no banco, em _aparencia_valida).
+export const MODELOS = {
+  equilibrado: { nome: "Equilibrado", descricao: "Apresentação ao lado de uma foto (ou das iniciais) e o passo a passo do pedido" },
+  vitrine: { nome: "Vitrine", descricao: "Foto grande no topo e os produtos logo em seguida" },
+  minimalista: { nome: "Minimalista", descricao: "Texto centralizado, cores claras e direto ao cardápio" },
+};
+export const MODELO_PADRAO = "equilibrado";
+
 /** Aceita qualquer coisa vinda do banco e devolve uma aparência completa e válida. */
 export function normalizarAparencia(a) {
   const base = temaPorId(a?.tema) ?? (a?.tema === "personalizado" ? null : temaPorId(TEMA_PADRAO));
@@ -142,7 +151,8 @@ export function normalizarAparencia(a) {
     cores[k] = base ? base.cores[k] : corValida(v) ? v.trim().toLowerCase() : padrao.cores[k];
   }
   const fonte = FONTES[a?.fonte] ? a.fonte : (base ?? padrao).fonte;
-  return { tema: base ? base.id : "personalizado", cores, fonte };
+  const modelo = MODELOS[a?.modelo] ? a.modelo : MODELO_PADRAO;
+  return { tema: base ? base.id : "personalizado", cores, fonte, modelo };
 }
 
 /* ---------- gerador ---------- */

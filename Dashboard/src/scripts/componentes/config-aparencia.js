@@ -9,7 +9,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { ocupado, toast } from "/src/scripts/base/ui.js";
 import { mostrarErros } from "/src/scripts/base/formularios.js";
 import { iniciais } from "/src/scripts/base/formatacao.js";
-import { FONTES, TEMAS, aplicarAparencia, gerarTokens, normalizarAparencia } from "/src/scripts/base/tema.js";
+import { FONTES, MODELOS, TEMAS, aplicarAparencia, gerarTokens, normalizarAparencia } from "/src/scripts/base/tema.js";
 import { api } from "../nucleo/api.js";
 import { estado } from "../nucleo/estado.js";
 
@@ -42,12 +42,15 @@ export function cartaoTema(t, atual) {
     </label>`;
 }
 
-/** Mini-loja da prévia: usa o nome, a logo e os textos reais da loja. */
-export function miniLoja(cfg) {
+/** Desenho simples de cada modelo da página inicial (só formas, nas cores do tema). */
+const desenhoDoModelo = (id) => html`<span class="ap-modelo__desenho ap-modelo__desenho--${id}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
+
+/** Mini-loja da prévia: usa o nome, a logo e os textos reais da loja, no modelo escolhido. */
+export function miniLoja(cfg, modelo = normalizarAparencia(cfg.aparencia).modelo) {
   const nome = cfg.loja?.nome || "Minha loja";
   const titulo = cfg.textos?.hero_titulo || nome; // como na loja: sem título, o topo mostra o nome
   return html`
-    <div class="mini" data-previa aria-hidden="true">
+    <div class="mini mini--${modelo}" data-previa aria-hidden="true">
       <div class="mini__topo">
         ${cfg.loja?.logo ? html`<span class="mini__logo mini__logo--img"><img src="${cfg.loja.logo}" alt=""></span>` : html`<span class="mini__logo">${iniciais(nome)}</span>`}
         <strong class="mini__nome">${nome}</strong>
@@ -57,7 +60,7 @@ export function miniLoja(cfg) {
         <p class="mini__script">${cfg.loja?.slogan || "Pedidos online"}</p>
         <p class="mini__titulo">${titulo}</p>
         <p class="mini__sub">Faça seu pedido online, com entrega ou retirada.</p>
-        <span class="mini__btn">Ver cardápio</span><span class="mini__btn mini__btn--contorno">Fale conosco</span>
+        <span class="mini__btn">Ver cardápio</span><span class="mini__btn mini__btn--contorno">WhatsApp</span>
       </div>
       <div class="mini__cards">
         <div class="mini__card"><i class="mini__foto"></i><b>Bolo de Ninho</b><small>bolo 1 kg</small><span><em>R$ 120,00</em><u>Mais pedido</u></span></div>
@@ -122,6 +125,18 @@ export function paginaAparencia(cfg) {
                 </span>
               </label>`)}
           </div>
+          <h3 class="ap__passo"><span>3</span> Modelo da página inicial</h3>
+          <div class="ap-modelos" role="radiogroup" aria-label="Modelo da página inicial">
+            ${Object.entries(MODELOS).map(([id, mo]) => html`
+              <label class="ap-modelo">
+                <input type="radio" name="modelo" value="${id}" ${a.modelo === id && "checked"}>
+                <span class="ap-modelo__corpo">
+                  ${desenhoDoModelo(id)}
+                  <strong>${mo.nome}</strong>
+                  <small>${mo.descricao}</small>
+                </span>
+              </label>`)}
+          </div>
           <p class="texto-suave ap-logo-dica">${icone("imagem", { tamanho: 14 })} A logo e as fotos da página inicial ficam em <a class="link" href="#/configuracoes/imagens">Imagens</a>.</p>
         </div>
 
@@ -149,12 +164,14 @@ export function ligarAparencia(ctx, cfg, aoSalvar) {
   const escolha = () => {
     const tema = form.querySelector('[name="tema"]:checked')?.value ?? inicial.tema;
     const fonte = form.querySelector('[name="fonte"]:checked')?.value ?? inicial.fonte;
-    return tema === "personalizado" ? { tema, fonte, cores: { ...cores } } : { tema, fonte };
+    const modelo = form.querySelector('[name="modelo"]:checked')?.value ?? inicial.modelo;
+    return tema === "personalizado" ? { tema, fonte, modelo, cores: { ...cores } } : { tema, fonte, modelo };
   };
 
   const atualizarPrevia = () => {
     const a = escolha();
     for (const [k, v] of Object.entries(gerarTokens(a))) previa.style.setProperty(k, v);
+    previa.className = `mini mini--${a.modelo}`;
     blocoCores.hidden = a.tema !== "personalizado";
   };
 
@@ -191,7 +208,7 @@ export function ligarAparencia(ctx, cfg, aoSalvar) {
         aplicarAparencia(configuracoes.aparencia); // o próprio painel já troca de cor
         estado.aparencia = configuracoes.aparencia;
         aoSalvar(configuracoes);
-        toast("Aparência salva! A loja já abre com as novas cores.");
+        toast("Aparência salva! A loja já abre com o novo visual.");
       } catch (erro) { mostrarErros(form, erro, (m) => toast(m, "erro")); }
     });
   });

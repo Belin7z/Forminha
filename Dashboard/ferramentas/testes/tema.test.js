@@ -87,7 +87,9 @@ describe("cores", () => {
 
 describe("aparência vinda do banco", () => {
   it("vazia ou estranha vira o tema padrão; tema pronto ignora cores soltas", () => {
-    assert.deepEqual(normalizarAparencia(undefined), { tema: "neutro", cores: TEMAS[0].cores, fonte: "moderno" });
+    assert.deepEqual(normalizarAparencia(undefined), { tema: "neutro", cores: TEMAS[0].cores, fonte: "moderno", modelo: "equilibrado" });
+    assert.equal(normalizarAparencia({ modelo: "vitrine" }).modelo, "vitrine");
+    assert.equal(normalizarAparencia({ modelo: "revista" }).modelo, "equilibrado", "modelo desconhecido vira o padrão");
     assert.equal(normalizarAparencia({ tema: "nao-existe" }).tema, "neutro");
     const pronto = normalizarAparencia({ tema: "menta", cores: { marca: "#ff0000" } });
     assert.equal(pronto.cores.marca, TEMAS.find((t) => t.id === "menta").cores.marca);
