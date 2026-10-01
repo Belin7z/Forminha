@@ -9,7 +9,7 @@ import { precoInicial } from "../nucleo/catalogo.js";
 export function visualProduto(p) {
   if (p.imagem) return html`<img src="${p.imagem}" alt="${p.nome}" loading="lazy">`;
   const categoria = estado.categorias.find((c) => c.id === p.categoria_id);
-  return html`<div class="produto__ph" aria-hidden="true">${icone(categoria?.icone || "bolo", { tamanho: 46 })}</div>`;
+  return html`<div class="produto__ph" aria-hidden="true">${icone(categoria?.icone || "sacola", { tamanho: 46 })}</div>`;
 }
 
 export function cartaoProduto(p, indice = 0) {

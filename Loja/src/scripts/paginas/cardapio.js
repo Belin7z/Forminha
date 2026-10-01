@@ -18,9 +18,9 @@ export function cardapio(ctx) {
           <h1>Nosso <span class="script">cardápio</span></h1>
         </header>
         <div class="vazio vazio--largo">
-          <span class="vazio__ico">${icone("bolo", { tamanho: 38 })}</span>
-          <h3>Estamos preparando o cardápio</h3>
-          <p>Em breve você poderá escolher seus doces por aqui. Volte daqui a pouco ou fale com a gente.</p>
+          <span class="vazio__ico">${icone("sacola", { tamanho: 38 })}</span>
+          <h3>O cardápio está chegando</h3>
+          <p>Em breve os produtos aparecem aqui. Enquanto isso, fale com a loja para encomendar.</p>
           <a href="#/contato" class="btn btn--primario">Falar com a loja</a>
         </div>
       </section>`);
@@ -44,7 +44,7 @@ export function cardapio(ctx) {
       <div class="ferramentas">
         <div class="busca">
           ${icone("busca", { tamanho: 18 })}
-          <input type="search" id="busca" placeholder="Buscar bolo, sabor, brigadeiro…" value="${busca}" aria-label="Buscar no cardápio" autocomplete="off">
+          <input type="search" id="busca" placeholder="Buscar no cardápio…" value="${busca}" aria-label="Buscar no cardápio" autocomplete="off">
         </div>
         <select id="ordem" class="entrada ferramentas__ordem" aria-label="Ordenar por">
           <option value="padrao">Ordem da casa</option>
@@ -87,7 +87,7 @@ export function cardapio(ctx) {
       <button type="button" class="chip ${!categoria && "chip--ativo"}" data-acao="cat" data-id="0" role="tab" aria-selected="${String(!categoria)}">Todos <small>${estado.produtos.length}</small></button>
       ${estado.categorias.map((c) => html`
         <button type="button" class="chip ${categoria === c.id && "chip--ativo"}" data-acao="cat" data-id="${c.id}" role="tab" aria-selected="${String(categoria === c.id)}">
-          ${icone(c.icone || "bolo", { tamanho: 16 })} ${c.nome} <small>${contar(c.id)}</small></button>`)}`);
+          ${c.icone && icone(c.icone, { tamanho: 16 })} ${c.nome} <small>${contar(c.id)}</small></button>`)}`);
   }
 
   function desenharGrade() {

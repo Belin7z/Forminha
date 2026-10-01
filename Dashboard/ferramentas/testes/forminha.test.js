@@ -9,7 +9,9 @@
 import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "node:fs";
 import { iniciarEmulador } from "./emulador/servidor.js";
+import { COMO_DONO } from "./emulador/banco.js";
 import { criarApiLoja } from "../../../Loja/src/scripts/base/api/loja.js";
 import { criarApiPainel } from "../../src/scripts/base/api/painel.js";
 
@@ -36,7 +38,9 @@ describe("loja nova", () => {
     assert.equal(cfg.loja.nome, "Minha Doceria");
     assert.equal(cfg.loja.lat, null);
     assert.equal(cfg.loja.instagram, "");
-    assert.deepEqual(cfg.aparencia, { tema: "neutro", fonte: "elegante" });
+    assert.deepEqual(cfg.aparencia, { tema: "neutro", fonte: "moderno" });
+    assert.equal(cfg.loja.slogan, "", "sem frase pronta de confeitaria");
+    for (const k of ["hero_titulo", "hero_subtitulo", "sobre_titulo", "sobre_texto"]) assert.equal(cfg.textos[k], "", k);
     assert.equal((await visitante.get("/catalogo")).produtos.length, 0);
   });
 
@@ -153,5 +157,37 @@ describe("convite de primeiro acesso", () => {
     const e = await falha(p.post("/convite/usar", { codigo, criar: true, nome: "A", email: "sem-arroba", senha: "123" }));
     assert.equal(e.status, 422);
     assert.ok(e.campos.email && e.campos.nome && e.campos.senha);
+  });
+});
+
+describe("visual neutro da loja (migração 0028)", () => {
+  const TEXTOS_ANTIGOS = {
+    hero_titulo: "Doces que transformam momentos em memórias",
+    hero_subtitulo: "Bolos, doces e encomendas para festas — feitos sob encomenda, com ingredientes selecionados e muito carinho.",
+    sobre_titulo: "Feito à mão, do nosso jeito",
+    sobre_texto: "Cada receita é preparada com calma, ingredientes selecionados e atenção aos detalhes — do primeiro brigadeiro ao último confeito.\n\nFaça seu pedido pelo site e combine a entrega ou a retirada no horário que for melhor para você.",
+  };
+  const rodarMigracao = async () => {
+    const texto = readFileSync(new URL("../../supabase/migrations/20260930000028_visual_neutro.sql", import.meta.url), "utf8");
+    try { await emu.db.exec(`${COMO_DONO}\n${texto}`); } finally { await emu.db.exec("reset role;"); }
+  };
+
+  it("o título da página inicial é opcional (em branco, a loja mostra o nome)", async () => {
+    await painel.put("/configuracoes/textos", { hero_titulo: "", hero_subtitulo: "", sobre_titulo: "", sobre_texto: "" });
+    assert.equal((await visitante.get("/config")).textos.hero_titulo, "");
+  });
+
+  it("apaga os textos prontos antigos só de quem não os trocou, e pode rodar de novo", async () => {
+    await emu.db.query("update public.configuracoes set valor = valor || $1::jsonb where chave = 'textos'",
+      [JSON.stringify({ ...TEXTOS_ANTIGOS, sobre_titulo: "A nossa história" })]);
+    await emu.db.query("update public.configuracoes set valor = valor || '{\"slogan\":\"Doces feitos com carinho\"}'::jsonb where chave = 'loja'");
+    await rodarMigracao();
+    await rodarMigracao();
+    const cfg = await visitante.get("/config");
+    assert.equal(cfg.loja.slogan, "");
+    assert.equal(cfg.textos.hero_titulo, "");
+    assert.equal(cfg.textos.hero_subtitulo, "");
+    assert.equal(cfg.textos.sobre_texto, "");
+    assert.equal(cfg.textos.sobre_titulo, "A nossa história", "o que a dona escreveu fica");
   });
 });

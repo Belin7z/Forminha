@@ -120,7 +120,7 @@ const ROSA_DOURADO = {
 };
 
 export const TEMAS = [
-  { id: "neutro", nome: "Neutro", descricao: "Areia e café, discreto e elegante", cores: { marca: "#e3d8cc", escura: "#2f2925", detalhe: "#a8895f" }, fonte: "elegante" },
+  { id: "neutro", nome: "Neutro", descricao: "Areia e café, discreto e elegante", cores: { marca: "#e3d8cc", escura: "#2f2925", detalhe: "#a8895f" }, fonte: "moderno" },
   { id: "rosa-dourado", nome: "Rosa e dourado", descricao: "Rosa bebê, vinho e champanhe", cores: { marca: "#f4c9d9", escura: "#4f2436", detalhe: "#b08a58" }, fonte: "elegante", exato: ROSA_DOURADO },
   { id: "chocolate", nome: "Chocolate", descricao: "Caramelo e cacau", cores: { marca: "#e8cdb4", escura: "#3d2217", detalhe: "#b0874f" }, fonte: "classico" },
   { id: "pistache", nome: "Pistache", descricao: "Verde suave e dourado", cores: { marca: "#cfe0bf", escura: "#2c4127", detalhe: "#b08a58" }, fonte: "elegante" },

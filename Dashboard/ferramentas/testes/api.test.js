@@ -524,7 +524,7 @@ describe("favoritos, clientes, resumo e configurações", () => {
     assert.equal(salvo.configuracoes.loja.instagram, "minhaloja");
     assert.equal(salvo.configuracoes.loja.lat, cfg.loja.lat, "a localização não se perde");
     assert.equal((await falha(painel.put("/configuracoes/loja", { ...cfg.loja, nome: "A" }))).status, 422);
-    const t = await painel.put("/configuracoes/textos", { ...cfg.textos, hero_titulo: "Doces para todo mundo" });
+    const t = await painel.put("/configuracoes/textos", { ...cfg.textos, hero_titulo: "Doces para todo mundo", sobre_texto: "Primeiro parágrafo.\n\nSegundo parágrafo." });
     assert.equal((await visitante.get("/config")).textos.hero_titulo, "Doces para todo mundo");
     assert.ok(t.configuracoes.textos.sobre_texto.includes("\n"), "quebras de parágrafo preservadas");
   });

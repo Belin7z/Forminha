@@ -83,10 +83,10 @@ export async function configuracoes(ctx) {
         <p class="texto-suave">${icone("pino", { tamanho: 14 })} A posição no mapa (para calcular o frete) é definida em <a href="#/entrega" class="link">Entrega e mapa</a>.</p>`)}
       ${cartaoForm("f-textos", "Textos do site", html`
         <input type="hidden" name="hero_imagem" value="${cfg.textos.hero_imagem ?? ""}"><input type="hidden" name="sobre_imagem" value="${cfg.textos.sobre_imagem ?? ""}">
-        ${campo({ nome: "hero_titulo", rotulo: "Título da página inicial", valor: cfg.textos.hero_titulo, obrigatorio: true, atributos: 'maxlength="120"' })}
+        ${campo({ nome: "hero_titulo", rotulo: "Título da página inicial (opcional)", valor: cfg.textos.hero_titulo, atributos: 'maxlength="120"', ajuda: "Em branco, aparece o nome da loja." })}
         ${campo({ nome: "hero_subtitulo", rotulo: "Subtítulo", tipo: "textarea", valor: cfg.textos.hero_subtitulo, linhas: 2, atributos: 'maxlength="300"' })}
         ${campo({ nome: "sobre_titulo", rotulo: "Título da seção “sobre”", valor: cfg.textos.sobre_titulo })}
-        ${campo({ nome: "sobre_texto", rotulo: "Texto “sobre”", tipo: "textarea", valor: cfg.textos.sobre_texto, linhas: 6, atributos: 'maxlength="1500"', ajuda: "Separe parágrafos com uma linha em branco." })}`)}`,
+        ${campo({ nome: "sobre_texto", rotulo: "Texto “sobre”", tipo: "textarea", valor: cfg.textos.sobre_texto, linhas: 6, atributos: 'maxlength="1500"', ajuda: "Separe parágrafos com uma linha em branco. Em branco, a seção “sobre” não aparece na loja." })}`)}`,
 
     horarios: () => cartaoForm("f-horarios", "Horário de funcionamento", html`
       <p class="texto-suave">Define os dias e horários em que os clientes conseguem agendar retirada ou entrega.</p>

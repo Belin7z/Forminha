@@ -16,7 +16,7 @@ function destinoSeguro(valor) {
 const BENEFICIOS = [
   ["pacote", "Acompanhe seus pedidos etapa por etapa"],
   ["pino", "Salve seus endereços e receba onde quiser"],
-  ["coracao", "Guarde seus doces favoritos"],
+  ["coracao", "Guarde os seus favoritos"],
   ["atualizar", "Peça de novo em poucos cliques"],
 ];
 
@@ -24,8 +24,8 @@ function moldura(titulo, subtitulo, formulario, rodape) {
   return html`
     <section class="container auth">
       <aside class="auth__lateral" aria-hidden="true">
-        <span class="auth__bolo">${icone("bolo", { tamanho: 58 })}</span>
-        <h2>Sua conta, seus doces</h2>
+        <span class="auth__ico">${icone("usuario", { tamanho: 30 })}</span>
+        <h2>Sua conta na loja</h2>
         <ul>${BENEFICIOS.map(([e, t]) => html`<li><span>${icone(e, { tamanho: 18 })}</span>${t}</li>`)}</ul>
       </aside>
       <div class="auth__caixa">

@@ -78,11 +78,11 @@
   --sombra-forte: 0 4px 8px rgb(var(--escura-rgb) / .06), 0 24px 56px rgb(var(--escura-rgb) / .16);
 
   /* Letras (o estilo escolhido troca estas) */
-  --f-titulo: "Cormorant Garamond", "Playfair Display", Georgia, serif;
-  --f-corpo:  "Jost", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-titulo: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-corpo:  "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-script: var(--f-titulo);
   --f-script-estilo: italic;
   /* equaliza o tamanho visual entre fontes diferentes ("none" = tamanho natural) */
-  --f-titulo-ajuste: none;
-  --f-corpo-ajuste:  none;
+  --f-titulo-ajuste: 0.40;
+  --f-corpo-ajuste:  0.47;
 }

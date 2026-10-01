@@ -55,6 +55,25 @@ export function diasDisponiveis(horarios, minimo, intervaloMin, diasMax) {
   return dias;
 }
 
+const DIAS_MINUSCULOS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+
+/**
+ * A situação da loja agora, em uma frase curta: "Aberto agora · até 18:00", "Abre hoje às 09:00",
+ * "Abre amanhã às 09:00", "Abre segunda às 09:00" ou "Fechado no momento".
+ */
+export function situacaoAgora(horarios, agora = new Date()) {
+  const conv = (hhmm) => { const [h, m] = String(hhmm).split(":").map(Number); return h * 60 + m; };
+  if (abertaAgora(horarios, agora)) return { aberta: true, texto: `Aberto agora · até ${horarios[agora.getDay()].fecha}` };
+  const minutos = agora.getHours() * 60 + agora.getMinutes();
+  for (let i = 0; i < 7; i++) {
+    const dia = (agora.getDay() + i) % 7;
+    const h = horarios?.[dia];
+    if (!h?.aberto || (i === 0 && minutos >= conv(h.abre))) continue;
+    return { aberta: false, texto: `Abre ${i === 0 ? "hoje" : i === 1 ? "amanhã" : DIAS_MINUSCULOS[dia]} às ${h.abre}` };
+  }
+  return { aberta: false, texto: "Fechado no momento" };
+}
+
 /** A loja está dentro do horário de funcionamento neste instante? */
 export function abertaAgora(horarios, agora = new Date()) {
   const janela = janelaDoDia(horarios, agora);

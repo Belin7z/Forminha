@@ -8,8 +8,8 @@
 
 -- Configurações padrão (uma linha por seção)
 insert into public.configuracoes (chave, valor) values
-('loja', '{"nome":"Minha Doceria","slogan":"Doces feitos com carinho","whatsapp":"","instagram":"","email":"","endereco":"","cidade":"","uf":"SP","lat":null,"lng":null}'),
-('textos', '{"hero_titulo":"Doces que transformam momentos em memórias","hero_subtitulo":"Bolos, doces e encomendas para festas — feitos sob encomenda, com ingredientes selecionados e muito carinho.","sobre_titulo":"Feito à mão, do nosso jeito","sobre_texto":"Cada receita é preparada com calma, ingredientes selecionados e atenção aos detalhes — do primeiro brigadeiro ao último confeito.\n\nFaça seu pedido pelo site e combine a entrega ou a retirada no horário que for melhor para você."}'),
+('loja', '{"nome":"Minha Doceria","slogan":"","whatsapp":"","instagram":"","email":"","endereco":"","cidade":"","uf":"SP","lat":null,"lng":null}'),
+('textos', '{"hero_titulo":"","hero_subtitulo":"","sobre_titulo":"","sobre_texto":""}'),
 ('horarios', '{"0":{"aberto":false,"abre":"09:00","fecha":"15:00"},"1":{"aberto":true,"abre":"09:00","fecha":"18:00"},"2":{"aberto":true,"abre":"09:00","fecha":"18:00"},"3":{"aberto":true,"abre":"09:00","fecha":"18:00"},"4":{"aberto":true,"abre":"09:00","fecha":"18:00"},"5":{"aberto":true,"abre":"09:00","fecha":"18:00"},"6":{"aberto":true,"abre":"09:00","fecha":"15:00"}}'),
 ('pedidos', '{"pausados":false,"mensagem_pausa":"Estamos sem receber novos pedidos no momento. Volte em breve!","antecedencia_horas":24,"pedido_minimo":0,"intervalo_min":30,"dias_maximos":45}'),
 ('entrega', '{"entrega_ativa":true,"retirada_ativa":true,"gratis_acima":0,"taxa_padrao":0}'),

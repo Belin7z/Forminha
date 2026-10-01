@@ -44,8 +44,8 @@ export function cartaoTema(t, atual) {
 
 /** Mini-loja da prévia: usa o nome, a logo e os textos reais da loja. */
 export function miniLoja(cfg) {
-  const nome = cfg.loja?.nome || "Minha Doceria";
-  const titulo = cfg.textos?.hero_titulo || "Doces que transformam momentos em memórias";
+  const nome = cfg.loja?.nome || "Minha loja";
+  const titulo = cfg.textos?.hero_titulo || nome; // como na loja: sem título, o topo mostra o nome
   return html`
     <div class="mini" data-previa aria-hidden="true">
       <div class="mini__topo">
@@ -54,7 +54,7 @@ export function miniLoja(cfg) {
         <span class="mini__sacola">${icone("sacola", { tamanho: 13 })} 2</span>
       </div>
       <div class="mini__hero">
-        <p class="mini__script">feito à mão</p>
+        <p class="mini__script">${cfg.loja?.slogan || "Pedidos online"}</p>
         <p class="mini__titulo">${titulo}</p>
         <p class="mini__sub">Faça seu pedido online, com entrega ou retirada.</p>
         <span class="mini__btn">Ver cardápio</span><span class="mini__btn mini__btn--contorno">Fale conosco</span>

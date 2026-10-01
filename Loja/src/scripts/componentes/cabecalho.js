@@ -19,14 +19,20 @@ const LINKS = [
 // Se o nome TERMINA com o tipo do negócio ("Ana Souza Confeitaria"), ele vira a linha pequena embaixo do nome.
 const TIPO_NO_FIM = /\s+(confeitaria|doceria|doces|brigaderia|bolos|ateli[êe]|patisserie|p[âa]tisserie|cakes|bakery|padaria)$/i;
 
+/** Iniciais da loja para o monograma: "Doce da Bia" -> "DB", "Ana Souza Confeitaria" -> "AS" (sem o tipo e sem "da/de/do"). */
+export function monograma(nome) {
+  const tipo = TIPO_NO_FIM.exec(nome);
+  const principal = tipo ? nome.slice(0, tipo.index) : nome;
+  return principal.split(/\s+/).filter((p) => p && !/^(da|de|do|das|dos|e)$/i.test(p)).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+}
+
 /** Logo enviada no Dashboard ou, na falta dela, um monograma com o nome da loja. */
 function marca(config) {
   const nome = config.loja.nome;
   if (config.loja.logo) return html`<img class="marca__img" src="${config.loja.logo}" alt="${nome}">`;
   const tipo = TIPO_NO_FIM.exec(nome);
   const principal = tipo ? nome.slice(0, tipo.index) : nome;
-  const iniciais = principal.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
-  return html`<span class="marca__mono" aria-hidden="true">${iniciais}</span>
+  return html`<span class="marca__mono" aria-hidden="true">${monograma(nome)}</span>
     <span class="marca__txt"><strong>${principal}</strong>${tipo && html`<em>${tipo[1]}</em>`}</span>`;
 }
 

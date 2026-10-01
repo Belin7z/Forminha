@@ -22,20 +22,20 @@ export function desenharRodape() {
     <div class="container rodape__grade">
       <div>
         <p class="rodape__marca">${loja.nome}</p>
-        <p class="rodape__texto">${loja.slogan}</p>
+        ${loja.slogan && html`<p class="rodape__texto">${loja.slogan}</p>`}
         <div class="rodape__redes">
           ${loja.instagram && html`<a href="https://instagram.com/${loja.instagram}" target="_blank" rel="noopener" class="btn-icone btn-icone--contorno" aria-label="Instagram">${icone("instagram")}</a>`}
           ${whats && html`<a href="${whats}" target="_blank" rel="noopener" class="btn-icone btn-icone--contorno" aria-label="WhatsApp">${icone("mensagem")}</a>`}
         </div>
       </div>
-      <div>
+      ${(loja.whatsapp || loja.email || loja.endereco) && html`<div>
         <h3>Atendimento</h3>
         <ul class="rodape__lista">
           ${loja.whatsapp && html`<li>${icone("telefone", { tamanho: 16 })} ${telefone(loja.whatsapp)}</li>`}
           ${loja.email && html`<li>${icone("email", { tamanho: 16 })} ${loja.email}</li>`}
           ${loja.endereco && html`<li>${icone("pino", { tamanho: 16 })} ${loja.endereco}${loja.cidade && ` — ${loja.cidade}/${loja.uf}`}</li>`}
         </ul>
-      </div>
+      </div>`}
       <div>
         <h3>Horários</h3>
         <ul class="rodape__horarios">

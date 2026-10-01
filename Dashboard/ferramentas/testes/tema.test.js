@@ -78,7 +78,6 @@ describe("cores", () => {
     const css = readFileSync(new URL("../../src/estilos/base/tokens.css", import.meta.url), "utf8");
     const neutro = gerarTokens({ tema: TEMA_PADRAO });
     for (const [k, v] of Object.entries(neutro)) {
-      if (k.startsWith("--f-")) continue;
       const m = new RegExp(`${k}:\\s*([^;]+);`).exec(css);
       assert.ok(m, `tokens.css não define ${k}`);
       assert.equal(m[1].trim(), v, `tokens.css ${k}`);
@@ -88,7 +87,7 @@ describe("cores", () => {
 
 describe("aparência vinda do banco", () => {
   it("vazia ou estranha vira o tema padrão; tema pronto ignora cores soltas", () => {
-    assert.deepEqual(normalizarAparencia(undefined), { tema: "neutro", cores: TEMAS[0].cores, fonte: "elegante" });
+    assert.deepEqual(normalizarAparencia(undefined), { tema: "neutro", cores: TEMAS[0].cores, fonte: "moderno" });
     assert.equal(normalizarAparencia({ tema: "nao-existe" }).tema, "neutro");
     const pronto = normalizarAparencia({ tema: "menta", cores: { marca: "#ff0000" } });
     assert.equal(pronto.cores.marca, TEMAS.find((t) => t.id === "menta").cores.marca);
@@ -101,7 +100,7 @@ describe("aparência vinda do banco", () => {
     assert.equal(a.cores.escura, TEMAS[0].cores.escura);
     assert.equal(a.cores.detalhe, TEMAS[0].cores.detalhe);
     assert.equal(a.fonte, "delicado");
-    assert.equal(normalizarAparencia({ tema: "personalizado", fonte: "comic-sans" }).fonte, "elegante");
+    assert.equal(normalizarAparencia({ tema: "personalizado", fonte: "comic-sans" }).fonte, "moderno");
   });
 
   it("o pacote do navegador leva as cores e o endereço da fonte certa", () => {

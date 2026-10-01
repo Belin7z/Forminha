@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import { iniciarEmulador } from "./emulador/servidor.js";
 import { criarApiLoja } from "../../../Loja/src/scripts/base/api/loja.js";
 import { criarApiPainel } from "../../src/scripts/base/api/painel.js";
-import { gerarHorarios, dataISO } from "../../../Loja/src/scripts/base/agendamento.js";
+import { gerarHorarios, dataISO, situacaoAgora } from "../../../Loja/src/scripts/base/agendamento.js";
 
 let emu, painel, visitante, cliente, bolo, datas;
 const novoCliente = () => createClient(emu.url, emu.chaveAnon, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -154,5 +154,26 @@ describe("lista de produção", () => {
     assert.match(r.data, /^\d{4}-\d{2}-\d{2}$/);
     assert.equal((await falha(painel.get("/producao?data=31/12/2026"))).status, 422);
     assert.equal((await falha(criarApiPainel(cliente.supabase).get("/producao"))).status, 403);
+  });
+});
+
+describe("situação da loja no topo do site", () => {
+  const util = { aberto: true, abre: "09:00", fecha: "18:00" };
+  const fechado = { aberto: false, abre: "09:00", fecha: "18:00" };
+  const semana = { 0: fechado, 1: util, 2: util, 3: util, 4: util, 5: util, 6: fechado };
+  const em = (dia, hora) => new Date(2026, 8, 27 + dia, ...hora.split(":").map(Number)); // 27/09/2026 = domingo
+
+  it("aberta: diz até que horas", () => {
+    assert.deepEqual(situacaoAgora(semana, em(1, "10:30")), { aberta: true, texto: "Aberto agora · até 18:00" });
+  });
+  it("fechada: diz quando abre (hoje, amanhã ou o dia da semana)", () => {
+    assert.equal(situacaoAgora(semana, em(1, "07:00")).texto, "Abre hoje às 09:00");
+    assert.equal(situacaoAgora(semana, em(1, "19:00")).texto, "Abre amanhã às 09:00");
+    assert.equal(situacaoAgora(semana, em(5, "19:00")).texto, "Abre segunda às 09:00");
+    assert.equal(situacaoAgora(semana, em(0, "12:00")).aberta, false);
+  });
+  it("sem nenhum dia aberto: fechado no momento", () => {
+    assert.deepEqual(situacaoAgora({ 0: fechado, 1: fechado, 2: fechado, 3: fechado, 4: fechado, 5: fechado, 6: fechado }, em(1, "10:00")),
+      { aberta: false, texto: "Fechado no momento" });
   });
 });
