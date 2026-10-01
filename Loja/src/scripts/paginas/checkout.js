@@ -10,6 +10,7 @@ import { armazenamento } from "/src/scripts/base/armazenamento.js";
 import { brl, dataCurta, diaCurto, enderecoEmLinha, horasTexto, km, paraCentavos } from "/src/scripts/base/formatacao.js";
 import { diasDisponiveis, gerarHorarios } from "/src/scripts/base/agendamento.js";
 import { FORMAS_PAGAMENTO } from "/src/scripts/base/dominio.js";
+import { nomeComQuantidade } from "/src/scripts/base/opcoes.js";
 import { api } from "../nucleo/api.js";
 import { estado, ouvir } from "../nucleo/estado.js";
 import { antecedenciaHoras, limpar, linhas, paraApi } from "../nucleo/carrinho.js";
@@ -183,7 +184,7 @@ export async function checkout(ctx) {
       <ul class="resumo__itens">${itens.map((l) => html`
         <li><div class="resumo__img">${visualProduto(l.produto)}</div>
           <div><strong>${l.qtd}× ${l.produto.nome}</strong>
-            ${l.escolhas.map((e) => html`<small>${e.itens.map((i) => i.nome).join(", ")}</small>`)}</div>
+            ${l.escolhas.map((e) => html`<small>${e.itens.map(nomeComQuantidade).join(", ")}</small>`)}</div>
           <span>${brl(l.total)}</span></li>`)}</ul>
       <button type="button" class="link" data-acao="editar-carrinho">Editar carrinho</button>
 

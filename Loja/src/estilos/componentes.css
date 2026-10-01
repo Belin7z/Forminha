@@ -86,6 +86,14 @@
 .produto-detalhe__desc { color: var(--texto-suave); margin: .5rem 0; }
 .produto-detalhe__linha { display: flex; align-items: center; gap: .6rem; }
 .produto-detalhe__ingredientes { margin: .2rem 0 .6rem; font-size: .88rem; }
+/* monte sua caixa: quantos de cada sabor */
+.grupo-opcoes__contador { margin-left: auto; font-weight: 600; color: var(--texto-suave); }
+.grupo-opcoes__contador--ok { color: #1f8a4d; }
+.opcao--qtd { display: flex; align-items: center; justify-content: space-between; gap: .8rem; cursor: default; }
+.opcao--qtd .opcao__texto { display: grid; }
+.qtd--mini { padding: .15rem; }
+.qtd--mini button { width: 30px; height: 30px; }
+.qtd--mini output { min-width: 1.8rem; font-size: .92rem; }
 .produto-detalhe__ingredientes summary { cursor: pointer; font-weight: 500; color: var(--escura); }
 .produto-detalhe__ingredientes p { margin: .3rem 0 0; color: var(--texto-suave); }
 .produto-detalhe__compartilhar { margin-left: auto; }

@@ -9,6 +9,9 @@
    ========================================================== */
 import { ALERGENOS } from "./dominio.js";
 import { telefone } from "./formatacao.js";
+import { opcoesEmTexto } from "./opcoes.js";
+
+export { opcoesEmTexto };
 
 /** Tamanhos de etiqueta: as térmicas (uma por "página") e a folha A4 com 21 (63,5 × 38,1 mm, a mais comum). */
 export const TAMANHOS = {
@@ -38,10 +41,6 @@ export function textoAlergicos(alergenos = []) {
   const nomes = ALERGENOS.filter(([id]) => alergenos.includes(id)).map(([, nome]) => nome.replace(/\s*\(.*\)$/, ""));
   return nomes.length ? `ALÉRGICOS: CONTÉM ${listaEmTexto(nomes)}.`.toUpperCase() : "";
 }
-
-/** [{grupo, itens}] do pedido -> "Tamanho: 1 kg · Recheio: Ninho" */
-export const opcoesEmTexto = (opcoes) => (Array.isArray(opcoes) ? opcoes : [])
-  .map((o) => `${o.grupo}: ${(o.itens ?? []).map((i) => (i.qtd > 1 ? `${i.qtd}× ${i.nome ?? i}` : i.nome ?? i)).join(", ")}`).join(" · ");
 
 /** A identificação da loja numa linha: "Doce da Bia · Rua X, 10 — Santos/SP · (13) 99999-0000". */
 export function identificacaoDaLoja(loja = {}) {

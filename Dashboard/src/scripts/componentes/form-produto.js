@@ -11,13 +11,13 @@ import { ALERGENOS } from "/src/scripts/base/dominio.js";
 import { api } from "../nucleo/api.js";
 import { escolherFoto } from "./foto.js";
 
-const novoGrupo = () => ({ nome: "", tipo: "unica", obrigatorio: false, max: "", itens: [{ nome: "", preco: "0,00" }] });
+const novoGrupo = () => ({ nome: "", tipo: "unica", obrigatorio: false, max: "", total: "", itens: [{ nome: "", preco: "0,00" }] });
 
 export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
   const p = produto ?? {};
   // opções em edição: preços viram texto ("12,50") enquanto o usuário digita
   const opcoes = (p.opcoes ?? []).map((g) => ({
-    nome: g.nome, tipo: g.tipo, obrigatorio: g.obrigatorio, max: g.max ?? "",
+    nome: g.nome, tipo: g.tipo, obrigatorio: g.obrigatorio, max: g.max ?? "", total: g.total ?? "",
     itens: g.itens.map((i) => ({ nome: i.nome, preco: emReais(i.preco) })),
   }));
   let imagemNova = null;
@@ -158,13 +158,19 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
           <select class="entrada" data-campo="tipo" aria-label="Tipo de escolha">
             <option value="unica" ${g.tipo === "unica" && "selected"}>Escolher uma</option>
             <option value="multipla" ${g.tipo === "multipla" && "selected"}>Escolher várias</option>
+            <option value="quantidade" ${g.tipo === "quantidade" && "selected"}>Monte a caixa</option>
           </select>
           <button type="button" class="btn-icone btn-icone--perigo btn-icone--pequeno" data-tirar-grupo="${gi}" aria-label="Remover grupo">${icone("lixeira", { tamanho: 16 })}</button>
         </div>
-        <div class="linha-flex grupo-editor__regras">
-          <label class="opcao-mini"><input type="checkbox" data-campo="obrigatorio" ${g.obrigatorio && "checked"}> Obrigatório</label>
-          ${g.tipo === "multipla" && html`<label class="opcao-mini">Máximo <input type="number" class="entrada entrada--curta" data-campo="max" min="1" max="30" value="${g.max}" placeholder="—"></label>`}
-        </div>
+        ${g.tipo === "quantidade"
+          ? html`<div class="linha-flex grupo-editor__regras">
+              <label class="opcao-mini">Unidades na caixa <input type="number" class="entrada entrada--curta" data-campo="total" min="2" max="500" value="${g.total}" placeholder="25"></label>
+              <small class="texto-suave">O cliente escolhe quantos de cada opção até completar a caixa. O valor de cada opção soma por unidade.</small>
+            </div>`
+          : html`<div class="linha-flex grupo-editor__regras">
+              <label class="opcao-mini"><input type="checkbox" data-campo="obrigatorio" ${g.obrigatorio && "checked"}> Obrigatório</label>
+              ${g.tipo === "multipla" && html`<label class="opcao-mini">Máximo <input type="number" class="entrada entrada--curta" data-campo="max" min="1" max="30" value="${g.max}" placeholder="—"></label>`}
+            </div>`}
         <ul class="grupo-editor__itens">${g.itens.map((it, ii) => html`
           <li data-i="${ii}">
             <input class="entrada" data-item="nome" placeholder="Opção (ex.: 1,5 kg)" value="${it.nome}" maxlength="60" aria-label="Nome da opção">
@@ -219,7 +225,8 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
       alergenos: ALERGENOS.filter(([id]) => d[`al_${id}`]).map(([id]) => id),
       galeria,
       opcoes: opcoes.map((g) => ({
-        nome: g.nome, tipo: g.tipo, obrigatorio: g.obrigatorio, max: g.tipo === "multipla" ? g.max : null,
+        nome: g.nome, tipo: g.tipo, obrigatorio: g.tipo === "quantidade" || g.obrigatorio, max: g.tipo === "multipla" ? g.max : null,
+        total: g.tipo === "quantidade" ? Number(g.total) || null : null,
         itens: g.itens.map((i) => ({ nome: i.nome, preco: paraCentavos(i.preco) })),
       })),
     };

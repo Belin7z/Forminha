@@ -2,6 +2,7 @@
 import { html, montar, delegar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { brl, horasTexto } from "/src/scripts/base/formatacao.js";
+import { nomeComQuantidade } from "/src/scripts/base/opcoes.js";
 import { estado, ouvir } from "../nucleo/estado.js";
 import { alterarQtd, antecedenciaHoras, linhas, remover, subtotal } from "../nucleo/carrinho.js";
 import { visualProduto } from "./cartao-produto.js";
@@ -15,7 +16,7 @@ function itemHtml(l) {
       <div class="item-carrinho__img">${visualProduto(l.produto)}</div>
       <div class="item-carrinho__info">
         <strong>${l.produto.nome}</strong>
-        ${l.escolhas.map((e) => html`<small>${e.grupo}: ${e.itens.map((i) => i.nome).join(", ")}</small>`)}
+        ${l.escolhas.map((e) => html`<small>${e.grupo}: ${e.itens.map(nomeComQuantidade).join(", ")}</small>`)}
         ${l.obs && html`<small class="item-carrinho__obs">“${l.obs}”</small>`}
         <div class="item-carrinho__linha">
           <div class="qtd">

@@ -44,7 +44,7 @@ describe("etiquetas", () => {
   });
 
   it("opções com quantidade (caixa montada) e identificação da loja sem endereço", () => {
-    assert.equal(opcoesEmTexto([{ grupo: "Sabores", itens: [{ nome: "Ninho", qtd: 10 }, { nome: "Beijinho", qtd: 1 }] }]), "Sabores: 10× Ninho, Beijinho");
+    assert.equal(opcoesEmTexto([{ grupo: "Sabores", itens: [{ nome: "Ninho", qtd: 10 }, { nome: "Beijinho", qtd: 1 }] }]), "Sabores: 10× Ninho, 1× Beijinho");
     assert.equal(identificacaoDaLoja({ nome: "Doce da Bia" }), "Doce da Bia");
   });
 

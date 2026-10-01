@@ -4,6 +4,7 @@
    tudo (preço, entrega, cupom) quando o pedido é finalizado.
    ========================================================== */
 import { armazenamento } from "/src/scripts/base/armazenamento.js";
+import { chaveDaSelecao } from "/src/scripts/base/opcoes.js";
 import { descricaoDaSelecao, extrasDaSelecao, produtoPorId } from "./catalogo.js";
 import { emitir, estado } from "./estado.js";
 
@@ -12,8 +13,7 @@ let itens = armazenamento.ler(CHAVE, []);
 
 /** Identifica "o mesmo item": mesmo produto, mesmas opções e mesma observação. */
 function chaveDe({ produto_id, opcoes = {}, obs = "" }) {
-  const partes = Object.keys(opcoes).sort().map((g) => `${g}:${[...opcoes[g]].sort().join(",")}`).join("|");
-  return `${produto_id}#${partes}#${obs.trim()}`;
+  return `${produto_id}#${chaveDaSelecao(opcoes)}#${obs.trim()}`;
 }
 
 function salvar() {

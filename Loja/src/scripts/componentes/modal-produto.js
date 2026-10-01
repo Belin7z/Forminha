@@ -6,11 +6,36 @@ import { brl, dataCurta, horasTexto } from "/src/scripts/base/formatacao.js";
 import { ALERGENOS, caminhoDoProduto } from "/src/scripts/base/dominio.js";
 import { estado, ouvir } from "../nucleo/estado.js";
 import { extrasDaSelecao, produtoPorId } from "../nucleo/catalogo.js";
+import { faltandoNaSelecao, somaDaCaixa } from "/src/scripts/base/opcoes.js";
 import { adicionar } from "../nucleo/carrinho.js";
 import { alternarFavorito } from "../nucleo/sessao.js";
 import { visualProduto } from "./cartao-produto.js";
 
+/** Monte sua caixa: quantos de cada opção, até completar o total do grupo. */
+function caixaHtml(g) {
+  return html`
+    <fieldset class="grupo-opcoes grupo-opcoes--caixa" data-grupo="${g.id}">
+      <legend>
+        <strong>${g.nome}</strong>
+        <span class="badge badge--aviso">Escolha ${g.total}</span>
+        <small class="grupo-opcoes__contador" data-contador="${g.id}" aria-live="polite">0 de ${g.total}</small>
+      </legend>
+      <div class="opcoes">
+        ${g.itens.map((i) => html`
+          <div class="opcao opcao--qtd">
+            <span class="opcao__texto"><strong>${i.nome}</strong>${i.preco > 0 && html`<small class="opcao__extra">+ ${brl(i.preco)} cada</small>`}</span>
+            <div class="qtd qtd--mini" role="group" aria-label="Quantidade de ${i.nome}">
+              <button type="button" data-caixa="${g.id}" data-item="${i.id}" data-passo="-1" aria-label="Menos ${i.nome}">${icone("menos", { tamanho: 14 })}</button>
+              <output data-caixa-qtd="${g.id}:${i.id}">0</output>
+              <button type="button" data-caixa="${g.id}" data-item="${i.id}" data-passo="1" aria-label="Mais ${i.nome}">${icone("mais", { tamanho: 14 })}</button>
+            </div>
+          </div>`)}
+      </div>
+    </fieldset>`;
+}
+
 function grupoHtml(g) {
+  if (g.tipo === "quantidade") return caixaHtml(g);
   const multipla = g.tipo === "multipla";
   return html`
     <fieldset class="grupo-opcoes" data-grupo="${g.id}">
@@ -108,15 +133,17 @@ export function abrirProduto(id, ctx, { aoFechar } = {}) {
   const botaoMenos = m.rodape.querySelector("[data-menos]");
   const botaoFav = m.el.querySelector("[data-fav]");
 
+  const caixas = Object.fromEntries(p.opcoes.filter((g) => g.tipo === "quantidade").map((g) => [g.id, {}])); // { grupo: { item: n } }
   const selecao = () => {
     const s = {};
-    for (const g of p.opcoes) s[g.id] = [...form.querySelectorAll(`[name="${g.id}"]:checked`)].map((x) => x.value);
+    for (const g of p.opcoes) {
+      s[g.id] = g.tipo === "quantidade"
+        ? Object.fromEntries(Object.entries(caixas[g.id]).filter(([, n]) => n > 0))
+        : [...form.querySelectorAll(`[name="${g.id}"]:checked`)].map((x) => x.value);
+    }
     return s;
   };
-
-  function faltando(s) {
-    return p.opcoes.find((g) => g.obrigatorio && !(s[g.id]?.length));
-  }
+  const faltando = (s) => faltandoNaSelecao(p, s);
 
   function atualizar() {
     const s = selecao();
@@ -125,12 +152,24 @@ export function abrirProduto(id, ctx, { aoFechar } = {}) {
       const cheio = s[g.id].length >= g.max;
       form.querySelectorAll(`[name="${g.id}"]:not(:checked)`).forEach((el) => { el.disabled = cheio; });
     }
+    // caixas: contador e botões (não passa do total)
+    for (const g of p.opcoes.filter((x) => x.tipo === "quantidade")) {
+      const soma = somaDaCaixa(caixas[g.id]);
+      const contador = form.querySelector(`[data-contador="${g.id}"]`);
+      contador.textContent = `${soma} de ${g.total}`;
+      contador.classList.toggle("grupo-opcoes__contador--ok", soma === g.total);
+      for (const b of form.querySelectorAll(`[data-caixa="${g.id}"]`)) {
+        const n = caixas[g.id][b.dataset.item] ?? 0;
+        b.disabled = b.dataset.passo === "1" ? soma >= g.total : n <= 0;
+        form.querySelector(`[data-caixa-qtd="${g.id}:${b.dataset.item}"]`).textContent = n;
+      }
+    }
     const falta = faltando(s);
     const total = (p.preco + extrasDaSelecao(p, s)) * qtd;
     saidaQtd.textContent = qtd;
     botaoMenos.disabled = qtd <= minimo;
     botaoAdd.disabled = !!falta;
-    botaoAdd.textContent = falta ? `Escolha: ${falta.nome}` : `Adicionar · ${brl(total)}`;
+    botaoAdd.textContent = falta ? falta.texto : `Adicionar · ${brl(total)}`;
   }
 
   function desenharFavorito() {
@@ -143,6 +182,13 @@ export function abrirProduto(id, ctx, { aoFechar } = {}) {
   m.rodape.querySelector("[data-mais]").addEventListener("click", () => { qtd = Math.min(qtd + 1, 999); atualizar(); });
   botaoMenos.addEventListener("click", () => { qtd = Math.max(minimo, qtd - 1); atualizar(); });
   form.addEventListener("change", atualizar);
+  form.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-caixa]");
+    if (!b) return;
+    const caixa = caixas[b.dataset.caixa];
+    caixa[b.dataset.item] = Math.max(0, (caixa[b.dataset.item] ?? 0) + Number(b.dataset.passo));
+    atualizar();
+  });
   // miniaturas: trocam a foto grande (a primeira devolve a foto principal)
   m.el.querySelectorAll("[data-foto]").forEach((botao) => botao.addEventListener("click", () => {
     const n = Number(botao.dataset.foto);

@@ -60,7 +60,7 @@ export function personalizarHtmlLoja(html, dados) {
 /** Menor preço do produto: o preço base + a opção mais barata de cada grupo obrigatório (o "a partir de" da loja). */
 export function precoDoProduto(p) {
   let valor = Number(p.preco) || 0;
-  for (const g of p.opcoes ?? []) if (g.obrigatorio && g.itens?.length) valor += Math.min(...g.itens.map((i) => Number(i.preco) || 0));
+  for (const g of p.opcoes ?? []) if (g.obrigatorio && g.itens?.length) valor += Math.min(...g.itens.map((i) => Number(i.preco) || 0)) * (g.tipo === "quantidade" ? Number(g.total) || 1 : 1);
   return valor;
 }
 

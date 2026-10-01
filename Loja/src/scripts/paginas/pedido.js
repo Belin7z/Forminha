@@ -8,6 +8,7 @@ import { icone } from "/src/scripts/base/icones.js";
 import { confirmar, copiar, ocupado, toast } from "/src/scripts/base/ui.js";
 import { brl, dataHora, dataPorExtenso, enderecoEmLinha, km } from "/src/scripts/base/formatacao.js";
 import { STATUS_ATIVOS, etapasDoPedido, statusTexto } from "/src/scripts/base/dominio.js";
+import { faltandoNaSelecao, nomeComQuantidade, selecaoDaDescricao } from "/src/scripts/base/opcoes.js";
 import { criarMapa } from "/src/scripts/base/mapa.js";
 import { gerarPix } from "/src/scripts/base/pix.js";
 import { api } from "../nucleo/api.js";
@@ -50,12 +51,8 @@ function refazerPedido(p) {
   for (const item of p.itens) {
     const produto = produtoPorId(item.produto_id);
     if (!produto) continue;
-    const opcoes = {};
-    for (const escolha of item.opcoes) {
-      const grupo = produto.opcoes.find((g) => g.nome === escolha.grupo);
-      if (!grupo) continue;
-      opcoes[grupo.id] = escolha.itens.map((i) => grupo.itens.find((x) => x.nome === i.nome)?.id).filter(Boolean);
-    }
+    const opcoes = selecaoDaDescricao(produto, item.opcoes);
+    if (faltandoNaSelecao(produto, opcoes)) continue; // as opções do produto mudaram (ex.: a caixa mudou de tamanho)
     adicionar({ produto_id: produto.id, qtd: Math.max(item.qtd, produto.min_qtd), opcoes, obs: item.obs ?? "" });
     adicionados++;
   }
@@ -148,7 +145,7 @@ export async function pedido(ctx) {
               <h2>Itens do pedido</h2>
               <ul class="pedido__itens">${p.itens.map((i) => html`
                 <li><div><strong>${i.qtd}× ${i.nome}</strong>
-                  ${i.opcoes.map((o) => html`<small>${o.grupo}: ${o.itens.map((x) => x.nome).join(", ")}</small>`)}
+                  ${i.opcoes.map((o) => html`<small>${o.grupo}: ${o.itens.map(nomeComQuantidade).join(", ")}</small>`)}
                   ${i.obs && html`<small class="item-carrinho__obs">“${i.obs}”</small>`}</div><span>${brl(i.total)}</span></li>`)}</ul>
               <dl class="resumo__totais">
                 <div><dt>Subtotal</dt><dd>${brl(p.subtotal)}</dd></div>

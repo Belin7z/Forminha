@@ -6,14 +6,13 @@ import { dataISO } from "/src/scripts/base/agendamento.js";
 import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina, vazio } from "../componentes/pagina.js";
 import { abrirEtiquetas } from "../componentes/etiquetas.js";
+import { opcoesEmTexto as opcoesTexto } from "/src/scripts/base/opcoes.js"; // "Sabores: 10× Ninho, 15× Beijinho · Fita: Rosa"
 
 const inicial = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const somarDias = (iso, n) => {
   const [a, m, d] = iso.split("-").map(Number);
   return dataISO(new Date(a, m - 1, d + n));
 };
-/** [{grupo, itens}] de um pedido -> "Cobertura: Chocolate · Recheio: Ninho" */
-const opcoesTexto = (opcoes) => (Array.isArray(opcoes) ? opcoes : []).map((o) => `${o.grupo}: ${(o.itens ?? []).map((i) => i.nome ?? i).join(", ")}`).join(" · ");
 
 export async function producao(ctx) {
   montar(ctx.raiz, carregandoPagina);

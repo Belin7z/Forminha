@@ -13,6 +13,7 @@ import { api } from "../nucleo/api.js";
 import { atualizarContagem } from "../nucleo/notificacoes.js";
 import { carregandoPagina } from "./pagina.js";
 import { abrirEtiquetas } from "./etiquetas.js";
+import { nomeComQuantidade } from "/src/scripts/base/opcoes.js";
 
 /** Mensagem pronta para avisar o cliente sobre o novo status. */
 function mensagemWhats(p) {
@@ -80,7 +81,7 @@ function corpo(p) {
           <h3>Itens</h3>
           <ul class="ped-itens">${p.itens.map((i) => html`
             <li><div><strong>${i.qtd}× ${i.nome}</strong>
-              ${i.opcoes.map((o) => html`<small>${o.grupo}: ${o.itens.map((x) => x.nome).join(", ")}</small>`)}
+              ${i.opcoes.map((o) => html`<small>${o.grupo}: ${o.itens.map(nomeComQuantidade).join(", ")}</small>`)}
               ${i.obs && html`<small class="ped-itens__obs">“${i.obs}”</small>`}</div><span>${brl(i.total)}</span></li>`)}</ul>
           <dl class="resumo__totais">
             <div><dt>Subtotal</dt><dd>${brl(p.subtotal)}</dd></div>

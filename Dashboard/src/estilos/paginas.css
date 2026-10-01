@@ -12,6 +12,8 @@
 .grupo-editor { border: 1px solid var(--borda); border-radius: var(--raio-sm); padding: .9rem; margin-bottom: .8rem; background: var(--marca-25); }
 .grupo-editor__cab { display: grid; grid-template-columns: 1fr 150px auto; gap: .5rem; align-items: center; margin-bottom: .6rem; }
 .grupo-editor__regras { margin-bottom: .6rem; font-size: .84rem; }
+.grupo-editor__cab { grid-template-columns: 1fr 220px auto; }
+.opcao-linha--qtd { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
 .opcao-mini { display: inline-flex; align-items: center; gap: .4rem; font-size: .84rem; cursor: pointer; }
 .opcao-mini .entrada { width: 70px; padding: .3rem .5rem; }
 .grupo-editor__itens { display: grid; gap: .4rem; margin-bottom: .5rem; }

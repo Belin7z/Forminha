@@ -5,6 +5,7 @@ import { ocupado, toast } from "/src/scripts/base/ui.js";
 import { ativarCampos, campo, dadosDe, mostrarErros } from "/src/scripts/base/formularios.js";
 import { brl, paraCentavos, plural, telefone } from "/src/scripts/base/formatacao.js";
 import { dataISO } from "/src/scripts/base/agendamento.js";
+import { descricaoDaSelecao, extrasDaSelecao, faltandoNaSelecao, nomeComQuantidade } from "/src/scripts/base/opcoes.js";
 import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina } from "../componentes/pagina.js";
 
@@ -138,26 +139,37 @@ export async function novoPedido(ctx) {
 
   function desenharOpcoes() {
     const p = produtoEscolhido();
-    montar($("#opcoes-produto"), p ? html`${(p.opcoes ?? []).map((g) => html`
+    montar($("#opcoes-produto"), p ? html`${(p.opcoes ?? []).map((g) => (g.tipo === "quantidade"
+      ? html`
+      <fieldset class="opcao-grupo" data-grupo="${g.id}"><legend>${g.nome} * (quantos de cada, somando ${g.total})</legend>
+        ${g.itens.map((i) => html`<label class="opcao-linha opcao-linha--qtd"><span>${i.nome}${i.preco > 0 ? html` <small class="texto-suave">+ ${brl(i.preco)} cada</small>` : ""}</span>
+          <input class="entrada entrada--curta" type="number" min="0" max="${g.total}" value="0" data-item="${i.id}" aria-label="Quantidade de ${i.nome}"></label>`)}</fieldset>`
+      : html`
       <fieldset class="opcao-grupo" data-grupo="${g.id}"><legend>${g.nome}${g.obrigatorio ? " *" : ""}${g.tipo === "unica" ? "" : " (pode marcar mais de uma)"}</legend>
         ${g.itens.map((i) => html`<label class="opcao-linha"><input type="${g.tipo === "unica" ? "radio" : "checkbox"}" name="g-${g.id}" value="${i.id}">
-          <span>${i.nome}${i.preco > 0 ? html` <small class="texto-suave">+ ${brl(i.preco)}</small>` : ""}</span></label>`)}</fieldset>`)}` : html``);
+          <span>${i.nome}${i.preco > 0 ? html` <small class="texto-suave">+ ${brl(i.preco)}</small>` : ""}</span></label>`)}</fieldset>`))}` : html``);
   }
 
   function lerSelecao(p) {
-    const selecao = {}, descricao = [];
-    let extras = 0;
+    const selecao = {};
     for (const g of p.opcoes ?? []) {
+      if (g.tipo === "quantidade") {
+        const caixa = {};
+        for (const el of ctx.raiz.querySelectorAll(`[data-grupo="${g.id}"] [data-item]`)) {
+          const n = Math.max(0, Math.floor(Number(el.value) || 0));
+          if (n) caixa[el.dataset.item] = n;
+        }
+        if (Object.keys(caixa).length) selecao[g.id] = caixa;
+        continue;
+      }
       const marcados = [...ctx.raiz.querySelectorAll(`[data-grupo="${g.id}"] input:checked`)].map((i) => i.value);
-      if (g.obrigatorio && !marcados.length) { toast(`Escolha “${g.nome}”.`, "erro"); return null; }
       if (g.max && marcados.length > g.max) { toast(`“${g.nome}”: escolha até ${g.max}.`, "erro"); return null; }
-      if (!marcados.length) continue;
-      selecao[g.id] = marcados;
-      const itens = g.itens.filter((i) => marcados.includes(i.id));
-      extras += itens.reduce((s, i) => s + i.preco, 0);
-      descricao.push(`${g.nome}: ${itens.map((i) => i.nome).join(", ")}`);
+      if (marcados.length) selecao[g.id] = marcados;
     }
-    return { selecao, descricao, extras };
+    const falta = faltandoNaSelecao(p, selecao);
+    if (falta) { toast(falta.texto, "erro"); return null; }
+    const descricao = descricaoDaSelecao(p, selecao).map((d) => `${d.grupo}: ${d.itens.map(nomeComQuantidade).join(", ")}`);
+    return { selecao, descricao, extras: extrasDaSelecao(p, selecao) };
   }
 
   const qtdValida = (el) => { const n = Number(el.value); return Number.isInteger(n) && n >= 1 && n <= 999 ? n : null; };
