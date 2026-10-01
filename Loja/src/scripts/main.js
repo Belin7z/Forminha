@@ -16,7 +16,7 @@ import { iniciarGaveta } from "./componentes/gaveta-carrinho.js";
 import { desenharRodape } from "./componentes/rodape.js";
 import { carregando, erroDePagina } from "./componentes/carregando.js";
 import { inicio } from "./paginas/inicio.js";
-import { cardapio } from "./paginas/cardapio.js";
+import { cardapio, paginaDoProduto } from "./paginas/cardapio.js";
 import { favoritos } from "./paginas/favoritos.js";
 import { paginaCadastrar, paginaEntrar, paginaRecuperar, paginaRedefinir } from "./paginas/autenticacao.js";
 import { checkout } from "./paginas/checkout.js";
@@ -27,9 +27,14 @@ import { naoEncontrada } from "./paginas/nao-encontrada.js";
 import { paginaPrivacidade, paginaTermos } from "./paginas/legal.js";
 import { aplicarSeo, registrarApp } from "./nucleo/seo.js";
 import { aplicarAparencia } from "/src/scripts/base/tema.js";
+import { produtoDoCaminho } from "/src/scripts/base/dominio.js";
 import { iniciarWhatsFlutuante } from "./componentes/whats-flutuante.js";
 
 const pagina = document.getElementById("pagina");
+
+// link próprio do produto (/p/12-bolo-de-ninho): vira a rota #/produto/12, sem recarregar a página
+const produtoDoLink = produtoDoCaminho(location.pathname);
+if (produtoDoLink) history.replaceState(null, "", `/#/produto/${produtoDoLink}`);
 
 async function iniciar() {
   montar(pagina, carregando);
@@ -51,6 +56,7 @@ async function iniciar() {
   const rotas = {
     "/": inicio,
     "/cardapio": cardapio,
+    "/produto/:id": paginaDoProduto,
     "/favoritos": favoritos,
     "/entrar": paginaEntrar,
     "/cadastrar": paginaCadastrar,

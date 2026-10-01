@@ -5,6 +5,9 @@
   "installCommand": "echo sem-dependencias",
   "outputDirectory": "dist",
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/p/:produto", "destination": "/" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

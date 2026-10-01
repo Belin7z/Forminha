@@ -84,6 +84,8 @@
 .produto-detalhe__alergenos { display: flex; gap: .5rem; align-items: flex-start; margin: .6rem 0; padding: .55rem .8rem; background: var(--marca-50); border: 1px solid var(--borda); border-radius: var(--raio-sm); font-size: .85rem; }
 .produto-detalhe__alergenos .icone { color: var(--detalhe); flex: none; margin-top: .15rem; }
 .produto-detalhe__desc { color: var(--texto-suave); margin: .5rem 0; }
+.produto-detalhe__linha { display: flex; align-items: center; gap: .6rem; }
+.produto-detalhe__compartilhar { margin-left: auto; }
 .produto-detalhe__meta { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-size: .8rem; color: var(--texto-suave); margin-bottom: 1rem; }
 .produto-detalhe__meta span { display: inline-flex; align-items: center; gap: .35rem; }
 .produto-detalhe__meta .icone { color: var(--detalhe); }

@@ -2,12 +2,38 @@
 import { html, montar, delegar } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { plural } from "/src/scripts/base/formatacao.js";
+import { toast } from "/src/scripts/base/ui.js";
 import { estado } from "../nucleo/estado.js";
-import { precoInicial } from "../nucleo/catalogo.js";
+import { precoInicial, produtoPorId } from "../nucleo/catalogo.js";
+import { aplicarSeo, aplicarSeoDoProduto } from "../nucleo/seo.js";
 import { cartaoProduto } from "../componentes/cartao-produto.js";
 import { ligarProdutos } from "../componentes/acoes-produto.js";
+import { abrirProduto } from "../componentes/modal-produto.js";
 
 const semAcento = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/**
+ * Link próprio do produto: o cardápio com a janela do produto já aberta.
+ * Ao fechar a janela, o endereço volta a ser o do cardápio.
+ */
+export function paginaDoProduto(ctx) {
+  const desligar = cardapio(ctx);
+  const p = produtoPorId(ctx.params.id);
+  if (!p) {
+    toast("Este produto não está mais disponível. Veja o cardápio.", "info");
+    history.replaceState(null, "", "#/cardapio");
+    return desligar;
+  }
+  history.replaceState(null, "", `#/produto/${p.id}`); // o cardápio acerta o endereço ao abrir; enquanto o produto está aberto, é o dele
+  aplicarSeoDoProduto(estado.config, p);
+  abrirProduto(p.id, ctx, {
+    aoFechar: () => {
+      aplicarSeo(estado.config);
+      if (ctx.ativo()) history.replaceState(null, "", "#/cardapio");
+    },
+  });
+  return desligar;
+}
 
 export function cardapio(ctx) {
   // cardápio novo, ainda sem produtos: nada de busca e filtros vazios

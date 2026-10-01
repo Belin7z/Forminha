@@ -9,6 +9,7 @@
    ajusta sozinho quando o visitante abrir (nada quebra).
    ========================================================== */
 import { gerarTokens, pacoteDoTema } from "../src/scripts/base/tema.js";
+import { caminhoDoProduto } from "../src/scripts/base/dominio.js";
 
 /** Lê a configuração pública da loja (a mesma que o site lê ao abrir). */
 export async function buscarLoja({ supabaseUrl, supabaseAnonKey }, { tempo = 8000 } = {}) {
@@ -54,6 +55,43 @@ export function personalizarHtmlLoja(html, dados) {
   saida = trocarMeta(saida, "property", "og:description", t.descricao);
   if (t.imagem) saida = saida.replace(/(<meta property="og:locale"[^>]*>)/, `<meta property="og:image" content="${escapar(t.imagem)}">\n  $1`);
   return saida;
+}
+
+/** Menor preço do produto: o preço base + a opção mais barata de cada grupo obrigatório (o "a partir de" da loja). */
+export function precoDoProduto(p) {
+  let valor = Number(p.preco) || 0;
+  for (const g of p.opcoes ?? []) if (g.obrigatorio && g.itens?.length) valor += Math.min(...g.itens.map((i) => Number(i.preco) || 0));
+  return valor;
+}
+
+const reais = (centavos) => `R$ ${(centavos / 100).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+
+/** Coloca (ou troca) uma <meta property> antes do og:locale. */
+function colocarMeta(html, nome, valor) {
+  if (!valor) return html;
+  if (new RegExp(`<meta property="${nome}" `).test(html)) return trocarMeta(html, "property", nome, valor);
+  return html.replace(/(<meta property="og:locale"[^>]*>)/, `<meta property="${nome}" content="${escapar(valor)}">\n  $1`);
+}
+
+/**
+ * HTML do link próprio de um produto (/p/12-bolo…): o WhatsApp e o Instagram mostram a foto,
+ * o nome e o preço do produto. `origem`: "https://endereco-da-loja".
+ */
+export function personalizarHtmlProduto(html, produto, dados, origem) {
+  const t = textosDaLoja(dados);
+  const url = origem + caminhoDoProduto(produto);
+  const titulo = `${String(produto.nome ?? "").trim()} — ${t.nome}`;
+  const descricaoDoProduto = String(produto.descricao ?? "").replace(/\s+/g, " ").trim();
+  const preco = precoDoProduto(produto);
+  const descricao = `${preco > 0 ? `${reais(preco)} · ` : ""}${descricaoDoProduto || `Encomende online na ${t.nome}.`}`.slice(0, 280);
+  let saida = html.replace(/<title>[^<]*<\/title>/, `<title>${escapar(titulo)}</title>`);
+  saida = trocarMeta(saida, "name", "description", descricao);
+  saida = trocarMeta(saida, "property", "og:type", "product");
+  saida = trocarMeta(saida, "property", "og:title", titulo);
+  saida = trocarMeta(saida, "property", "og:description", descricao);
+  saida = colocarMeta(saida, "og:image", produto.imagem || t.imagem);
+  saida = colocarMeta(saida, "og:url", url);
+  return saida.replace("</head>", `  <link rel="canonical" href="${escapar(url)}">\n</head>`);
 }
 
 /** HTML do Dashboard com o nome da loja no título e a cor da barra. */

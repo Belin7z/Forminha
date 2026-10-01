@@ -6,6 +6,7 @@ import { brl, plural } from "/src/scripts/base/formatacao.js";
 import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina, vazio } from "../componentes/pagina.js";
 import { abrirFormProduto } from "../componentes/form-produto.js";
+import { linkDoProduto } from "../nucleo/enderecos.js";
 
 const semAcento = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -69,6 +70,7 @@ export async function produtos(ctx) {
           <td><label class="interruptor interruptor--tabela"><input type="checkbox" ${p.ativo && "checked"} data-acao="alternar" data-campo="ativo" data-id="${p.id}" aria-label="Disponível na loja: ${p.nome}"><span class="interruptor__trilho"></span></label></td>
           <td><button type="button" class="btn-icone btn-icone--pequeno estrela-toggle ${p.destaque && "estrela-toggle--on"}" data-acao="alternar-destaque" data-id="${p.id}" aria-pressed="${String(p.destaque)}" aria-label="Destacar ${p.nome}">${icone("estrela", { tamanho: 18, preenchido: p.destaque })}</button></td>
           <td class="texto-direita nowrap">
+            ${linkDoProduto(p) && html`<button type="button" class="btn-icone btn-icone--pequeno" data-acao="link" data-id="${p.id}" aria-label="Copiar o link de ${p.nome}" title="Copiar o link do produto">${icone("compartilhar", { tamanho: 17 })}</button>`}
             <button type="button" class="btn-icone btn-icone--pequeno" data-acao="editar" data-id="${p.id}" aria-label="Editar ${p.nome}">${icone("editar", { tamanho: 17 })}</button>
             <button type="button" class="btn-icone btn-icone--pequeno btn-icone--perigo" data-acao="excluir" data-id="${p.id}" aria-label="Excluir ${p.nome}">${icone("lixeira", { tamanho: 17 })}</button></td>
         </tr>`)}</tbody></table></div></div>`
@@ -93,6 +95,12 @@ export async function produtos(ctx) {
       abrirFormProduto({ categorias, aoSalvar: trocar });
     },
     editar: (el) => abrirFormProduto({ produto: achar(el), categorias, aoSalvar: trocar }),
+    link: async (el) => {
+      const p = achar(el);
+      const url = linkDoProduto(p);
+      try { await navigator.clipboard.writeText(url); toast(p.ativo ? "Link copiado! Cole no WhatsApp ou no Instagram: abre direto neste produto." : "Link copiado. Ligue “Na loja” para o produto aparecer para os clientes.", p.ativo ? "sucesso" : "info"); }
+      catch { toast(`Link do produto: ${url}`, "info"); }
+    },
     "alternar-destaque": (el) => alterarCampo("destaque", achar(el), !achar(el).destaque),
     excluir: async (el) => {
       const p = achar(el);

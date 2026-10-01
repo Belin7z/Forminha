@@ -3,7 +3,7 @@ import { html } from "/src/scripts/base/html.js";
 import { icone } from "/src/scripts/base/icones.js";
 import { abrirModal, toast } from "/src/scripts/base/ui.js";
 import { brl, dataCurta, horasTexto } from "/src/scripts/base/formatacao.js";
-import { ALERGENOS } from "/src/scripts/base/dominio.js";
+import { ALERGENOS, caminhoDoProduto } from "/src/scripts/base/dominio.js";
 import { estado, ouvir } from "../nucleo/estado.js";
 import { extrasDaSelecao, produtoPorId } from "../nucleo/catalogo.js";
 import { adicionar } from "../nucleo/carrinho.js";
@@ -35,8 +35,22 @@ const nomeAlergeno = (id) => ALERGENOS.find(([codigo]) => codigo === id)?.[1] ??
 const periodoTexto = (p) => (p.disponivel_de && p.disponivel_ate ? `vendido para datas de ${dataCurta(p.disponivel_de)} a ${dataCurta(p.disponivel_ate)}`
   : p.disponivel_de ? `vendido para datas a partir de ${dataCurta(p.disponivel_de)}` : `vendido para datas até ${dataCurta(p.disponivel_ate)}`);
 
-/** Abre a janela do produto. `ctx` é o contexto da rota (usado para o login do favorito). */
-export function abrirProduto(id, ctx) {
+/** Compartilha o link próprio do produto: a janela de compartilhar do celular ou, no computador, copia o link. */
+async function compartilhar(p) {
+  const url = location.origin + caminhoDoProduto(p);
+  if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+    try { await navigator.share({ title: p.nome, text: `${p.nome} — ${estado.config.loja.nome}`, url }); return; }
+    catch (e) { if (e?.name === "AbortError") return; } // a pessoa desistiu
+  }
+  try { await navigator.clipboard.writeText(url); toast("Link do produto copiado. É só colar no WhatsApp ou no Instagram."); }
+  catch { toast(`Link do produto: ${url}`, "info"); }
+}
+
+/**
+ * Abre a janela do produto. `ctx` é o contexto da rota (usado para o login do favorito).
+ * `aoFechar`: chamado quando a janela fecha (o link próprio do produto volta para o cardápio).
+ */
+export function abrirProduto(id, ctx, { aoFechar } = {}) {
   const p = produtoPorId(id);
   if (!p) return;
   const minimo = p.min_qtd;
@@ -54,7 +68,10 @@ export function abrirProduto(id, ctx) {
         </div>
         ${fotos.length > 1 && html`<div class="produto-detalhe__fotos" role="group" aria-label="Fotos do produto">${fotos.map((f, n) => html`
           <button type="button" class="produto-detalhe__mini ${n === 0 && "produto-detalhe__mini--ativa"}" data-foto="${n}" aria-label="Ver foto ${n + 1}"><img src="${f}" alt="" loading="lazy"></button>`)}</div>`}
-        ${p.tag && html`<span class="badge">${p.tag}</span>`}
+        <div class="produto-detalhe__linha">
+          ${p.tag && html`<span class="badge">${p.tag}</span>`}
+          <button type="button" class="btn btn--suave btn--pequeno produto-detalhe__compartilhar" data-compartilhar>${icone("compartilhar", { tamanho: 15 })} Compartilhar</button>
+        </div>
         <p class="produto-detalhe__desc">${p.descricao}</p>
         ${(p.alergenos ?? []).length > 0 && html`<p class="produto-detalhe__alergenos">${icone("info", { tamanho: 16 })} <span><strong>Contém:</strong> ${(p.alergenos ?? []).map((a) => nomeAlergeno(a)).join(", ")}.</span></p>`}
         <p class="produto-detalhe__meta">
@@ -79,7 +96,7 @@ export function abrirProduto(id, ctx) {
         <button type="button" data-mais aria-label="Aumentar">${icone("mais", { tamanho: 16 })}</button>
       </div>
       <button type="button" class="btn btn--primario btn--grande espaco" data-add></button>`,
-    aoFechar: () => desligar(),
+    aoFechar: () => { desligar(); aoFechar?.(); },
   });
 
   const form = m.el.querySelector("form");
@@ -138,6 +155,7 @@ export function abrirProduto(id, ctx) {
     m.el.querySelectorAll(".produto-detalhe__mini").forEach((x) => x.classList.toggle("produto-detalhe__mini--ativa", x === botao));
   }));
   form.addEventListener("submit", (ev) => ev.preventDefault());
+  m.el.querySelector("[data-compartilhar]").addEventListener("click", () => compartilhar(p));
   botaoFav.addEventListener("click", () => { m.fechar(); alternarFavorito(p.id, ctx); });
 
   botaoAdd.addEventListener("click", () => {

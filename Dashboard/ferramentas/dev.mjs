@@ -93,7 +93,8 @@ function servir(app, porta, config) {
 
       if (caminho === "/config.js") return resposta(200, configJs, TIPOS[".js"]);
 
-      let arquivo = resolve(pastaApp, "." + caminho);
+      // link próprio do produto (/p/12-bolo…): a loja abre a página de sempre e vai direto ao produto
+      let arquivo = app === "loja" && /^\/p\/\d/.test(caminho) ? join(pastaApp, "index.html") : resolve(pastaApp, "." + caminho);
       const primeiro = relative(pastaApp, arquivo).split(sep)[0];
       if (!dentro(pastaApp, arquivo) || (arquivo !== pastaApp && !PUBLICO.includes(primeiro))) return resposta(403, "Acesso negado");
       if ((await stat(arquivo).catch(() => null))?.isDirectory()) arquivo = join(arquivo, "index.html");

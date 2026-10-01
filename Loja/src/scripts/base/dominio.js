@@ -57,6 +57,19 @@ export const ALERGENOS = [
 
 export const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
+/**
+ * Endereço próprio de um produto: "/p/12-bolo-de-ninho". Só o número vale (o nome pode mudar
+ * e o link antigo continua abrindo); o nome é para quem lê o link.
+ */
+export function caminhoDoProduto({ id, nome }) {
+  const nomeNoLink = String(nome ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");
+  return `/p/${id}${nomeNoLink ? `-${nomeNoLink}` : ""}`;
+}
+
+/** O número do produto num endereço "/p/12-…" (ou null se não for um link de produto). */
+export const produtoDoCaminho = (caminho) => Number(/^\/p\/(\d{1,9})(?:-[a-z0-9-]*)?\/?$/.exec(String(caminho))?.[1]) || null;
+
 export const UFS = [
   "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA",
   "PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
