@@ -7,6 +7,7 @@ import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina, vazio } from "../componentes/pagina.js";
 import { abrirFormProduto } from "../componentes/form-produto.js";
 import { linkDoProduto } from "../nucleo/enderecos.js";
+import { abrirEtiquetas } from "../componentes/etiquetas.js";
 
 const semAcento = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -71,6 +72,7 @@ export async function produtos(ctx) {
           <td><button type="button" class="btn-icone btn-icone--pequeno estrela-toggle ${p.destaque && "estrela-toggle--on"}" data-acao="alternar-destaque" data-id="${p.id}" aria-pressed="${String(p.destaque)}" aria-label="Destacar ${p.nome}">${icone("estrela", { tamanho: 18, preenchido: p.destaque })}</button></td>
           <td class="texto-direita nowrap">
             ${linkDoProduto(p) && html`<button type="button" class="btn-icone btn-icone--pequeno" data-acao="link" data-id="${p.id}" aria-label="Copiar o link de ${p.nome}" title="Copiar o link do produto">${icone("compartilhar", { tamanho: 17 })}</button>`}
+            <button type="button" class="btn-icone btn-icone--pequeno" data-acao="etiquetas" data-id="${p.id}" aria-label="Imprimir etiquetas de ${p.nome}" title="Imprimir etiquetas">${icone("impressora", { tamanho: 17 })}</button>
             <button type="button" class="btn-icone btn-icone--pequeno" data-acao="editar" data-id="${p.id}" aria-label="Editar ${p.nome}">${icone("editar", { tamanho: 17 })}</button>
             <button type="button" class="btn-icone btn-icone--pequeno btn-icone--perigo" data-acao="excluir" data-id="${p.id}" aria-label="Excluir ${p.nome}">${icone("lixeira", { tamanho: 17 })}</button></td>
         </tr>`)}</tbody></table></div></div>`
@@ -95,6 +97,7 @@ export async function produtos(ctx) {
       abrirFormProduto({ categorias, aoSalvar: trocar });
     },
     editar: (el) => abrirFormProduto({ produto: achar(el), categorias, aoSalvar: trocar }),
+    etiquetas: (el) => { const p = achar(el); abrirEtiquetas({ titulo: `Etiquetas — ${p.nome}`, itens: [{ produto_id: p.id, nome: p.nome }] }); },
     link: async (el) => {
       const p = achar(el);
       const url = linkDoProduto(p);

@@ -12,6 +12,7 @@ import { criarMapa } from "/src/scripts/base/mapa.js";
 import { api } from "../nucleo/api.js";
 import { atualizarContagem } from "../nucleo/notificacoes.js";
 import { carregandoPagina } from "./pagina.js";
+import { abrirEtiquetas } from "./etiquetas.js";
 
 /** Mensagem pronta para avisar o cliente sobre o novo status. */
 function mensagemWhats(p) {
@@ -160,7 +161,8 @@ export async function abrirPedido(id, aoMudar) {
 
   const m = abrirModal({
     titulo: "Pedido", largura: 920, classe: "modal-pedido", corpo: carregandoPagina,
-    rodape: html`<button type="button" class="btn btn--suave" data-imprimir>${icone("impressora", { tamanho: 16 })} Imprimir</button>
+    rodape: html`<button type="button" class="btn btn--suave" data-etiquetas>${icone("etiqueta", { tamanho: 16 })} Etiquetas</button>
+      <button type="button" class="btn btn--suave" data-imprimir>${icone("impressora", { tamanho: 16 })} Imprimir</button>
       <button type="button" class="btn btn--escuro" data-fechar>Fechar</button>`,
     aoFechar: () => mapa?.destruir(),
   });
@@ -180,6 +182,13 @@ export async function abrirPedido(id, aoMudar) {
   }
 
   m.rodape.querySelector("[data-imprimir]").addEventListener("click", () => window.print());
+  m.rodape.querySelector("[data-etiquetas]").addEventListener("click", () => {
+    if (!atual) return;
+    abrirEtiquetas({
+      titulo: `Etiquetas — pedido ${atual.codigo}`, comCliente: true,
+      itens: atual.itens.map((i) => ({ produto_id: i.produto_id, nome: i.nome, opcoes: i.opcoes, cliente: atual.cliente.nome, lote: atual.codigo })),
+    });
+  });
 
   async function carregarAvisos() {
     const lista = m.corpo.querySelector("[data-avisos-lista]");

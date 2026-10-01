@@ -73,6 +73,7 @@ export function abrirProduto(id, ctx, { aoFechar } = {}) {
           <button type="button" class="btn btn--suave btn--pequeno produto-detalhe__compartilhar" data-compartilhar>${icone("compartilhar", { tamanho: 15 })} Compartilhar</button>
         </div>
         <p class="produto-detalhe__desc">${p.descricao}</p>
+        ${p.ingredientes && html`<details class="produto-detalhe__ingredientes"><summary>Ingredientes</summary><p>${p.ingredientes}</p></details>`}
         ${(p.alergenos ?? []).length > 0 && html`<p class="produto-detalhe__alergenos">${icone("info", { tamanho: 16 })} <span><strong>Contém:</strong> ${(p.alergenos ?? []).map((a) => nomeAlergeno(a)).join(", ")}.</span></p>`}
         <p class="produto-detalhe__meta">
           <span>${icone("pacote", { tamanho: 16 })} ${p.unidade}</span>
@@ -80,6 +81,8 @@ export function abrirProduto(id, ctx, { aoFechar } = {}) {
           ${p.antecedencia_horas != null && html`<span>${icone("relogio", { tamanho: 16 })} encomendar com ${horasTexto(p.antecedencia_horas)} de antecedência</span>`}
           ${(p.disponivel_de || p.disponivel_ate) && html`<span>${icone("calendario", { tamanho: 16 })} ${periodoTexto(p)}</span>`}
           ${p.limite_diario && html`<span>${icone("pacote", { tamanho: 16 })} vendemos até ${p.limite_diario} por dia</span>`}
+          ${p.conservacao && html`<span>${icone("info", { tamanho: 16 })} ${p.conservacao}</span>`}
+          ${p.validade_dias && html`<span>${icone("calendario", { tamanho: 16 })} validade: ${p.validade_dias === 1 ? "1 dia" : `${p.validade_dias} dias`}</span>`}
         </p>
         <form id="form-produto" novalidate>
           ${p.opcoes.map(grupoHtml)}

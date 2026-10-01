@@ -85,6 +85,9 @@
 .produto-detalhe__alergenos .icone { color: var(--detalhe); flex: none; margin-top: .15rem; }
 .produto-detalhe__desc { color: var(--texto-suave); margin: .5rem 0; }
 .produto-detalhe__linha { display: flex; align-items: center; gap: .6rem; }
+.produto-detalhe__ingredientes { margin: .2rem 0 .6rem; font-size: .88rem; }
+.produto-detalhe__ingredientes summary { cursor: pointer; font-weight: 500; color: var(--escura); }
+.produto-detalhe__ingredientes p { margin: .3rem 0 0; color: var(--texto-suave); }
 .produto-detalhe__compartilhar { margin-left: auto; }
 .produto-detalhe__meta { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; font-size: .8rem; color: var(--texto-suave); margin-bottom: 1rem; }
 .produto-detalhe__meta span { display: inline-flex; align-items: center; gap: .35rem; }

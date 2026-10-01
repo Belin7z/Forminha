@@ -5,6 +5,7 @@ import { dataPorExtenso, plural } from "/src/scripts/base/formatacao.js";
 import { dataISO } from "/src/scripts/base/agendamento.js";
 import { api } from "../nucleo/api.js";
 import { cabecalhoPagina, carregandoPagina, erroPagina, vazio } from "../componentes/pagina.js";
+import { abrirEtiquetas } from "../componentes/etiquetas.js";
 
 const inicial = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const somarDias = (iso, n) => {
@@ -32,7 +33,8 @@ export async function producao(ctx) {
     montar(ctx.raiz, html`
       ${cabecalhoPagina({
         titulo: "Produção", descricao: "Tudo o que precisa ser feito para a data escolhida, somando todos os pedidos ativos.",
-        acoes: html`<button type="button" class="btn btn--primario" data-acao="imprimir">${icone("impressora", { tamanho: 17 })} Imprimir</button>`,
+        acoes: html`${r.pedidos.length > 0 && html`<button type="button" class="btn btn--suave" data-acao="etiquetas">${icone("etiqueta", { tamanho: 17 })} Etiquetas</button>`}
+          <button type="button" class="btn btn--primario" data-acao="imprimir">${icone("impressora", { tamanho: 17 })} Imprimir</button>`,
       })}
       <div class="prod__controles cartao cartao--sem-margem">
         <button type="button" class="btn-icone" data-acao="anterior" aria-label="Dia anterior">${icone("voltar", { tamanho: 18 })}</button>
@@ -81,6 +83,11 @@ export async function producao(ctx) {
   delegar(ctx.raiz, {
     anterior: () => ir(somarDias(data, -1)),
     seguinte: () => ir(somarDias(data, 1)),
+    // uma etiqueta por item de cada pedido do dia, com o nome do cliente e o código do pedido como lote
+    etiquetas: () => abrirEtiquetas({
+      titulo: `Etiquetas — ${dataPorExtenso(data)}`, comCliente: true,
+      itens: r.pedidos.flatMap((o) => (o.itens ?? []).map((i) => ({ nome: i.nome, opcoes: i.opcoes, cliente: o.cliente, lote: o.codigo }))),
+    }),
     imprimir: () => {
       document.body.classList.add("imprimindo-pagina");
       window.addEventListener("afterprint", () => document.body.classList.remove("imprimindo-pagina"), { once: true });

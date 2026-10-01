@@ -156,3 +156,24 @@ describe("período de venda", () => {
     await pedir(livre, 1);
   });
 });
+
+describe("etiqueta: ingredientes, validade e como conservar", () => {
+  it("são guardados, aparecem na vitrine e o que não veio continua como estava", async () => {
+    const { produto } = await painel.post("/produtos", base({ ingredientes: "  leite condensado,   manteiga e chocolate  ", validade_dias: 5, conservacao: "Manter refrigerado (0 °C a 5 °C)." }));
+    assert.deepEqual([produto.ingredientes, produto.validade_dias, produto.conservacao], ["leite condensado, manteiga e chocolate", 5, "Manter refrigerado (0 °C a 5 °C)."]);
+    const naVitrine = (await visitante.get("/catalogo")).produtos.find((p) => p.id === produto.id);
+    assert.deepEqual([naVitrine.ingredientes, naVitrine.validade_dias, naVitrine.conservacao], [produto.ingredientes, 5, produto.conservacao]);
+    const { produto: semMexer } = await painel.put(`/produtos/${produto.id}`, base({ nome: produto.nome }));
+    assert.equal(semMexer.validade_dias, 5, "salvar sem os campos da etiqueta não apaga o que estava");
+    const { produto: limpo } = await painel.put(`/produtos/${produto.id}`, base({ nome: produto.nome, validade_dias: null, ingredientes: "" }));
+    assert.deepEqual([limpo.validade_dias, limpo.ingredientes], [null, ""]);
+  });
+
+  it("valida no banco (validade de 1 a 730 dias, textos com tamanho máximo)", async () => {
+    for (const [extra, campo] of [[{ validade_dias: 0 }, "validade_dias"], [{ validade_dias: 731 }, "validade_dias"], [{ ingredientes: "x".repeat(1001) }, "ingredientes"], [{ conservacao: "x".repeat(161) }, "conservacao"]]) {
+      const e = await falha(painel.post("/produtos", base(extra)));
+      assert.equal(e.status, 422, campo);
+      assert.ok(e.campos?.[campo], `erro no campo ${campo}`);
+    }
+  });
+});

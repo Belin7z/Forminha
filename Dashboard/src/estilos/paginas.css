@@ -597,3 +597,44 @@
   .painel-grade--2-1, .painel-grade--3, .painel-grade--2 { grid-template-columns: 1fr 1fr; }
   .cartao { break-inside: avoid; }
 }
+
+/* ---------- Etiquetas: a janela (opções + prévia) ---------- */
+.etq-tela { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.4rem; align-items: start; }
+.etq-tela__previa { position: sticky; top: 0; min-width: 260px; }
+.etq-tela__aviso { display: flex; gap: .4rem; align-items: flex-start; margin-top: .8rem; font-size: .8rem; }
+.etq-previa { display: grid; place-items: center; padding: 1.2rem; border-radius: var(--raio); background: var(--neutro-bg); }
+.etq-previa .etq { box-shadow: var(--sombra); }
+.etq-lista { list-style: none; margin: .8rem 0 0; padding: 0; border-top: 1px solid var(--borda); }
+.etq-lista li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid var(--borda); }
+.etq-lista li > div { display: grid; min-width: 0; }
+.etq-lista small { font-size: .76rem; }
+@media (max-width: 760px) { .etq-tela { grid-template-columns: 1fr; } .etq-tela__previa { position: static; } }
+
+/* ---------- Etiquetas: o desenho (igual na prévia e no papel; medidas em mm/pt) ---------- */
+.etq { box-sizing: border-box; display: flex; flex-direction: column; gap: .45mm; width: var(--etq-l); height: var(--etq-a); padding: 1.8mm 2.2mm; overflow: hidden;
+  background: #fff; color: #000; font-family: Arial, Helvetica, sans-serif; font-size: 6pt; line-height: 1.2; text-align: left; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.etq b { font-weight: 700; }
+.etq__nome { font-size: 8.4pt; line-height: 1.1; font-weight: 700; }
+.etq__detalhe { font-size: 6.2pt; }
+.etq__cliente { font-size: 6.4pt; font-weight: 700; }
+.etq__ing { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.etq__alerta { font-weight: 700; }
+.etq__datas { display: flex; flex-wrap: wrap; gap: 0 2.4mm; margin-top: auto; }
+.etq__loja { font-size: 5.2pt; color: #222; }
+[data-tamanho="100x50"] .etq { font-size: 7.4pt; padding: 2.6mm 3mm; }
+[data-tamanho="100x50"] .etq__nome { font-size: 11pt; }
+[data-tamanho="100x50"] .etq__ing { -webkit-line-clamp: 6; }
+[data-tamanho="100x50"] .etq__loja { font-size: 6.2pt; }
+
+/* ---------- Etiquetas: impressão (só elas saem no papel) ---------- */
+#area-etiquetas { display: none; }
+@media print {
+  body.imprimindo-etiquetas { margin: 0; padding: 0; background: #fff !important; }
+  body.imprimindo-etiquetas > *:not(#area-etiquetas) { display: none !important; }
+  body.imprimindo-etiquetas #area-etiquetas { display: block !important; }
+  .etq-area--termica .etq-pagina { width: var(--etq-l); height: var(--etq-a); overflow: hidden; break-after: page; }
+  .etq-area--folha .etq-pagina { box-sizing: border-box; display: grid; grid-template-columns: repeat(var(--etq-col), var(--etq-l)); grid-auto-rows: var(--etq-a); column-gap: var(--etq-espaco);
+    align-content: start; width: 210mm; height: 297mm; padding: var(--etq-topo) 0 0 var(--etq-esq); overflow: hidden; break-after: page; }
+  .etq-pagina:last-child { break-after: auto; }
+}
+.editor-extras__sub { margin: 1rem 0 .5rem; font-size: 1rem; }

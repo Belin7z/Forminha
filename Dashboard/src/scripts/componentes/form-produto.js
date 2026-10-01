@@ -75,6 +75,13 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
             ${campo({ nome: "disponivel_de", rotulo: "Vender para datas a partir de", tipo: "date", valor: p.disponivel_de ?? "" })}
             ${campo({ nome: "disponivel_ate", rotulo: "…até", tipo: "date", valor: p.disponivel_ate ?? "", ajuda: "Para itens de época (Páscoa, Natal…)." })}
           </div>
+          <h3 class="editor-extras__sub">Etiqueta <small class="texto-suave">— sai na etiqueta impressa e o cliente também vê na loja</small></h3>
+          ${campo({ nome: "ingredientes", rotulo: "Ingredientes", tipo: "textarea", valor: p.ingredientes ?? "", linhas: 2, atributos: 'maxlength="1000"',
+            placeholder: "Ex.: leite condensado, creme de leite, chocolate em pó 50% cacau, manteiga e granulado.", ajuda: "Do que tem mais para o que tem menos." })}
+          <div class="grade-campos grade-campos--2">
+            ${campo({ nome: "validade_dias", rotulo: "Validade (dias)", tipo: "number", valor: p.validade_dias ?? "", atributos: 'min="1" max="730"', ajuda: "Contados da fabricação. Vazio = sem data de validade na etiqueta." })}
+            ${campo({ nome: "conservacao", rotulo: "Como conservar", valor: p.conservacao ?? "", atributos: 'maxlength="160"', placeholder: "Ex.: Manter refrigerado (0 °C a 5 °C)." })}
+          </div>
           <div class="campo"><label>Fotos extras <small class="texto-suave">(até 4)</small></label>
             <div class="galeria-editor galeria-editor--produto" id="galeria-produto"></div></div>
         </section>
@@ -208,6 +215,7 @@ export function abrirFormProduto({ produto = null, categorias, aoSalvar }) {
       categoria_id: Number(d.categoria_id),
       preco: paraCentavos(d.preco),
       min_qtd: Number(d.min_qtd) || 1,
+      validade_dias: d.validade_dias === "" ? null : Number(d.validade_dias),
       alergenos: ALERGENOS.filter(([id]) => d[`al_${id}`]).map(([id]) => id),
       galeria,
       opcoes: opcoes.map((g) => ({
