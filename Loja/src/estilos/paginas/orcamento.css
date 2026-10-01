@@ -1,0 +1,32 @@
+/* PÁGINA — encomenda por orçamento (o pedido) e a aba "Orçamentos" da conta */
+.pagina-orcamento { max-width: 760px; }
+.orcamento-form { display: grid; gap: .2rem; }
+.orcamento-form__tipo { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .6rem; margin: 0 0 1rem; padding: 0; border: 0; }
+.orcamento-form__tipo legend { margin-bottom: .5rem; font-size: .9rem; font-weight: 500; color: var(--texto); }
+.orcamento-form__nota { margin-top: .8rem; font-size: .84rem; }
+.orcamento-form .btn--grande { justify-self: start; margin-top: .6rem; }
+.orcamento-form [data-endereco] .linha-flex { flex-wrap: nowrap; }
+.orcamento-form [data-endereco] select { flex: 1; min-width: 0; }
+
+.orcamento-fotos { display: flex; flex-wrap: wrap; gap: .7rem; }
+.orcamento-fotos__foto { position: relative; width: 104px; height: 104px; margin: 0; overflow: hidden; border-radius: var(--raio-sm); background: var(--marca-100); }
+.orcamento-fotos__foto img { width: 100%; height: 100%; object-fit: cover; }
+.orcamento-fotos__foto .btn-icone { position: absolute; top: 5px; right: 5px; background: rgb(255 255 255 / .92); }
+.orcamento-fotos__nova { display: grid; place-items: center; align-content: center; gap: .3rem; width: 104px; height: 104px; border: 1px dashed var(--borda-forte); border-radius: var(--raio-sm);
+  color: var(--texto-suave); font-size: .76rem; text-align: center; cursor: pointer; transition: border-color .2s, color .2s; }
+.orcamento-fotos__nova:hover { border-color: var(--escura); color: var(--escura); }
+
+.lista-orcamentos { display: grid; gap: .9rem; }
+.orcamento-card { display: grid; gap: .5rem; padding: 1.1rem 1.2rem; border: 1px solid var(--borda); border-radius: var(--raio); background: #fff; }
+.orcamento-card--respondido { border-color: var(--escura); box-shadow: var(--sombra-sm); }
+.orcamento-card__cab { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .8rem; }
+.orcamento-card__cab small { margin-left: auto; }
+.orcamento-card__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 0; }
+.orcamento-card__meta { display: flex; align-items: center; gap: .35rem; margin: 0; font-size: .84rem; }
+.orcamento-card__proposta { display: grid; gap: .5rem; margin-top: .3rem; padding: 1rem; border-radius: var(--raio-sm); background: var(--marca-50); }
+.orcamento-card__proposta p { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin: 0; font-size: .9rem; }
+.orcamento-card__titulo { font-size: 1.05rem; color: var(--escura); }
+.orcamento-card__mensagem { margin: 0; font-style: italic; color: var(--texto-suave); }
+.orcamento-card__aceitar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .7rem; margin-top: .3rem; }
+.orcamento-card__aceitar .campo { display: grid; gap: .25rem; margin: 0; font-size: .82rem; color: var(--texto-suave); }
+.orcamento-card__cancelar { justify-self: start; font-size: .82rem; }

@@ -71,6 +71,7 @@ function corpo(p) {
       <span class="status status--${p.status} status--grande">${p.status_texto}</span>
       <span class="badge badge--info">${icone(p.tipo === "entrega" ? "caminhao" : "sacola", { tamanho: 14 })} ${p.tipo === "entrega" ? "Entrega" : "Retirada"}</span>
       ${p.origem === "manual" && html`<span class="badge badge--neutro">Lançado pela loja</span>`}
+      ${p.origem === "orcamento" && html`<span class="badge badge--info">Veio de um orçamento</span>`}
       <span class="ped-topo__quando">${icone("calendario", { tamanho: 16 })} <strong>${dataPorExtenso(p.data)}</strong> às <strong>${p.hora}</strong></span>
       <small class="texto-suave">Feito ${pertoDeAgora} · ${dataHora(p.criado_em)}</small>
     </div>

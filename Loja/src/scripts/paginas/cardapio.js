@@ -47,7 +47,10 @@ export function cardapio(ctx) {
           <span class="vazio__ico">${icone("sacola", { tamanho: 38 })}</span>
           <h3>O cardápio está chegando</h3>
           <p>Em breve os produtos aparecem aqui. Enquanto isso, fale com a loja para encomendar.</p>
-          <a href="#/contato" class="btn btn--primario">Falar com a loja</a>
+          <div class="linha-flex linha-flex--centro">
+            <a href="#/contato" class="btn btn--primario">Falar com a loja</a>
+            ${estado.config.orcamento?.ativo !== false && html`<a href="#/orcamento" class="btn btn--contorno">Pedir orçamento</a>`}
+          </div>
         </div>
       </section>`);
     return;
@@ -64,7 +67,7 @@ export function cardapio(ctx) {
     <section class="container pagina-cardapio">
       <header class="pagina-cab">
         <h1>Nosso <span class="script">cardápio</span></h1>
-        <p class="texto-suave">Escolha, personalize e finalize em poucos cliques.</p>
+        <p class="texto-suave">Escolha, personalize e finalize em poucos cliques.${estado.config.orcamento?.ativo !== false && html` Não achou o que queria? <a href="#/orcamento" class="link">Peça um orçamento</a>.`}</p>
       </header>
 
       <div class="ferramentas">

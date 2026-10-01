@@ -194,6 +194,13 @@ export const rotasPainel = [
   ["POST", "/avisos/enviar", ({ supabase, corpo }) => invocarFuncao(supabase, "whatsapp-avisar", corpo)],
   ["GET", "/pedidos/:id/avisos", ({ rpc, params }) => rpc("admin_avisos_pedido", { id: params.id })],
 
+  // encomenda por orçamento
+  ["GET", "/orcamentos", ({ rpc, consulta }) => rpc("admin_orcamentos", consulta)],
+  ["PUT", "/orcamentos/config", ({ rpc, corpo }) => rpc("admin_salvar_orcamento_config", corpo)],
+  ["GET", "/orcamentos/:id", ({ rpc, params }) => rpc("admin_orcamento", { id: Number(params.id) })],
+  ["POST", "/orcamentos/:id/responder", ({ rpc, params, corpo }) => rpc("admin_responder_orcamento", { ...corpo, id: Number(params.id) })],
+  ["POST", "/orcamentos/:id/recusar", ({ rpc, params, corpo }) => rpc("admin_recusar_orcamento", { ...corpo, id: Number(params.id) })],
+
   // estoque: ingredientes, receitas e previsão de compras
   ["GET", "/ingredientes", ({ rpc }) => rpc("admin_ingredientes")],
   ["POST", "/ingredientes", ({ rpc, corpo }) => rpc("admin_salvar_ingrediente", { ...corpo, id: undefined })],

@@ -16,7 +16,7 @@ import { alternarSom, pararNotificacoes, somAtivo } from "../nucleo/notificacoes
 import { aoMudarInstalacao, instalar, podeInstalar } from "/src/scripts/base/instalar.js";
 
 const MENU = [
-  { grupo: "Vendas", itens: [["/", "Visão geral", "grafico"], ["/relatorios", "Relatórios", "tendencia"], ["/pedidos", "Pedidos", "pacote", "pedidos"], ["/agenda", "Agenda", "calendario"], ["/producao", "Produção", "lista"]] },
+  { grupo: "Vendas", itens: [["/", "Visão geral", "grafico"], ["/relatorios", "Relatórios", "tendencia"], ["/pedidos", "Pedidos", "pacote", "pedidos"], ["/orcamentos", "Orçamentos", "documento", "orcamentos"], ["/agenda", "Agenda", "calendario"], ["/producao", "Produção", "lista"]] },
   { grupo: "Cardápio", itens: [["/produtos", "Produtos", "bolo"], ["/categorias", "Categorias", "grade"], ["/estoque", "Estoque", "estoque", "estoque"]] },
   { grupo: "Clientes", itens: [["/clientes", "Clientes", "usuarios"], ["/avaliacoes", "Avaliações", "estrela"], ["/favoritos", "Favoritos", "coracao"]] },
   { grupo: "Loja", itens: [["/cupons", "Cupons", "percentual"], ["/entrega", "Entrega e mapa", "caminhao"], ["/configuracoes", "Configurações", "ajustes"], ["/equipe", "Equipe", "usuario"], ["/atividade", "Atividade", "relogio"]] },
@@ -57,6 +57,7 @@ export function montarEstrutura({ aoSair }) {
   function desenharLateral() {
     const u = estado.usuario;
     const novos = estado.contagem.novo ?? 0;
+    const orcamentosNovos = estado.contagem.orcamentos ?? 0;
     const risco = estado.estoque?.risco ?? 0;
     const ativo = (c) => (c === "/" ? caminho === "/" : caminho.startsWith(c));
     montar(lateral, html`
@@ -71,6 +72,7 @@ export function montarEstrutura({ aoSair }) {
             <a href="#${c}" class="lateral__link ${ativo(c) && "lateral__link--ativo"}" ${ativo(c) && html`aria-current="page"`}>
               ${icone(ic, { tamanho: 19 })}<span>${texto}</span>
               ${selo === "pedidos" && novos > 0 && html`<b class="lateral__selo" title="${novos} pedido(s) novo(s)">${novos}</b>`}
+              ${selo === "orcamentos" && orcamentosNovos > 0 && html`<b class="lateral__selo" title="${orcamentosNovos} orçamento(s) esperando resposta">${orcamentosNovos}</b>`}
               ${selo === "estoque" && risco > 0 && html`<b class="lateral__selo lateral__selo--alerta" title="${risco} ingrediente(s) precisam de atenção">${risco}</b>`}
             </a>`)}`)}
       </nav>

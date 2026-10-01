@@ -29,6 +29,7 @@ table { border-collapse: collapse; width: 100%; }
 /* palavra de destaque nos títulos: serifa em itálico, sem letra cursiva */
 .script { font-family: var(--f-titulo); font-size-adjust: var(--f-titulo-ajuste); font-style: var(--f-script-estilo); font-weight: 600; color: var(--marca-destaque); }
 .linha-flex { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.linha-flex--centro { justify-content: center; }
 .espaco { flex: 1; }
 
 /* pequeno rótulo em caixa-alta, acima dos títulos de seção */

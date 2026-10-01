@@ -6,7 +6,7 @@
    ========================================================== */
 export const PAPEIS = { admin: "Administrador", atendente: "Atendente" };
 
-const DO_ATENDENTE = ["/pedidos", "/agenda", "/producao", "/conta"];
+const DO_ATENDENTE = ["/pedidos", "/orcamentos", "/agenda", "/producao", "/conta"];
 
 export const podeAcessar = (papel, caminho) =>
   papel === "admin" || DO_ATENDENTE.some((r) => caminho === r || caminho.startsWith(`${r}/`));

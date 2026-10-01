@@ -9,11 +9,13 @@ import { emitir, estado } from "../nucleo/estado.js";
 import { exigirLogin, sair } from "../nucleo/sessao.js";
 import { abrirFormEndereco, resumoDeEntrega } from "../componentes/endereco-form.js";
 import { carregando } from "../componentes/carregando.js";
+import { abaOrcamentos } from "./orcamento.js";
 
 const ABAS = [
   ["dados", "Meus dados", "usuario"],
   ["enderecos", "Endereços", "pino"],
   ["pedidos", "Pedidos", "pacote"],
+  ["orcamentos", "Orçamentos", "documento"],
   ["senha", "Senha", "cadeado"],
   ["privacidade", "Privacidade", "info"],
 ];
@@ -226,6 +228,7 @@ export async function conta(ctx) {
     if (aba === "dados") abaDados(alvo);
     else if (aba === "enderecos") await abaEnderecos(alvo, ctx);
     else if (aba === "pedidos") await abaPedidos(alvo, ctx);
+    else if (aba === "orcamentos") await abaOrcamentos(alvo, ctx);
     else if (aba === "privacidade") abaPrivacidade(alvo);
     else abaSenha(alvo);
   } catch (erro) {

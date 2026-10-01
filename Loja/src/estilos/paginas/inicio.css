@@ -82,6 +82,15 @@
 .faixa-entrega .btn--primario:hover { background: var(--marca-100); }
 .faixa-entrega__ico { display: grid; place-items: center; width: 132px; height: 132px; border-radius: 32px; color: var(--sobre-profunda); background: rgb(255 255 255 / .06); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
 
+/* ---------- Encomenda por orçamento ---------- */
+.secao--respiro { margin-block: 3.2rem; }
+.encomenda-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 1.4rem; padding: 1.8rem 2rem; border: 1px solid var(--borda); border-radius: var(--raio-lg);
+  background: radial-gradient(70% 120% at 100% 0, var(--marca-100), transparent 70%), #fff; }
+.encomenda-card__ico { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 18px; color: #fff; background: var(--escura); }
+.encomenda-card h2 { margin: .2rem 0 .3rem; font-size: clamp(1.5rem, 2.6vw, 2rem); }
+.encomenda-card p { color: var(--texto-suave); max-width: 60ch; }
+@media (max-width: 760px) { .encomenda-card { grid-template-columns: 1fr; text-align: left; } }
+
 /* ---------- Galeria ---------- */
 .galeria { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 220px; gap: .9rem; }
 .galeria__foto { position: relative; margin: 0; overflow: hidden; border-radius: var(--raio); background: var(--marca-100); }

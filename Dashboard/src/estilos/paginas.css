@@ -600,6 +600,29 @@
   .cartao { break-inside: avoid; }
 }
 
+/* ---------- Orçamentos ---------- */
+.orc-config__form { display: grid; grid-template-columns: auto 1fr auto; gap: 1rem; align-items: end; }
+.orc-config__form .campo { margin: 0; }
+.orc-filtros { margin: 1rem 0; }
+.orc-lista { display: grid; gap: .7rem; }
+.orc-item { display: grid; gap: .35rem; width: 100%; margin: 0; padding: 1rem 1.1rem; border: 1px solid var(--borda); text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.orc-item:hover { border-color: var(--escura); box-shadow: var(--sombra-sm); }
+.orc-item__cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.orc-item__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0; color: var(--texto); }
+.orc-detalhe__topo { display: flex; align-items: center; gap: .7rem; margin-bottom: 1rem; }
+.orc-detalhe__desc { white-space: pre-line; margin: 0 0 .8rem; }
+.orc-detalhe__dados { display: grid; gap: .5rem; margin: 0; }
+.orc-detalhe__dados div { display: grid; grid-template-columns: 9rem 1fr; gap: .5rem; font-size: .9rem; }
+.orc-detalhe__dados dt { color: var(--texto-suave); }
+.orc-detalhe__dados dd { margin: 0; }
+.orc-fotos { display: flex; flex-wrap: wrap; gap: .6rem; }
+.orc-fotos__foto { width: 150px; height: 150px; padding: 0; overflow: hidden; border: 1px solid var(--borda); border-radius: var(--raio-sm); background: var(--marca-50); cursor: zoom-in; }
+.orc-fotos__foto img { width: 100%; height: 100%; object-fit: cover; }
+.orc-fotos__foto--grande { width: 100%; height: auto; cursor: zoom-out; }
+.orc-fotos__foto--grande img { height: auto; object-fit: contain; }
+.orc-proposta h3 { margin: 0 0 .6rem; }
+@media (max-width: 760px) { .orc-config__form { grid-template-columns: 1fr; } }
+
 /* ---------- Etiquetas: a janela (opções + prévia) ---------- */
 .etq-tela { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1.4rem; align-items: start; }
 .etq-tela__previa { position: sticky; top: 0; min-width: 260px; }

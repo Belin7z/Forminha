@@ -28,9 +28,9 @@ const listaEmTexto = (itens) => itens.join(", ").replace(/, ([^,]*)$/, " e $1");
 
 /** A ordem dos blocos em cada modelo. */
 const ORDEM = {
-  equilibrado: ["topo", "como", "vazio", "categorias", "destaques", "entrega", "galeria", "avaliacoes", "sobre", "faq", "chamada"],
-  vitrine: ["topo", "vazio", "destaques", "categorias", "galeria", "como", "entrega", "avaliacoes", "sobre", "faq", "chamada"],
-  minimalista: ["topo", "vazio", "categorias", "destaques", "galeria", "como", "entrega", "avaliacoes", "sobre", "faq", "chamada"],
+  equilibrado: ["topo", "como", "vazio", "categorias", "destaques", "encomenda", "entrega", "galeria", "avaliacoes", "sobre", "faq", "chamada"],
+  vitrine: ["topo", "vazio", "destaques", "categorias", "encomenda", "galeria", "como", "entrega", "avaliacoes", "sobre", "faq", "chamada"],
+  minimalista: ["topo", "vazio", "categorias", "destaques", "encomenda", "galeria", "como", "entrega", "avaliacoes", "sobre", "faq", "chamada"],
 };
 
 /** Frase padrão do topo, conforme a loja entrega, deixa retirar ou os dois. */
@@ -279,6 +279,20 @@ export function inicio(ctx) {
             ${config.loja.instagram && html`<a class="link-seta" href="https://instagram.com/${config.loja.instagram}" target="_blank" rel="noopener">${icone("instagram", { tamanho: 16 })} @${config.loja.instagram}</a>`}
           </header>
           <div class="galeria">${galeria.map((url) => html`<figure class="galeria__foto revelar"><img src="${url}" alt="Foto da ${config.loja.nome}" loading="lazy"></figure>`)}</div>
+        </div>
+      </section>`,
+
+    // encomenda por orçamento (a dona pode desligar no painel)
+    encomenda: () => config.orcamento?.ativo !== false && html`
+      <section class="container revelar secao--respiro">
+        <div class="encomenda-card">
+          <span class="encomenda-card__ico">${icone("documento", { tamanho: 26 })}</span>
+          <div>
+            <span class="rotulo">Sob encomenda</span>
+            <h2>Quer algo especial?</h2>
+            <p>${String(config.orcamento?.texto ?? "").trim() || "Conte o que você imagina (tema, sabores, para quantas pessoas) e receba um orçamento da loja."}</p>
+          </div>
+          <a href="#/orcamento" class="btn btn--primario">Pedir orçamento ${icone("direita", { tamanho: 17 })}</a>
         </div>
       </section>`,
 

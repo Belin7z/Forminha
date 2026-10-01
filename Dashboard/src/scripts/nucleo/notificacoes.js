@@ -48,6 +48,11 @@ export async function atualizarContagem() {
   try {
     const nova = await api.get("/pedidos/contagem");
     const mudou = JSON.stringify(nova) !== JSON.stringify(estado.contagem);
+    // pedido de orçamento novo: avisa como um pedido (só depois da primeira leitura)
+    if (estado.contagem.orcamentos != null && (nova.orcamentos ?? 0) > estado.contagem.orcamentos) {
+      tocarAviso();
+      toast("Chegou um pedido de orçamento! Veja em Orçamentos.", "info", 7000);
+    }
     estado.contagem = nova;
     // só redesenha o menu se algo mudou (evita perder foco e rolagem a cada consulta)
     if (mudou) emitir("contagem");

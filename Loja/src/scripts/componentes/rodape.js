@@ -46,6 +46,7 @@ export function desenharRodape() {
         <h3>Navegue</h3>
         <ul class="rodape__lista rodape__links">
           <li><a href="#/cardapio">Cardápio</a></li>
+          ${estado.config.orcamento?.ativo !== false && html`<li><a href="#/orcamento">Pedir orçamento</a></li>`}
           <li><a href="#/favoritos">Favoritos</a></li>
           <li><a href="#/conta/pedidos">Meus pedidos</a></li>
           <li><a href="#/contato">Onde estamos</a></li>

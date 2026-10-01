@@ -131,6 +131,12 @@ export const rotasLoja = [
   ["GET", "/pedidos/:codigo", ({ rpc, params }) => rpc("cliente_pedido", { codigo: params.codigo })],
   ["POST", "/pedidos/:codigo/cancelar", ({ rpc, params, corpo }) => rpc("cliente_cancelar_pedido", { codigo: params.codigo, motivo: corpo.motivo })],
   ["POST", "/pedidos/:codigo/avaliar", ({ rpc, params, corpo }) => rpc("cliente_avaliar_pedido", { codigo: params.codigo, nota: corpo.nota, comentario: corpo.comentario })],
+
+  // encomenda por orçamento: o cliente pede, a loja responde, o cliente aceita (vira pedido)
+  ["POST", "/orcamentos", ({ rpc, corpo }) => rpc("cliente_pedir_orcamento", corpo)],
+  ["GET", "/orcamentos", ({ rpc }) => rpc("cliente_orcamentos")],
+  ["POST", "/orcamentos/:id/aceitar", ({ rpc, params, corpo }) => rpc("cliente_aceitar_orcamento", { ...corpo, id: Number(params.id) })],
+  ["POST", "/orcamentos/:id/cancelar", ({ rpc, params }) => rpc("cliente_cancelar_orcamento", { id: Number(params.id) })],
 ];
 
 /** contexto: { urlRecuperacao } — para onde o link do e-mail "esqueci a senha" leva. */

@@ -24,6 +24,7 @@ import { conta } from "./paginas/conta.js";
 import { pedido } from "./paginas/pedido.js";
 import { contato } from "./paginas/contato.js";
 import { naoEncontrada } from "./paginas/nao-encontrada.js";
+import { paginaOrcamento } from "./paginas/orcamento.js";
 import { paginaPrivacidade, paginaTermos } from "./paginas/legal.js";
 import { aplicarSeo, registrarApp } from "./nucleo/seo.js";
 import { aplicarAparencia } from "/src/scripts/base/tema.js";
@@ -66,6 +67,7 @@ async function iniciar() {
     "/conta/:aba?": conta,
     "/pedido/:codigo": pedido,
     "/contato": contato,
+    "/orcamento": paginaOrcamento,
     "/privacidade": paginaPrivacidade,
     "/termos": paginaTermos,
   };

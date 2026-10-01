@@ -20,6 +20,7 @@ import { pedidos } from "./paginas/pedidos.js";
 import { novoPedido } from "./paginas/novo-pedido.js";
 import { agenda } from "./paginas/agenda.js";
 import { producao } from "./paginas/producao.js";
+import { orcamentos } from "./paginas/orcamentos.js";
 import { estoque } from "./paginas/estoque.js";
 import { produtos } from "./paginas/produtos.js";
 import { categorias } from "./paginas/categorias.js";
@@ -47,6 +48,7 @@ const ROTAS = {
   "/relatorios": relatorios,
   "/pedidos": pedidos,
   "/pedidos/novo": novoPedido,
+  "/orcamentos": orcamentos,
   "/agenda": agenda,
   "/producao/:data?": producao,
   "/estoque/:aba?": estoque,
@@ -66,7 +68,7 @@ const ROTAS = {
 
 // o atendente só tem estas telas (a página inicial dele é a de pedidos)
 const ROTAS_ATENDENTE = {
-  "/": pedidos, "/pedidos": pedidos, "/pedidos/novo": novoPedido, "/agenda": agenda, "/producao/:data?": producao, "/conta": conta,
+  "/": pedidos, "/pedidos": pedidos, "/pedidos/novo": novoPedido, "/orcamentos": orcamentos, "/agenda": agenda, "/producao/:data?": producao, "/conta": conta,
 };
 
 function abrirPainel(usuario) {
